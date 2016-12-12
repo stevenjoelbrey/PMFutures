@@ -7,15 +7,24 @@ Created on Wed Oct 12 11:21:09 2016
 """
 
 ###############################################################################
+# -------------------------Description  
+###############################################################################
+# This script will be used to calculate and visualize the difference in Air
+# quality as putput from the CESM122 
+
+
+###############################################################################
 # User arguments to determine what is done by this script 
 ###############################################################################
-makeMonthlyFigures = False
-gfed = 'GFED4s' #  GFED4 | GFED4s
-species = 'C' # BA | C
-gfedUnits = 'gC/$m^{2}$' # 'gC/$m^{2}$' | "Burn Area (ha)"
+variable = 'HEIGHT'
+baseScenario = '2000Base'
+deltaScenario = '2050RCP85'
+dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/AirQualityData/'
+fileBase = 'cesm122_fmozsoa_f09f09_2000_fires_00.'
+fileTail = '.daily.200001-201012.nc'
 
-# TODO: Make start month and end month and all labels dynamic based on args  
-# TODO: update plot labels to be dynamic based on the header arguments 
+baseFile  = dataDirBase + baseScenario + '/' + fileBase + variable + fileTail
+deltaFile = dataDirBase + deltaScenario + '/' + fileBase + variable + fileTail
 
 ###############################################################################
 
@@ -31,9 +40,8 @@ from datetime import date
 import matplotlib.ticker as tkr
 
 
-os.chdir('/Users/sbrey/sharedProjects/smokeSource/')
-figureSaveDir = 'Figures/gridded/'
-dataDir = 'HMSDataframes/'
+os.chdir('/home/sbrey/projects/PMFutures/Python')
+
 
 ###############################################################################
 # Load the saved environment created by readGFED.py
