@@ -1,10 +1,12 @@
 ;-------------------------------------------------------------------------
 ; Function being put to use to transform from hybrid coords to pressure 
 ; coords
-; http://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p.shtml
 ;-------------------------------------------------------------------------
 ; TODO: Close all the files
+; TODO: Only load parts of nc files that are needed. Most important
+; TODO:    with T, because it is huge. 
 ; TODO: Make generic for any variable or passed file. 
+; TODO: Make generic to any passed variable daily or hourly
 
 ; Set static directory path variables 
 variable = "HEIGHT"
@@ -16,25 +18,43 @@ dataDir  = "/fischer-scratch/sbrey/outputFromYellowstone/"
 ; NOTE: These variables are static. They do not change as a function of time
 ; NOTE: or scenario
 coordData = dataDir+"cesm122_fmozsoa_f09f09_2000_fires_00.cam.h0.2000-01.nc"
-fcesm = addfile(coordData, "r")
+meta = addfile(coordData, "r")
 
 ; TODO: If statement on which coordinates to use. Depends on variable.
-hyam = fcesm->hyam ; pertains to lev
-hybm = fcesm->hybm ; pertains to lev
+hyam = meta->hyam ; pertains to lev
+hybm = meta->hybm ; pertains to lev
 
 ; for variables like HEIGHT that are defined along 'ilev' use?: 
-hyai = fcesm->hyai
-hybi = fcesm->hybi
+hyai = meta->hyai ; pertains to ilev
+hybi = meta->hybi ; petains to ilev 
 
 ;reference sea level specified in model, agurment requires [mb]
-P0mb = 0.01*fcesm->P0
+P0mb = 0.01*meta->P0
+
+; close fcesm 
+delete(meta)
 
 ; Now get the surface pressure 
 PSFileBase = dataDir + "AirQualityData/" + scenario
 PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_2000_fires_00.PS.daily."+yearString+".nc"
 fPS = addfile(PSFile,"r")
-
 ps = fPS->PS
+delete(fPS)
+
+; Surface temperature is always needed as well
+variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
+variableFile = variableFileBase + "T" + ".daily." + yearString + ".nc"
+fccT = addfile(variableFile,"r")
+T = fccT->T
+T_dims = getvardims(T)
+srf_index = T_dims(1) ; lev is the second dimension. 
+
+; T is on lev not ilev (HEIGHT), 25 is the closest level to ground. 
+; we want all times and points 
+T_surface = T(:,srf_index,:,:)  
+
+delete(fcct)
+delete(T)
 
 ; Now get the variable to be interpolated to a new grid. 
 variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
@@ -48,13 +68,17 @@ levs  = fccm->ilev ; ilev | lev
 lat  = fccm->lat
 lon  = fccm->lon
 
-; Ground level geopotential needs to be included? This is something
+delete(fccm)
+
+; Ground level geopotential needs to be included? I do not know how yet.
+; This is something
 ; I want to try. When I did not add ground level geopotential Mountains
 ; were too low. AFTER regridding I see ~5000m Z500 heights over the ocean
 ; but values like 400m over the hemaliya 
 usgsFile= dataDir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
 usgs = addfile(usgsFile,"r")
-groundGeopotential = (usgs->PHIS) / 9.81
+phis = (usgs->PHIS) ;/ 9.81
+delete(usgs)
 
 ;HEIGHT_plus = new((/4016,27,192,288/), float, 0) ; also slow because height is huge 
 
@@ -76,14 +100,17 @@ groundGeopotential = (usgs->PHIS) / 9.81
 lev_p = (/ 200,250,300,400,500,600,700,850,925,1000 /)
 ;lev_p = (/ 200,500 /)
 
-HEIGHT_P = vinth2p(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, False)
+; http://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p.shtml
+;HEIGHT_P = vinth2p(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, False)
 
+;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
+HEIGHT_P = vinth2p_ecmwf(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
 
 ;===================================================================
 ; Sanity check plot
 ; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
 ;===================================================================
-wks  = gsn_open_wks("png","Z_test")   ; send graphics to PNG file
+wks  = gsn_open_wks("png","X")   ; send graphics to PNG file
 
 res                     = True          ; plot mods desired
 
@@ -95,7 +122,12 @@ res@vpHeightF           = 0.3
 
 res@gsnMaximize         = True          ; maximize plot size
 
-x = HEIGHT_P(1000,4,:,:) + groundGeopotential
+topo = phis/9.81
+
+;x = HEIGHT_P(0,4,:,:) + topo; plot the 1000th day
+g = 9.81
+topo = doubletofloat(phis/g)
+x = HEIGHT_P(1000,9,:,:) ;+ topo;
 plot = gsn_csm_contour(wks,x,res)      
 
 
