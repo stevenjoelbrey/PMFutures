@@ -1,209 +1,232 @@
-;-------------------------------------------------------------------------
-; Function being put to use to transform from hybrid coords to pressure 
-; coords
-;-------------------------------------------------------------------------
-; TODO: Close all the files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                             ;;
+;; hybridToPressure.ncl                                                        ;;
+;;                                                                             ;;
+;; AUTHOR                                                                      ;;
+;; -> Steven Brey, sjbrey@rams.colostate.edu                                   ;;
+;;                                                                             ;;
+;; DESCRIPTION                                                                 ;;
+;; -> 	Function being put to use to transform from hybrid coords to pressure  ;;
+;; 		coords								                                   ;;
+;;                                                                             ;;	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; TODO: Only load parts of nc files that are needed. Most important
-; TODO:    with T, because it is huge. 
-; TODO: Make generic for any variable or passed file. 
-; TODO: Make generic to any passed variable daily or hourly
+;       with T, because it is huge. 
+; TODO: Make generic enough to pass any variable or passed file. 
+; TODO: Make generic to any passed variable daily or hourly.
 
-; Set static directory path variables 
-variable = "HEIGHT"
-scenario = "2000Base/" 
-yearString="200001-201012" ; must match the files under scenario dir 
-dataDir  = "/fischer-scratch/sbrey/outputFromYellowstone/"
+begin ; begin main script 
 
-; get hyam and hybm | hyai and hybi
-; NOTE: These variables are static. They do not change as a function of time
-; NOTE: or scenario
-coordData = dataDir+"cesm122_fmozsoa_f09f09_2000_fires_00.cam.h0.2000-01.nc"
-meta = addfile(coordData, "r")
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; Define variables and paths that are specific to this script. ;
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; TODO: If statement on which coordinates to use. Depends on variable.
-hyam = meta->hyam ; pertains to lev
-hybm = meta->hybm ; pertains to lev
+	; Set static directory path variables 
+	; TODO: PASS THESE AS ARGUMENTS
+	variable   = "HEIGHT" 
+	lev_p      = (/ 200,250,300,400,500,600,700,850,925,1000 /) ; make grid on these 
+	plot_lev   = 4 ; level that will be plotted on sanity plot 
+	onLev      = False  ; Set to False if variable vertical dim is on ilev, 
+                        ; True if on lev. for
+	scenario   = "2000Base/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
+	midYear    = "2000" ; 2000, 2050, 2100
+	yearString = "200001-201012" ; 200001-201012, 204001-205012, 209001-209912
+	dataDir    = "/fischer-scratch/sbrey/outputFromYellowstone/"
 
-; for variables like HEIGHT that are defined along 'ilev' use?: 
-hyai = meta->hyai ; pertains to ilev
-hybi = meta->hybi ; petains to ilev 
+    ;===================================================================
+	; Begin loading required model info 
+	;===================================================================
+    
+	; NOTE: These variables are static. They do not change as a function of date
+	; NOTE: or scenario
+	coordData = dataDir+"cesm122_fmozsoa_f09f09_2000_fires_00.cam.h0.2000-01.nc"
+	meta = addfile(coordData, "r")
 
-;reference sea level specified in model, agurment requires [mb]
-P0mb = 0.01*meta->P0
+	; get hyam and hybm | hyai and hybi
+	if(onLev) then
+		a_coef = meta->hyam ; pertains to lev
+		b_coef = meta->hybm ; pertains to lev
+		print("Using lev for vertical coordinates on " + variable)
+	else
+		; for variables like HEIGHT that are defined along 'ilev'
+		a_coef = meta->hyai ; pertains to ilev
+		b_coef = meta->hybi ; petains to ilev 
+		print("Using ilev for vertical coordinate on " + variable)
+	end if
 
-; close fcesm 
-delete(meta)
+	;reference sea level specified in model, agurment requires [mb]
+	P0mb = 0.01*meta->P0
 
-; Now get the surface pressure 
-PSFileBase = dataDir + "AirQualityData/" + scenario
-PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_2000_fires_00.PS.daily."+yearString+".nc"
-fPS = addfile(PSFile,"r")
-ps = fPS->PS
-delete(fPS)
+	; close fcesm 
+	delete(meta)
 
-; Surface temperature is always needed as well
-variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
-variableFile = variableFileBase + "T" + ".daily." + yearString + ".nc"
-fccT = addfile(variableFile,"r")
-T = fccT->T
-T_dims = getvardims(T)
-srf_index = T_dims(1) ; lev is the second dimension. 
+	; Now get the surface pressure. This is always required.  
+	PSFileBase = dataDir + "AirQualityData/" + scenario
+	PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_"+midYear+"_fires_00.PS.daily."+yearString+".nc"
+	print("Working on loading sea level pressure file")
+	fPS = addfile(PSFile,"r")
+	ps = fPS->PS
+	delete(fPS)
 
-; T is on lev not ilev (HEIGHT), 25 is the closest level to ground. 
-; we want all times and points 
-T_surface = T(:,srf_index,:,:)  
+	; Surface temperature is always needed as well
+	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_"+midYear+"_fires_00."
+	variableFile = variableFileBase + "T" + ".daily." + yearString + ".nc"
+	print("Working on loading temperature. Ground level temperature needed.")
+	fccT = addfile(variableFile,"r")
+	T = fccT->T
+	T_lev = fccT->lev
+	nTLev = dimsizes(T_lev)
+	srf_index = nTLev-1 ; lev is the second dimension. 
 
-delete(fcct)
-delete(T)
+	; T is on lev not ilev (HEIGHT), 25 is the closest level to ground. 
+	; we want all times and points 
+	T_surface = T(:,srf_index,:,:)  
 
-; Now get the variable to be interpolated to a new grid. 
-variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
-variableFile = variableFileBase + variable + ".daily." + yearString + ".nc"
-fccm = addfile(variableFile,"r")
+	delete(fcct)
+	delete(T)
 
-; take of the descriptive variables needed for saving
-HEIGHT = fccm->HEIGHT
-time = fccm->time
-levs  = fccm->ilev ; ilev | lev
-lat  = fccm->lat
-lon  = fccm->lon
+	; Now get the variable to be interpolated to a new grid. 
+	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
+	variableFile = variableFileBase + variable + ".daily." + yearString + ".nc"
+	fccm = addfile(variableFile,"r")
+	print("Working on loading " + variable)
+	print("file="+variableFile)
 
-delete(fccm)
+	; take the descriptive variables needed for saving
+	HEIGHT = fccm->HEIGHT ; can this reference be a string? 
+	time   = fccm->time
+	levs   = fccm->ilev ; ilev | lev
+	lat    = fccm->lat
+	lon    = fccm->lon
 
-; Ground level geopotential needs to be included? I do not know how yet.
-; This is something
-; I want to try. When I did not add ground level geopotential Mountains
-; were too low. AFTER regridding I see ~5000m Z500 heights over the ocean
-; but values like 400m over the hemaliya 
-usgsFile= dataDir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
-usgs = addfile(usgsFile,"r")
-phis = (usgs->PHIS) ;/ 9.81
-delete(usgs)
+	delete(fccm)
 
-;HEIGHT_plus = new((/4016,27,192,288/), float, 0) ; also slow because height is huge 
+	; Ground level geopotential is needed for regridding function. 
+	print("Working on loading ground level groupotential PHIS")
+	usgsFile= dataDir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
+	usgs = addfile(usgsFile,"r")
+	phis = (usgs->PHIS) ;/ 9.81
+	delete(usgs)
 
-; Add this to all levels all days 
-;nDays = dimsizes(time)
-;nLev  = dimsizes(levs)
-;d = 0
-;do while(d.le.nDays)
-;	l = 0
-;	do while(l.le.nLev)
-;		HEIGHT_plus(d,l,:,:) = HEIGHT(d,l,:,:) + groundGeopotential
-;		l = l + 1 
-;	end do
-;	d = d + 1
-;end do
+	; calculate ground level in meters from PHIS
+	topo = doubletofloat(phis/9.81) ; [m]
+
+	;===================================================================
+	print("Regridding "+variable)
+	; http://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p.shtml
+	;HEIGHT_P = vinth2p(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, False)
+	
+	; Transform from Hybrid vertical levels to pressure levels
+	;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
+	VAR_P = vinth2p_ecmwf(HEIGHT, a_coef, b_coef, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
+	VAR_P@units = HEIGHT@units
+	;===================================================================
+
+	;===================================================================
+	; Sanity check plot for this variable 
+	; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
+	;===================================================================
+	print("plotting "+variable)
+	wks  = gsn_open_wks("png",variable+lev_p(plot_lev))   ; send graphics to PNG file
+
+	res                     = True          ; plot mods desired
+	res@tiMainString        = Variable+"on"+lev_p(plot_lev)+"pressure surface"
+	res@cnFillOn            = True          ; turn on color
+	res@cnFillPalette       = "gui_default" ; set color map
+	res@vpWidthF            = 0.5           ; change aspect ratio of plot
+	res@vpHeightF           = 0.3
+	res@gsnMaximize         = True          ; maximize plot size
+	
+	; always plot the 0th day for sanitck check plot. 
+	x = VAR_P(0,plot_lev,:,:) ;+ topo; add topo if needed in analysis phases
+	plot = gsn_csm_contour(wks, x, res)
+
+	;===================================================================
+	; http://www.ncl.ucar.edu/Applications/netcdf4.shtml
+	; save output 
+	;===================================================================
+
+	; get dim sizes
+	ntime = dimsizes(time)
+	nlev = dimsizes(lev_p)                                            
+	nlat = dimsizes(lat)
+	nlon = dimsizes(lon) 
+	print("Working on saving output as netcdf")
+
+	setfileoption("nc", "FileStructure", "Advanced")
+	fon = "ncWriteTest1.nc" ; TODO: Make same name as input but append _P
+	fo = addfile(fon, "c")
+
+	;===================================================================
+	; explicitly declare file definition mode. Improve efficiency.
+	;===================================================================
+ 	setfileoption(fo,"DefineMode",True)
+
+	;===================================================================
+	; create global attributes of the file
+	;===================================================================
+	fAtt               = True            ; assign file attributes
+	fAtt@title         = variable + " regridded to pressure coords"  
+	fAtt@source_file   = variableFile
+	fAtt@Conventions   = "None"   
+	fAtt@creation_date = systemfunc ("date")        
+	fileattdef( fo, fAtt )            ; copy file attributes    
+
+	;===================================================================
+	; predefine the coordinate variables and their dimensionality
+	; Note: to get an UNLIMITED record dimension, we set the dimensionality
+	; to -1 (or the actual size) and set the dimension name to True.
+	;===================================================================
+ 	dimNames = (/"time", "lev_p", "lat", "lon"/)
+ 	dimSizes = (/ 1 ,   nlev,  nlat,  nlon /)
+ 	dimUnlim = (/ True , False, False, False/)
+ 	filedimdef(fo, dimNames, dimSizes, dimUnlim)
+
+	; predefine the the dimensionality of the variables to be written out
+	;===================================================================
+	; Here we are using NCL functions to facilitate defining
+	; each variable's dimension name(s) and type.
+	;===================================================================
+	filevardef(fo, "time", typeof(time), getvardims(time))
+	filevarattdef(fo,"time", time)                   ; copy time attributes
+	fo->time   = (/time/)
+
+	lev = levs(0:9)
+	lev(0:9) = (/lev_p/)
+	filevardef(fo, "lev", typeof(lev), getvardims(lev) )
+	filevarattdef(fo,"lev", lev)                     ; copy lev attributes
+	fo->lev    = (/lev/)
+
+	filevardef(fo, "lat", typeof(lat), getvardims(lat))
+	filevarattdef(fo,"lat", lat)                     ; copy lat attributes
+	fo->lat    = (/lat/)
+
+	filevardef(fo, "lon", typeof(lon), getvardims(lon))
+	filevarattdef(fo,"lon", lon)                     ; copy lon attributes
+	fo->lon    = (/lon/)
+
+	filevardef(fo, variable, typeof(VAR_P), getvardims(VAR_P))
+	filevarattdef(fo,variable, VAR_P)                         ; copy T attributes
+	filevarchunkdef(fo, variable, chunkSizes)
+	filevarcompressleveldef(fo, variable, 2)
+	fo->variable     = (/VAR_P/)
+	;print(fo)
+	;printVarSummary(t)
+	;exit
+
+    
 
 
-;new pressure levels we want output on
-lev_p = (/ 200,250,300,400,500,600,700,850,925,1000 /)
-;lev_p = (/ 200,500 /)
-
-; http://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p.shtml
-;HEIGHT_P = vinth2p(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, False)
-
-;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
-HEIGHT_P = vinth2p_ecmwf(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
-
-;===================================================================
-; Sanity check plot
-; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
-;===================================================================
-wks  = gsn_open_wks("png","X")   ; send graphics to PNG file
-
-res                     = True          ; plot mods desired
-
-res@cnFillOn            = True          ; turn on color
-res@cnFillPalette       = "gui_default" ; set color map
- 
-res@vpWidthF            = 0.5           ; change aspect ratio of plot
-res@vpHeightF           = 0.3
-
-res@gsnMaximize         = True          ; maximize plot size
-
-topo = phis/9.81
-
-;x = HEIGHT_P(0,4,:,:) + topo; plot the 1000th day
-g = 9.81
-topo = doubletofloat(phis/g)
-x = HEIGHT_P(1000,9,:,:) ;+ topo;
-plot = gsn_csm_contour(wks,x,res)      
+	
 
 
-; comes with dims
-;[time | 4016] x [lev_p | 2] x [lat | 192] x [lon | 288]
 
-;===================================================================
-; https://www.ncl.ucar.edu/Applications/method_2.shtml
-; save output. plot sea level pressure and 500mb pressure to make sure this 
-; makes sense. 
-;===================================================================
-dims  = dimsizes(HEIGHT_P)                 ; get dimension sizes  
-ntime = dims(0)
-nlev = 10                                            
-nlat = dims(2) 
-nlon = dims(3)     
 
-diro = "/fischer-scratch/sbrey/" ; Output directory
-filo = "test.nc"                 ; Output file, will be same as old name 
-                                 ;only with _P added to indicate that this 
-								 ;data is on pressure coords
 
-fout  = addfile (diro + filo, "c")  ; open output file
 
-;===================================================================
-; explicitly declare file definition mode. Improve efficiency.
-;===================================================================
-setfileoption(fout,"DefineMode",True)
 
-;===================================================================
-; create global attributes of the file
-;===================================================================
-fAtt               = True            ; assign file attributes
-fAtt@title         = "NCL Efficient Approach to netCDF Creation"  
-fAtt@source_file   = "original-file.nc"
-fAtt@Conventions   = "None"   
-fAtt@creation_date = systemfunc ("date")        
-fileattdef( fout, fAtt )            ; copy file attributes    
-
-;===================================================================
-; predefine the coordinate variables and their dimensionality
-; Note: to get an UNLIMITED record dimension, we set the dimensionality
-; to -1 (or the actual size) and set the dimension name to True.
-;===================================================================
-dimNames = (/"time", "lat", "lon", "lev_p"/)  
-dimSizes = (/ ntime, nlat, nlon, nlev /) 
-dimUnlim = (/ True , False, False, False/)   
-filedimdef(fout, dimNames, dimSizes, dimUnlim)
-
-;===================================================================
-; predefine the the dimensionality of the variables to be written out
-;===================================================================
-; Here we are using NCL functions to facilitate defining 
-; each variable's dimension name(s) and type. 
-; The following could be replaced with explicit, user defined dimension 
-; names different from those associated with the variable in memory. 
-; Say, PS(time,lat,lon) in the NCL script. They could be redefined for the file via: 
-; filevardef(fout, "PS"   ,typeof(PS) ,(/"TIME","latitude","longitude"/)) 
-;===================================================================
-filevardef(fout, "time" ,typeof(time),getvardims(time)) 
-filevardef(fout, "lev_p"  ,typeof(lev_p),"lev_p")                           
-filevardef(fout, "lat"  ,typeof(lat),getvardims(lat))                          
-filevardef(fout, "lon"  ,typeof(lon),getvardims(lon))                          
-filevardef(fout, "HEIGHT_P"    ,typeof(HEIGHT_P)  ,getvardims(HEIGHT_P))    
-
-;===================================================================
-; Copy attributes associated with each variable to the file
-; All attributes associated with each variable will be copied.
-;====================================================================
-filevarattdef(fout,"HEIGHT_P",HEIGHT_P)             ; copy HEIGHT_P attributes
-filevarattdef(fout,"time" ,time)                    ; copy time attributes
-filevarattdef(fout,"lev_p"  ,lev_p)                 ; copy lev attributes
-filevarattdef(fout,"lat"  ,lat)                     ; copy lat attributes
-filevarattdef(fout,"lon"  ,lon)                     ; copy lon attributes
-
-;===================================================================
-; explicitly exit file definition mode. **NOT REQUIRED**
-;===================================================================
-setfileoption(fout,"DefineMode", False)  
+end   ; end main script
