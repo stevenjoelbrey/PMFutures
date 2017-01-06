@@ -51,11 +51,13 @@ begin ; begin main script
 		a_coef = meta->hyam ; pertains to lev
 		b_coef = meta->hybm ; pertains to lev
 		print("Using lev for vertical coordinates on " + variable)
+		levStr = "lev"
 	else
 		; for variables like HEIGHT that are defined along 'ilev'
 		a_coef = meta->hyai ; pertains to ilev
 		b_coef = meta->hybi ; petains to ilev 
 		print("Using ilev for vertical coordinate on " + variable)
+		levStr = "ilev"
 	end if
 
 	;reference sea level specified in model, agurment requires [mb]
@@ -86,7 +88,7 @@ begin ; begin main script
 	; we want all times and points 
 	T_surface = T(:,srf_index,:,:)  
 
-	delete(fcct)
+	delete(fccT)
 	delete(T)
 
 	; Now get the variable to be interpolated to a new grid. 
@@ -97,9 +99,9 @@ begin ; begin main script
 	print("file="+variableFile)
 
 	; take the descriptive variables needed for saving
-	HEIGHT = fccm->HEIGHT ; can this reference be a string? 
+	VAR    = fccm->$variable$ 
 	time   = fccm->time
-	levs   = fccm->ilev ; ilev | lev
+	levs   = fccm->$levStr$ ; ilev | lev, determined above in if statement
 	lat    = fccm->lat
 	lon    = fccm->lon
 
@@ -109,41 +111,52 @@ begin ; begin main script
 	print("Working on loading ground level groupotential PHIS")
 	usgsFile= dataDir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
 	usgs = addfile(usgsFile,"r")
-	phis = (usgs->PHIS) ;/ 9.81
+	phis = (usgs->PHIS) 
 	delete(usgs)
 
 	; calculate ground level in meters from PHIS
 	topo = doubletofloat(phis/9.81) ; [m]
+	
+	; Add topo to HEIGHT in order to make true geopotential
+	; Figure out what this means for other variables to be tansformed
+
+	; last arg is what dimensions match
+	if(variable == "HEIGHT") then
+		print("Working on adding ground level geopotential to each level of height")
+		geopotential = VAR + conform(VAR, topo, (/2,3/))  
+		copy_VarCoords(VAR, geopotential)
+		VAR_ready = geopotential
+		delete(geopotential)
+	else 
+		print("no addition of topo need for " + variable)
+		VAR_ready = VAR
+	end if 
+	delete(VAR)
 
 	;===================================================================
-	print("Regridding "+variable)
-	; http://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p.shtml
-	;HEIGHT_P = vinth2p(HEIGHT, hyai, hybi, lev_p, ps, 1, P0mb, 1, False)
-	
-	; Transform from Hybrid vertical levels to pressure levels
+	; Transform from Hybrid vertical levels to pressure levels	
 	;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
-	VAR_P = vinth2p_ecmwf(HEIGHT, a_coef, b_coef, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
-	VAR_P@units = HEIGHT@units
-	;===================================================================
+	print("Regridding "+ variable)
+	VAR_P = vinth2p_ecmwf(VAR_ready, a_coef, b_coef, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
 
 	;===================================================================
 	; Sanity check plot for this variable 
 	; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
 	;===================================================================
-	print("plotting "+variable)
-	wks  = gsn_open_wks("png",variable+lev_p(plot_lev))   ; send graphics to PNG file
+	;print("plotting "+variable)
+	;wks  = gsn_open_wks("png",variable+lev_p(plot_lev)+"_Topo")   ; send graphics to PNG file
 
-	res                     = True          ; plot mods desired
-	res@tiMainString        = Variable+"on"+lev_p(plot_lev)+"pressure surface"
-	res@cnFillOn            = True          ; turn on color
-	res@cnFillPalette       = "gui_default" ; set color map
-	res@vpWidthF            = 0.5           ; change aspect ratio of plot
-	res@vpHeightF           = 0.3
-	res@gsnMaximize         = True          ; maximize plot size
+	;res                     = True          ; plot mods desired
+	;res@tiMainString        = Variable+"on"+lev_p(plot_lev)+"pressure surface"
+	;res@cnFillOn            = True          ; turn on color
+	;res@cnFillPalette       = "gui_default" ; set color map
+	;res@vpWidthF            = 0.5           ; change aspect ratio of plot
+	;res@vpHeightF           = 0.3
+	;res@gsnMaximize         = True          ; maximize plot size
 	
 	; always plot the 0th day for sanitck check plot. 
-	x = VAR_P(0,plot_lev,:,:) ;+ topo; add topo if needed in analysis phases
-	plot = gsn_csm_contour(wks, x, res)
+	;x = VAR_P(0,plot_lev,:,:) + topo; add topo if needed in analysis phases
+	;plot = gsn_csm_contour(wks, VAR_P(0,4,:,:), res)
 
 	;===================================================================
 	; http://www.ncl.ucar.edu/Applications/netcdf4.shtml
@@ -151,20 +164,17 @@ begin ; begin main script
 	;===================================================================
 
 	; get dim sizes
-	ntime = dimsizes(time)
-	nlev = dimsizes(lev_p)                                            
-	nlat = dimsizes(lat)
-	nlon = dimsizes(lon) 
+	;ntime = dimsizes(time)
+	;nlev = dimsizes(lev_p)                                            
+	;nlat = dimsizes(lat)
+	;nlon = dimsizes(lon) 
 	print("Working on saving output as netcdf")
 
 	setfileoption("nc", "FileStructure", "Advanced")
-	fon = "ncWriteTest1.nc" ; TODO: Make same name as input but append _P
+	; Make the nc file save name the same name as input but append _P
+	fon =  scenario + "cesm122_fmozsoa_f09f09_2000_fires_00." + variable + ".daily." + yearString + "_P.nc"
+	system("rm"+ fon) ; remove it because if it exists this wont write
 	fo = addfile(fon, "c")
-
-	;===================================================================
-	; explicitly declare file definition mode. Improve efficiency.
-	;===================================================================
- 	setfileoption(fo,"DefineMode",True)
 
 	;===================================================================
 	; create global attributes of the file
@@ -172,61 +182,66 @@ begin ; begin main script
 	fAtt               = True            ; assign file attributes
 	fAtt@title         = variable + " regridded to pressure coords"  
 	fAtt@source_file   = variableFile
-	fAtt@Conventions   = "None"   
+	fAtt@Conventions   = "hybrid coords to pressure coords using vinth2p_ecmwf"   
 	fAtt@creation_date = systemfunc ("date")        
 	fileattdef( fo, fAtt )            ; copy file attributes    
+
+	VAR_P!1="plevel"
+	VAR_P&plevel = lev_p
+	fo->$variable$ = VAR_P
+	
+	; close the file connection
+	delete(fo)
+	;===================================================================
+	; explicitly declare file definition mode. Improve efficiency.
+	;===================================================================
+ 	;setfileoption(fo,"DefineMode",True)
+
+
 
 	;===================================================================
 	; predefine the coordinate variables and their dimensionality
 	; Note: to get an UNLIMITED record dimension, we set the dimensionality
 	; to -1 (or the actual size) and set the dimension name to True.
 	;===================================================================
- 	dimNames = (/"time", "lev_p", "lat", "lon"/)
- 	dimSizes = (/ 1 ,   nlev,  nlat,  nlon /)
- 	dimUnlim = (/ True , False, False, False/)
- 	filedimdef(fo, dimNames, dimSizes, dimUnlim)
+ 	;dimNames = (/"time", "lev_p", "lat", "lon"/)
+ 	;dimSizes = (/ 1 ,   nlev,  nlat,  nlon /)
+ 	;dimUnlim = (/ True , False, False, False/)
+ 	;filedimdef(fo, dimNames, dimSizes, dimUnlim)
 
 	; predefine the the dimensionality of the variables to be written out
 	;===================================================================
 	; Here we are using NCL functions to facilitate defining
 	; each variable's dimension name(s) and type.
 	;===================================================================
-	filevardef(fo, "time", typeof(time), getvardims(time))
-	filevarattdef(fo,"time", time)                   ; copy time attributes
-	fo->time   = (/time/)
+	;filevardef(fo, "time", typeof(time), getvardims(time))
+	;filevarattdef(fo,"time", time)                   ; copy time attributes
+	;fo->time   = (/time/)
 
-	lev = levs(0:9)
-	lev(0:9) = (/lev_p/)
-	filevardef(fo, "lev", typeof(lev), getvardims(lev) )
-	filevarattdef(fo,"lev", lev)                     ; copy lev attributes
-	fo->lev    = (/lev/)
+	;lev = levs(0:9)
+	;lev(0:9) = (/lev_p/)
+	;filevardef(fo, "lev", typeof(lev), getvardims(lev) )
+	;filevarattdef(fo,"lev", lev)                     ; copy lev attributes
+	;fo->lev    = (/lev/)
 
-	filevardef(fo, "lat", typeof(lat), getvardims(lat))
-	filevarattdef(fo,"lat", lat)                     ; copy lat attributes
-	fo->lat    = (/lat/)
+	;filevardef(fo, "lat", typeof(lat), getvardims(lat))
+	;filevarattdef(fo,"lat", lat)                     ; copy lat attributes
+	;fo->lat    = (/lat/)
 
-	filevardef(fo, "lon", typeof(lon), getvardims(lon))
-	filevarattdef(fo,"lon", lon)                     ; copy lon attributes
-	fo->lon    = (/lon/)
+	;filevardef(fo, "lon", typeof(lon), getvardims(lon))
+	;filevarattdef(fo,"lon", lon)                     ; copy lon attributes
+	;fo->lon    = (/lon/)
 
-	filevardef(fo, variable, typeof(VAR_P), getvardims(VAR_P))
-	filevarattdef(fo,variable, VAR_P)                         ; copy T attributes
-	filevarchunkdef(fo, variable, chunkSizes)
-	filevarcompressleveldef(fo, variable, 2)
-	fo->variable     = (/VAR_P/)
+	;filevardef(fo, variable, typeof(VAR_P), getvardims(VAR_P))
+	;filevarattdef(fo,variable, VAR_P)                         ; copy T attributes
+	;filevarchunkdef(fo, variable, chunkSizes)
+	;filevarcompressleveldef(fo, variable, 2)
+	;fo->variable     = (/VAR_P/)
 	;print(fo)
 	;printVarSummary(t)
 	;exit
 
     
-
-
-	
-
-
-
-
-
 
 
 end   ; end main script
