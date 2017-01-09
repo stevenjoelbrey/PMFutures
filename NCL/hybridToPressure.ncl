@@ -32,9 +32,9 @@ begin ; begin main script
 	plot_lev   = 4 ; level that will be plotted on sanity plot 
 	onLev      = False  ; Set to False if variable vertical dim is on ilev, 
                         ; True if on lev. for
-	scenario   = "2000Base/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
-	midYear    = "2000" ; 2000, 2050, 2100
-	yearString = "200001-201012" ; 200001-201012, 204001-205012, 209001-209912
+	scenario   = "2050RCP85/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
+	midYear    = "2050_rcp85" ; 2000, 2050_rcp85, 2100_rcp45
+	yearString = "204001-205012" ; 200001-201012, 204001-205012, 209001-209912
 	dataDir    = "/fischer-scratch/sbrey/outputFromYellowstone/"
 
     ;===================================================================
@@ -121,7 +121,7 @@ begin ; begin main script
 	; Figure out what this means for other variables to be tansformed
 
 	; last arg is what dimensions match
-	if(variable == "HEIGHT") then
+	if(variable.eq."HEIGHT") then		
 		print("Working on adding ground level geopotential to each level of height")
 		geopotential = VAR + conform(VAR, topo, (/2,3/))  
 		copy_VarCoords(VAR, geopotential)
@@ -131,7 +131,7 @@ begin ; begin main script
 		print("no addition of topo need for " + variable)
 		VAR_ready = VAR
 	end if 
-	delete(VAR)
+	
 
 	;===================================================================
 	; Transform from Hybrid vertical levels to pressure levels	
@@ -173,7 +173,7 @@ begin ; begin main script
 	setfileoption("nc", "FileStructure", "Advanced")
 	; Make the nc file save name the same name as input but append _P
 	fon =  scenario + "cesm122_fmozsoa_f09f09_2000_fires_00." + variable + ".daily." + yearString + "_P.nc"
-	system("rm"+ fon) ; remove it because if it exists this wont write
+	system("rm "+ fon) ; remove it because if it exists this wont write
 	fo = addfile(fon, "c")
 
 	;===================================================================
@@ -183,7 +183,7 @@ begin ; begin main script
 	fAtt@title         = variable + " regridded to pressure coords"  
 	fAtt@source_file   = variableFile
 	fAtt@Conventions   = "hybrid coords to pressure coords using vinth2p_ecmwf"   
-	fAtt@creation_date = systemfunc ("date")        
+	fAtt@creation_date = systemfunc("date")        
 	fileattdef( fo, fAtt )            ; copy file attributes    
 
 	VAR_P!1="plevel"
