@@ -11,6 +11,8 @@
 # plots for desired time and season subsets. Much later, this code will be
 # incorperated into a shiny app that will allow easy exploration of the model 
 # output. 
+# TODO: Make this into a class. Copy the stucture of Sam Atwoods code. 
+# TODO: Update function documentation to be the accepted format. 
 
 # Load resources
 import cesm_nc_manager as cnm
@@ -26,14 +28,7 @@ from datetime import timedelta
 import matplotlib.ticker as tkr
 
 
-###############################################################################
-# ------------------------- USER INPUT ---------------------------------------- 
-###############################################################################
-# TODO: Make sure these can work as agruments passed by the command line. 
 
-variable = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
-scenario = 'RCP85' # Will be a loop
-year     = '2100'  # Will be a loop
 
 def getVariableData(variable, scenario, year):
 	"""This function loads the emission 'variable' for the given secenario
@@ -86,9 +81,6 @@ def getVariableData(variable, scenario, year):
 	lon = nc.variables['lon'][:]
 	lat = nc.variables['lat'][:]
 
-	nlon = len(lon)
-	nlat = len(lat)
-
 	nc.close()
 
 	return bb, bbUnits, t, lat, lon
@@ -96,18 +88,16 @@ def getVariableData(variable, scenario, year):
 def loadEmissionGridAttributes(lat, lon):
 	"""Load model grid cell atributes. These do not depend on time. Must be subset 
 	   to match bb grid that is already loaded into workspace.
+   	   Parameters:
+           lon: longitude that defines the grid of emission data.
+           lat: latitude that defines the grid of emission data. 
 	
-   	   Args:
-   	   lon --- longitude that defines the grid of emission data.
-       lat --- latitude that defines the grid of emission data. 
-	
-	   return value: area of grid cells in units of m^2
+           return value: area of grid cells in units of m^2
 	"""
 
 	dataDir = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
 	moduleLayers = ['area','landfrac','landmask']
 	layer = {}
-	layerUnits = {}
 	for f in moduleLayers:
 		fileName = dataDir + 'cesm130_clm5_firemodule_'+ f + '_f09x125.nc'
 		nc = Dataset(fileName, 'r')
@@ -142,11 +132,12 @@ def makeTotalEmissions(bb, area, t):
 	   an equal size array that returns kg/day/gridcell and another array
 	   that returns total emissions (kg) in time period, shape=(lat, lon). 	
 	
-	   Args:
-		bb --- data in kg/sec/m^2 to be changed. 
-		area --- associated grid showing the area of each cell in m^2. 
-		t --- the time array. Datetime object that describes time dimension
-			  of bb. 
+	   Parameters:
+            bb:      data in kg/sec/m^2 to be changed. 
+            area:    associated grid showing the area of each cell in m^2. 
+            t:       the time array. Datetime object that describes time 
+                     dimension
+			      of bb. 
 		
 	   return vaue: kgPerDay, kgTotal
 	"""
@@ -163,68 +154,118 @@ def makeTotalEmissions(bb, area, t):
 	return kgPerDay, kgTotal
 
 
-
 # TODO: add extent arg so that all have same limit
-def makePcolorFig(m,x,y,z,titleText): 
+def makePcolorFig(ax, m, x, y, z, titleText): 
+    '''Creates a simple pcolor image of the NxM array passed in z. 
+           Parameters:
+               m: The map object to be plotted on.
+               x: The x coords of m.
+               y: The y coords of m.
+               z: NxM array to be plotted using pColor
+               titleText: The title of the figure returned by this func. 
+    '''
 
-	# Create the figure 
-	fig = plt.figure(figsize=(4, 4))
+    # Create the figure on the passes axis
+    ax
+    
+    m.drawcoastlines()
+    m.drawstates()
+    m.drawcountries()
+    
+    parallels = np.arange(0.,90,15.)
+    meridians = np.arange(180.,360.,15.)
+    
+    m.drawparallels(parallels,labels=[1,0,0,0], fontsize=10)
+    m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=10)
+    
+    z = ma.masked_where(z == 0, z)
+    cs = m.pcolor(x, y, z, cmap='Reds')
+    
+    # add colorbar.
+    cbar = m.colorbar(cs, location='bottom',pad='3%')
+    cbar.set_label(variable, fontsize=18)
+    
+    # add title
+    ax.set_title(titleText, fontsize=20)
+    #plt.savefig(figureName, format='png')
+    		    
+    return(ax) 
 
-	m.drawcoastlines()
-	m.drawstates()
-	m.drawcountries()
-
-	parallels = np.arange(0.,90,15.)
-	meridians = np.arange(180.,360.,15.)
-
-	m.drawparallels(parallels,labels=[1,0,0,0], fontsize=10)
-	m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=10)
-
-	z = ma.masked_where(z == 0, z)
-	cs = m.pcolor(x, y, z, cmap='Reds')
-
-	# add colorbar.
-	cbar = m.colorbar(cs, location='bottom',pad='3%')
-	cbar.set_label(variable, fontsize=18)
-
-	# add title
-	plt.title(titleText, fontsize=20)
-	#plt.savefig(figureName, format='png')
-		    
-	return(fig) 
 
 
-###############################################################################
-# TODO: Build a function that subsets time and space based on a startDate, 
-# TODO: endDate argument, minLon, maxLon, minLat, maxLat set of arguments. 
-###############################################################################
-def timeSeries(s1, s2, s1Label, s2Label, t, titleText):
-	"""s1 and s2 are data time series for emission summed over a specified time
-       and spatial extent. That work is done by another function. """
+def subsetModelEmissions(data, t, lat, lon, startMonth=1, endMonth=12, 
+                         minLat=11., maxLat=90., minLon=190., maxLon=320.):
+    '''This function subsets a three dimensional grid (time, lat, lon) based
+    on the passed spatial and temporal arguments.
+    Parameters:
+        data:       The array(time, lat, lon) to be subset. 
+        t:          data time dimension as datetime.date object
+        lat:        The latitude of data
+        lon:        The longitude of data
+        startMonth: The first month to be considered for all years.
+        endMonth:   The last month to be consider for all years. 
+        minLat:     These four parameters subset the passed data array
+        maxLat:
+        minLon:
+        maxLon: 
+        
+        return Value: dataSubset, tSubset, latSubset, lonSubset
 
-	# TODO: consider keeping on the same yaxis so it is easy to tell bigger values
-	# TODO: trend lines maybe? Slope for decade in legend? 
-	
-	fig, ax1 = plt.subplots(figsize=(4,3))
+    '''
+    # NOTE:masks do not work on multidimensional arrays
+    latMask = (lat >= minLat) & (lat <= maxLat)
+    lonMask = (lon >= minLon) & (lon <= maxLon)
+    lati = np.where(latMask == True)[0]
+    loni = np.where(lonMask == True)[0]
+    
+    # TODO: Figure out qwhy the TODO is needed for last index,
+    #       this is a strange python thing I do not understand. 
+    lonSubset = lon[loni[0]:(loni[-1]+1)]
+    latSubset = lat[lati[0]:(lati[-1]+1)]
+    
+    # Make the time subset 
+    nt = len(t)
+    mon = np.zeros(nt, dtype='int')
+    timeMask = np.zeros(nt, dtype='bool')
+    for i in range(nt):
+        mon[i] = t[i].month
+        
+    tMask = (mon >= startMonth) & (mon <= endMonth)
+    ti = np.where(tMask == True)[0] # you can have whatever you like
+    tSubset = t[ti[0]:(ti[-1]+1)]
+    
+    # Super ugly statement for getting the subset of lat and lon
+    dataSubset = data[ti[0]:(ti[-1]+1), lati[0]:(lati[-1]+1), loni[0]:(loni[-1]+1)]
 
-	ax2 = ax1.twinx()
-	ax1.plot(t, s1, 'b-', linewidth=1)
-	ax1.tick_params(axis='x', labelsize=11)
-	ax1.tick_params(axis='y', labelsize=11)
-
-	ax2.plot(t, s2, 'r-', linewidth=1)
-	ax2.tick_params(axis='y', labelsize=11)
-	ax2.tick_params(axis='x', labelsize=11)
-
-	# shared x-axis 
-	ax1.set_xlabel('Time', fontsize=11)
-	# Label y axes	
-	ax1.set_ylabel(s1Label, color='b', fontsize=11)
-	ax2.set_ylabel(s2Label, color='r', fontsize=11)
-
-	plt.title(titleText, fontsize=18)
-
-	return(fig)
+    return dataSubset, tSubset, latSubset, lonSubset    
+    
+    
+    
+def timeSeries(ax1, s1, s2, s1Label, s2Label, t, titleText):    
+    '''kgPerDay1 and kgPerDay2 are emissions data (time, lat, lon). This 
+    function will sum over time and lon to plot total emissions vs. time in
+    the entire spatial domain of the passed arrays. '''
+  
+    ax1
+        
+    ax2 = ax1.twinx()
+    ax1.plot(t, s1, 'b-', linewidth=1)
+    ax1.tick_params(axis='x', labelsize=11)
+    ax1.tick_params(axis='y', labelsize=11)
+        
+    ax2.plot(t, s2, 'r-', linewidth=1)
+    ax2.tick_params(axis='y', labelsize=11)
+    ax2.tick_params(axis='x', labelsize=11)
+        
+    # shared x-axis 
+    ax1.set_xlabel('Time', fontsize=11)
+    # Label y axes	
+    ax1.set_ylabel(s1Label, color='b', fontsize=11)
+    ax2.set_ylabel(s2Label, color='r', fontsize=11)
+        
+    plt.title(titleText, fontsize=18)
+        
+    return(ax1)
 
 
 def monthlyTotals(s, t):
@@ -243,53 +284,84 @@ def monthlyTotals(s, t):
 	return sMonthTotal
 		
 		
-def makeHist(s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
-	"""Function makes lovely histogram (bar plot) for two series of data
-	   TODO: Make histogram actually lovely
-	   TODO: startMonth endMonth dynamic argument accept. 
-	"""
+def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
+    """Function makes lovely histogram (bar plot) for two series of data
+    TODO: Make histogram actually lovely
+    TODO: startMonth endMonth dynamic argument accept. 
+    """
+    n_groups = len(s1MonthTotal)
+ 
+    ax
 
-	n_groups = len(s1MonthTotal)
+    index = np.arange(n_groups)
+    bar_width = 0.35
 
-	fig, ax = plt.subplots()
+    opacity = 1
 
-	index = np.arange(n_groups)
-	bar_width = 0.35
+    rects1 = plt.bar(index, s1MonthTotal, bar_width,
+                 	  alpha=opacity,
+                	  color='b',
+                 	  label=s1Label)
 
-	opacity = 1
-	error_config = {'ecolor': '0.3'}
+    rects2 = plt.bar(index + bar_width, s2MonthTotal, bar_width,
+                 	  alpha=opacity,
+                 	  color='r',
+                 	  label=s2Label)
 
-	rects1 = plt.bar(index, s1MonthTotal, bar_width,
-                 	 alpha=opacity,
-                	 color='b',
-                 	 label=s1Label)
+    plt.xlabel('Month')
+    plt.ylabel('Emissions [passed units argument]')
+    plt.title(titleText)
+    plt.xticks(index + bar_width, ('1', '2', '3', '4', '5', '6', '7', '8', \
+                                    '9', '10', '11', '12'))
+    plt.legend()
 
-	rects2 = plt.bar(index + bar_width, s2MonthTotal, bar_width,
-                 	 alpha=opacity,
-                 	 color='r',
-                 	 label=s2Label)
+    plt.tight_layout()
 
-	plt.xlabel('Month')
-	plt.ylabel('Emissions [passed units argument]')
-	plt.title(titleText)
-	plt.xticks(index + bar_width, ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'))
-	plt.legend()
-
-	plt.tight_layout()
-
-	return(fig)
+    return(ax)
 
 
+###############################################################################
+# ------------------------- USER INPUT ---------------------------------------- 
+###############################################################################
+# TODO: Make sure these can work as agruments passed by the command line. 
+
+variable = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
+scenario = 'RCP85' # Will be a loop
+year     = '2000'  # Will be a loop
 
 ###############################################################################
 # ------------------------- exe envire ---------------------------------------- 
 ###############################################################################
-bb, bbUnits, t, lat, lon = getVariableData(variable, scenario, year)
-area                     = loadEmissionGridAttributes(lat, lon)
-kgPerDay, kgTotal        = makeTotalEmissions(bb, area, t)
 
-# Start developing the actual plot. One vertical panel at a time. 
+# Create loop[ that gives us output we want for plotting and saves
+# everything into python dictionaries.
+kgTotals     = {}
+tSeries      = {}
+sMonthTotals = {}
+for scenario in ['RCP45', 'RCP85']:
+    for year in ['2050', '2100']:
 
+        # Key names
+        NAME = scenario+year        
+        
+        # Load specified variable
+        bb, bbUnits, t, lat, lon = getVariableData(variable, scenario, year)
+
+        # Subset variable
+        bb, t, lat, lon = subsetModelEmissions(bb, t, lat, lon, 
+                                               startMonth=1, endMonth=12, 
+                                               minLat=10., maxLat=90.,
+                                               minLon=190., maxLon=320.)
+
+        # Get Associated area mask
+        area = loadEmissionGridAttributes(lat, lon)
+
+        # Summarize the data for plotting 
+        kgPerDay, kgTotals[NAME] = makeTotalEmissions(bb, area, t)
+
+        s                  = np.sum(kgPerDay, (1,2)) 
+        tSeries[NAME]      = s 
+        sMonthTotals[NAME] = monthlyTotals(s, t)
 
 ###############################################################################
 # north america plot setup area 
@@ -300,13 +372,40 @@ m = Basemap(width=8000000,height=6500000,
             resolution='l',area_thresh=10000.,projection='lcc',\
             lat_1=45.,lat_2=55,lat_0=50,lon_0=-105.)
 
-
-
 lons, lats = np.meshgrid(lon, lat) # get lat/lons of ny by nx evenly space grid.
 x, y = m(lons, lats) # compute map proj coordinates.
 
+fig = plt.figure(figsize=(6,24))
 
-kgPerDayDomain = np.sum(kgPerDay, (1,2))
+ax1 = fig.add_subplot(421)
+makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], titleText='RCP45 2050')
+
+ax2 = fig.add_subplot(422)
+makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], titleText='RCP45 2100')
+
+ax3 = fig.add_subplot(423)
+makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], titleText='RCP85 2050')
+
+ax4 = fig.add_subplot(424)
+makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], titleText='RCP85 2100')
+
+ax5 = fig.add_subplot(425)
+timeSeries(ax5, tSeries['RCP452050'], tSeries['RCP852050'], 
+           s1Label='RCP45', s2Label='RCP85', t=t, titleText='2050')
+
+ax6 = fig.add_subplot(426)
+timeSeries(ax5, tSeries['RCP452100'], tSeries['RCP852100'], 
+           s1Label='RCP45', s2Label='RCP85', t=t, titleText='2100')
+
+ax7 = fig.add_subplot(427)
+makeHist(ax7, sMonthTotals['RCP452050'], sMonthTotals['RCP852050'],
+         s1Label='RCP45', s2Label='RCP85', titleText='title')
+
+ax8 = fig.add_subplot(428)
+makeHist(ax8, sMonthTotals['RCP452100'], sMonthTotals['RCP852100'],
+         s1Label='RCP45', s2Label='RCP85', titleText='title')
+
+plt.show()
 
 
 
