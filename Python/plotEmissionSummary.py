@@ -155,7 +155,7 @@ def makeTotalEmissions(bb, area, t):
 
 
 # TODO: add extent arg so that all have same limit
-def makePcolorFig(ax, m, x, y, z, titleText): 
+def makePcolorFig(ax, m, x, y, z, titleText, maxVal): 
     '''Creates a simple pcolor image of the NxM array passed in z. 
            Parameters:
                m: The map object to be plotted on.
@@ -172,21 +172,21 @@ def makePcolorFig(ax, m, x, y, z, titleText):
     m.drawstates()
     m.drawcountries()
     
-    parallels = np.arange(0.,90,15.)
-    meridians = np.arange(180.,360.,15.)
+    #parallels = np.arange(0.,90,15.)
+    #meridians = np.arange(180.,360.,15.)
     
-    m.drawparallels(parallels,labels=[1,0,0,0], fontsize=10)
-    m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=10)
+    #m.drawparallels(parallels,labels=[1,0,0,0], fontsize=10)
+    #m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=10)
     
     z = ma.masked_where(z == 0, z)
-    cs = m.pcolor(x, y, z, cmap='Reds')
+    cs = m.pcolor(x, y, z, cmap='Reds', vmin=0, vmax = maxVal)
     
     # add colorbar.
-    cbar = m.colorbar(cs, location='bottom',pad='3%')
-    cbar.set_label(variable, fontsize=18)
+    cbar = m.colorbar(cs, location='bottom', pad='5%')
+    cbar.set_label(variable, fontsize=11)
     
     # add title
-    ax.set_title(titleText, fontsize=20)
+    ax.set_title(titleText, fontsize=16)
     #plt.savefig(figureName, format='png')
     		    
     return(ax) 
@@ -248,23 +248,23 @@ def timeSeries(ax1, s1, s2, s1Label, s2Label, t, titleText):
   
     ax1
         
-    ax2 = ax1.twinx()
-    ax1.plot(t, s1, 'b-', linewidth=1)
+    ax1.plot(t, s1, 'b-', linewidth=1, label=s1Label)
     ax1.tick_params(axis='x', labelsize=11)
     ax1.tick_params(axis='y', labelsize=11)
         
-    ax2.plot(t, s2, 'r-', linewidth=1)
-    ax2.tick_params(axis='y', labelsize=11)
-    ax2.tick_params(axis='x', labelsize=11)
+    ax1.plot(t, s2, 'r-', linewidth=1, label=s2Label)
+    ax1.tick_params(axis='y', labelsize=11)
+    ax1.tick_params(axis='x', labelsize=11)
         
     # shared x-axis 
     ax1.set_xlabel('Time', fontsize=11)
     # Label y axes	
-    ax1.set_ylabel(s1Label, color='b', fontsize=11)
-    ax2.set_ylabel(s2Label, color='r', fontsize=11)
-        
+    ax1.set_ylabel('[kg]', fontsize=11)
+    
     plt.title(titleText, fontsize=18)
-        
+    
+    ax1.legend(frameon=False, loc='upper left')
+    
     return(ax1)
 
 
@@ -325,9 +325,13 @@ def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
 ###############################################################################
 # TODO: Make sure these can work as agruments passed by the command line. 
 
-variable = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
-scenario = 'RCP85' # Will be a loop
-year     = '2000'  # Will be a loop
+variable   = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
+startMonth = 1
+endMonth   = 12
+minLat     = 37.   # 10.
+maxLat     = 41.   # 90.
+minLon     = -109 + 360.  # 190.
+maxLon     = -102. + 360. # 320
 
 ###############################################################################
 # ------------------------- exe envire ---------------------------------------- 
@@ -335,9 +339,10 @@ year     = '2000'  # Will be a loop
 
 # Create loop[ that gives us output we want for plotting and saves
 # everything into python dictionaries.
-kgTotals     = {}
-tSeries      = {}
-sMonthTotals = {}
+kgTotals     = {}; kgTotals_max     = []
+tSeries      = {}; tSeries_max      = []
+sMonthTotals = {}; sMonthTotals_max = []
+ts           = {}
 for scenario in ['RCP45', 'RCP85']:
     for year in ['2050', '2100']:
 
@@ -349,25 +354,38 @@ for scenario in ['RCP45', 'RCP85']:
 
         # Subset variable
         bb, t, lat, lon = subsetModelEmissions(bb, t, lat, lon, 
-                                               startMonth=1, endMonth=12, 
-                                               minLat=10., maxLat=90.,
-                                               minLon=190., maxLon=320.)
-
+                                               startMonth, endMonth, 
+                                               minLat, maxLat,
+                                               minLon, maxLon)
+        ts[year] = t
+                                              
         # Get Associated area mask
         area = loadEmissionGridAttributes(lat, lon)
 
         # Summarize the data for plotting 
-        kgPerDay, kgTotals[NAME] = makeTotalEmissions(bb, area, t)
-
+        kgPerDay, kgTotal = makeTotalEmissions(bb, area, t)
+        kgTotals[NAME]    = kgTotal
+        kgTotals_max.append(kgTotal.max())
+        
         s                  = np.sum(kgPerDay, (1,2)) 
         tSeries[NAME]      = s 
+        tSeries_max.append(s.max())
+        
         sMonthTotals[NAME] = monthlyTotals(s, t)
+        sMonthTotals_max.append(sMonthTotals[NAME].max())
+        
+# Reduce max lists to single values
+kgTotals_max     = max(kgTotals_max)
+tSeries_max      = max(tSeries_max)
+sMonthTotals_max = max(sMonthTotals_max)
 
 ###############################################################################
 # north america plot setup area 
 # Set up the projection etc. Things that can be outside time loop
+# TODO: Make a map projection that adjust to tghe limts passed above.
+# TODO: Will probably have to go with a square projection. 
 ###############################################################################
-m = Basemap(width=8000000,height=6500000,
+m = Basemap(width=9000000, height=6000000,
             rsphere=(6378137.00, 6356752.3142),\
             resolution='l',area_thresh=10000.,projection='lcc',\
             lat_1=45.,lat_2=55,lat_0=50,lon_0=-105.)
@@ -375,35 +393,43 @@ m = Basemap(width=8000000,height=6500000,
 lons, lats = np.meshgrid(lon, lat) # get lat/lons of ny by nx evenly space grid.
 x, y = m(lons, lats) # compute map proj coordinates.
 
-fig = plt.figure(figsize=(6,24))
+fig = plt.figure(figsize=(12,12))
 
 ax1 = fig.add_subplot(421)
-makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], titleText='RCP45 2050')
+makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], 
+              titleText='RCP45 2050', maxVal=kgTotals_max)
 
 ax2 = fig.add_subplot(422)
-makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], titleText='RCP45 2100')
+makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], 
+              titleText='RCP45 2100', maxVal=kgTotals_max)
 
 ax3 = fig.add_subplot(423)
-makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], titleText='RCP85 2050')
+makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], 
+              titleText='RCP85 2050', maxVal=kgTotals_max)
 
 ax4 = fig.add_subplot(424)
-makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], titleText='RCP85 2100')
+makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], 
+              titleText='RCP85 2100', maxVal=kgTotals_max)
 
 ax5 = fig.add_subplot(425)
 timeSeries(ax5, tSeries['RCP452050'], tSeries['RCP852050'], 
-           s1Label='RCP45', s2Label='RCP85', t=t, titleText='2050')
+           s1Label='RCP45', s2Label='RCP85', t=ts['2050'], titleText='2050')
 
 ax6 = fig.add_subplot(426)
-timeSeries(ax5, tSeries['RCP452100'], tSeries['RCP852100'], 
-           s1Label='RCP45', s2Label='RCP85', t=t, titleText='2100')
+timeSeries(ax6, tSeries['RCP452100'], tSeries['RCP852100'], 
+           s1Label='RCP45', s2Label='RCP85', t=ts['2100'], titleText='2100')
 
 ax7 = fig.add_subplot(427)
 makeHist(ax7, sMonthTotals['RCP452050'], sMonthTotals['RCP852050'],
-         s1Label='RCP45', s2Label='RCP85', titleText='title')
+         s1Label='RCP45', s2Label='RCP85', titleText='2050')
 
 ax8 = fig.add_subplot(428)
 makeHist(ax8, sMonthTotals['RCP452100'], sMonthTotals['RCP852100'],
-         s1Label='RCP45', s2Label='RCP85', titleText='title')
+         s1Label='RCP45', s2Label='RCP85', titleText='2100')
+
+
+# Handle the amount of space between plots 
+plt.subplots_adjust(wspace=0.5, hspace=0.5)
 
 plt.show()
 
