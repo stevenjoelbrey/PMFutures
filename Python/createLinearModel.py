@@ -34,6 +34,6 @@ E, EUnits, ELongName, Et, Elat, Elon = pme.getEmissionVariableData("BC", \
 ncFile = cnm.makeAQNCFile("T", "2000Base")                                                                   
 M, MUnits, MLongName, Mt, Mlat, Mlon = mef.getGroundAirQaulityData("T",\
                                                                 ncFile,\
-                                                                "200Base") 
+                                                                "2000Base") 
 
 # Figure out a way to make the two firds comparable                                                                  
