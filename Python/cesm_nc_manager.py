@@ -1,8 +1,15 @@
+#!/usr/bin/env python2
+
 ###############################################################################
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
 # This script will evantually be a class to be used to help analyze CESM air
 # quality data. 
+
+# NOTE on NC variables vertical dimensions: Z3 is the height of the middle
+# model layers above sea level. The model uses hybrid vertical coordinates
+# which are terrain-following, sigma coordinates in most of the troposphere
+# and then gradually become pure pressure coordinates somewhere around 100 hPa
 
 #os.chdir('/home/sbrey/projects/PMFutures/Python')
 
@@ -19,19 +26,25 @@ import matplotlib.ticker as tkr
 from datetime import date
 
 ###############################################################################
-# ------------------------- USE INPUT ----------------------------------------- 
+# ------------------------- USER INPUT ---------------------------------------- 
 ###############################################################################
+
 scenario = '2000Base'
 AQ_or_fire = 'AirQuality' # TODO: Decide if this is needed 
 NCVariable = 'HEIGHT'
-analysisDay = date(2005, 2, 1) # will be something that is eventually looped over 
-analysisLevel = 500 # mb
+analysisDay = date(2005, 3, 1) # will be something that is eventually looped over 
+analysisLevel = 100 # mb
 
 # TODO: Make these functions into a class
 
 def dateNumToDate(dateNum):
 	"""This function takes dates of the form YYYYMMDD and turns them into python
-		date objects."""
+		date objects.
+
+	Keyword arguments:
+	dateNum -- A single date string in the format YYYYMMDD or an array of datestring containing YYYYMMDD
+
+	"""
 	n = len(dateNum)
 	Dates = []
 	for i in range(n):    
@@ -44,9 +57,8 @@ def dateNumToDate(dateNum):
 	return(Dates)
 
 
-def makeNCFile(NCVariable, scenario):
-	"""function for getting path of desired variable nc file path\n
-       TODO: Make work for emissions data also, dynamically"""
+def makeAQNCFile(NCVariable, scenario):
+	"""Function for getting path of desired AirQuality variable nc file path."""
 
 	scenDec = scenario[0:4]
 	scenarioEmissions = scenario[4:len(scenario)]	
@@ -64,22 +76,39 @@ def makeNCFile(NCVariable, scenario):
 	rcp['2050RCP85'] = 'rcp85'
 	rcp['2100RCP45'] = 'rcp45'
 	rcp['2100RCP85'] = 'rcp85'
-		
-	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/AirQualityData/'
+	
+	# Data will always live in the same place on Yellowstone, static. 
+	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/'
 	fileHead = 'cesm122_fmozsoa_f09f09_' 
 	fileMid  =  scenDate[scenDec+'center']+'_'+rcp[scenario]+'fires_00.'+ NCVariable
 	fileTail = '.daily.' + scenDate[scenDec+'tail'] + '.nc'
-	ncFile   = dataDirBase + scenario + '/' + fileHead + fileMid + fileTail
-	
+	ncFile   = dataDirBase + "AirQualityData/" + scenario + '/' + fileHead + fileMid + fileTail
+
 	return ncFile
+ 
+def makeEmissionNCFile(NCVariable, scenario, year):
+	"""function for getting path of desired variable nc file path"""
+
+	dateSpan = {}
+	dateSpan['2010']   = '20000101-20101231'
+	dateSpan['2050']   = '20400101-20501231'
+	dateSpan['2100']   = '20900101-21001231'
+	
+	# Data will always live in the same place on Yellowstone, static. 
+	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
+	fileHead = 'cesm130_clm5_firemodule_' 
+	fileMid  =  scenario + '_02.' + NCVariable
+	fileTail = '.daily.NA.' + dateSpan[year] + '.nc'
+	ncFile   = dataDirBase + fileHead + fileMid + fileTail
+
+	return ncFile 
 
 
-def getNCVarDims(NCVariable, scenario):
+def getNCVarDims(ncFile, NCVariable):
 	""""Function takes NCVariable and RCP scenario and returns the dimensions of
         that variable in a dictionary."""	
 	
-	ncFile = makeNCFile(NCVariable, scenario)	
-	nc = Dataset(ncFile, 'r')
+	nc     = Dataset(ncFile, 'r')
 	ncDims = nc.variables[NCVariable].dimensions
 	
 	# Assign each dimension variable to a datastructure (list?) with keys 
@@ -100,12 +129,23 @@ def getNCVarDims(NCVariable, scenario):
 	
 	return dimDict
 	
+ 
+
 
 def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 	"""Get the data for a selected level of NCVariable. This function will 
        automatically determine if the dataset has multiple levels. If there
        is only one dimension in the vertical analysisLevel arugment is ignored.
-       TODO: Make this work for a passed time mask instead of a single date."""
+       TODO: Make this work for a passed time mask instead of a single date.
+
+	  Keyword arguments:
+	  NCVarialbe -- String , the variable to be loaded. 
+	  scemario -- String, RCP scenario, helps select data 
+	  analysisDay -- String, YYYYMMDD for which to get data
+	  analysisLevel -- float, the pressure surface of interest for data defined on
+                     pressure surfaces.
+	
+	"""
 
 
 	# Get model dimension information from other functions 
@@ -121,9 +161,12 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 	dimDict['units'] = nc.variables[NCVariable].units
 	dimDict['longName'] = nc.variables[NCVariable].long_name
 	
+	print nc.variables
+
 	# Find the ilev to pull from the data, if relevent
-	# TODO: Make dynamic based on what dimensions exist and in that order subcalls 
-	print dimDict.keys()
+	# TODO: Make dynamic based on what dimensions exist and in that order
+    # subcalls 
+
 		
 	if 'ilev' in dimDict.keys():
 		diff = np.abs(dimDict['ilev'] - analysisLevel)
@@ -137,6 +180,8 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 		data = nc.variables[NCVariable][dayIndex, :, :]
 
 	nc.close()
+
+	print 'the level chosen is: ' + str(levIndex)
 	
 	# Now get the land mask
 	fireBase = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
@@ -144,19 +189,72 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 	landMask = nc.variables[u'landmask'][:]
 	nc.close
 
-	return data, landMask, dimDict
+	dimDict[NCVariable] = data
+	dimDict['landMask'] = landMask
+
+	return dimDict
 
 
-def contourPlot(data, dimDict, scenario, NCVariable, dateLab, analysisLevel):
+def getUSGSTopo():
+	"""This function returns USGS ncobject"""
+	
+	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
+	ncFile= baseDir + 'USGS-gtopo30_0.9x1.25_remap_c051027.nc'
+		
+	nc = Dataset(ncFile,'r')
+	srf_geo = {}
+	srf_geo['PHIS'] = nc.variables[u'PHIS'][:]
+	srf_geo['units'] = nc.variables[u'PHIS'].units
+	srf_geo['longName'] = nc.variables[u'PHIS'].long_name
+	nc.close()
+	
+	srf_geo['topo'] = srf_geo['PHIS'] / 9.81 # (m**2/s**2) / (m/s**2)
+	
+	return srf_geo
+
+
+def getCESMPHIS():
+	"""This function extracts and returns surface geopotential 
+	   m**2/s**2."""
+
+	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
+	ncFile= baseDir + 'cesm122_fmozsoa_f09f09_2000_fires_00.PHIS.monthly.200001-201012.nc'
+		
+	nc = Dataset(ncFile,'r')
+	srf_PHIS = {}
+	# All times are the same, does not change, so just grab first
+	srf_PHIS['PHIS'] = nc.variables[u'PHIS'][0,:,:] 
+	srf_PHIS['Z_srf'] = srf_PHIS['PHIS'] / 9.81 # (m**2/s**2) / (m/s**2) = [m]
+	srf_PHIS['units'] = nc.variables[u'PHIS'].units
+	srf_PHIS['longName'] = nc.variables[u'PHIS'].long_name
+	nc.close()
+
+	return srf_PHIS
+
+def getZ3():
+	"""This function gets a month geopotential heights"""
+	
+	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
+	ncFile= baseDir + 'cesm122_fmozsoa_f09f09_2000_fires_00.Z3.monthly.200001-201012.nc'
+		
+	nc = Dataset(ncFile,'r')
+	Z = {}
+	Z['Z3'] = nc.variables[u'Z3'][0,:,:,:] 
+	Z['units'] = nc.variables[u'Z3'].units
+	Z['longName'] = nc.variables[u'Z3'].long_name
+	nc.close()
+
+	return Z	
+
+def contourPlot(Z, titleText, units):
 	"""Plots a Single date model layer on global projection centered over NA"""
-	if(type(dateLab) != str):
-		dateLab = str(dateLab)
+	# TODO: PLACE ALL ARGUMENTS INTO DICTIONARY
 
 	# set up orthographic map projection with
 	# perspective of satellite looking down at 50N, 100W.
 	# use low resolution coastlines.
 
-	fig = plt.figure(figsize=(10, 10))
+	fig = plt.figure(figsize=(6, 6))
 
 	m = Basemap(projection='ortho',lat_0=45,lon_0=-100,resolution='l')
 	# draw coastlines, country boundaries, fill continents.
@@ -170,14 +268,16 @@ def contourPlot(data, dimDict, scenario, NCVariable, dateLab, analysisLevel):
 	m.drawparallels(np.arange(-90,90,30))
 
 	# make up some data on a regular lat/lon grid.
-	lons, lats = np.meshgrid(dimDict['lon'], dimDict['lat']) 
+	lons, lats = np.meshgrid(data['lon'], data['lat']) 
 	x, y = m(lons, lats) # compute map proj coordinates.
 
 	# contour data over the map.
-	cs = m.contour(x, y, data, 15,linewidths=3)
-	cbar = m.colorbar(cs, location='bottom',pad="1%")
-	titleText= dateLab+' '+scenario + ' ' + str(analysisLevel) + 'hPa ' +NCVariable
-	plt.title(titleText, fontsize=30)
+	cs = m.contourf(x, y, Z, 16,linewidths=3)
+	csFill = m.pcolor(x, y, Z, visible=False)
+	cbar = m.colorbar(csFill, location='bottom', pad="1%")
+	cbar.set_label(units, fontsize=17)
+	#titleText= dateLab+' '+scenario + ' ' + str(analysisLevel) + 'hPa ' +NCVariable
+	plt.title(titleText, fontsize=15)
 	#plt.draw()
 	plt.show(block=False)
 
@@ -186,17 +286,29 @@ def contourPlot(data, dimDict, scenario, NCVariable, dateLab, analysisLevel):
 # Area for testing by calling functions, will eventually be a different script 
 # of its own 
 ###############################################################################
-data,landMask,dimDict=getNCData(NCVariable,scenario,analysisDay, analysisLevel)
+#data = getNCData(NCVariable,scenario,analysisDay, analysisLevel)
 
+###############################################################################
+# HOW TO CONVERT TO Z500 from sigma pressure coordinate system
+###############################################################################
+# In any case for "lev" >100 hPa you should EXPECT to see the signature of
+# topography on Z3 and HEIGHT contoured at any particular level.  Picking a
+# level in the vertical that corresponds to around 500 hPa in the reference
+# pressure profile will not be the same as plotting Z500.  To actually obtain
+# contours of Z500 you should interpolate the daily 3D HEIGHT fields in pressure
+# to 500 hPa using a 3D field of edge pressures constructed from a formula like
 
-contourPlot(data, dimDict, scenario, NCVariable, dateLab=analysisDay,analysisLevel=analysisLevel)
+#P(x,y,L)= a(L)*100000. + b(L)*PS(x,y)
+
+#Here a(L) and b(L) are "hyai" and "hybi" fields on most CAM history files, and PS is the surface pressure.  Please check the formula above to see where the a's and b's should actually go with respect to 100000 (Pa) and PS(x,y)
 	
+
+#contourPlot(data[NCVariable], 'geopotential height above surface at interfaces', '')
+#contourPlot(Z, 'Ground Level Geopotential Height [m]', 'meters')
+#contourPlot(data[NCVariable] - Z, 'Z - srf_Z', 'meters')
+
+#Z_sea = getZ3()
+#contourPlot(Z_sea['Z3'][18,:,:] , 'Geopotential Height of 500mb (above sea level, Z3)', 'meters')
+
+#if Name == '__main__':
 	
-
-
-
-
-
-
-
-

@@ -27,24 +27,32 @@ from datetime import date
 from datetime import timedelta
 import matplotlib.ticker as tkr
 
+# TODO: Dynamic map object range extension based on the bounds of analysis
+# TODO: Save the figure in a sensible place with a sensible name. 
+# TODO: Integrate into a shiny app that I can run on ozone. 
 
 
-
-def getVariableData(variable, scenario, year):
+def getEmissionVariableData(variable, scenario, year):
 	"""This function loads the emission 'variable' for the given secenario
-       and year (ending decade of 11 year period of data). The time variable
-	   is transformed to a python datetime.date object and assumes that there
-       are no leap years in the model output (tested). 
-	   
-	   return value: bb, bbUnits, t, lat, lon
+     and year (ending decade of 11 year period of data). The time variable
+	is transformed to a python datetime.date object and assumes that there
+     are no leap years in the model output (tested). 
+         Paremeters: 
+             variable:  The emission variable to be loaded
+             scenario:  The RCP scenario to load data for 
+             year:      The decade to load data for 
+
+   
+         return value: bb, bbUnits, t, lat, lon
 
 	"""
 
 	# Load the data
-	ncFile   = cnm.makeEmissionNCFile(variable, scenario, year)
-	nc       = Dataset(ncFile, 'r')
-	bb       = nc.variables['bb'][:]
-	bbUnits  = nc.variables['bb'].units
+	ncFile     = cnm.makeEmissionNCFile(variable, scenario, year)
+	nc         = Dataset(ncFile, 'r')
+	bb         = nc.variables['bb'][:]
+	bbUnits    = nc.variables['bb'].units
+	bbLongName = nc.variables['bb'].long_name
 
 	# Handle the massive fill_value for bb so math does not go crazy later
 	bbMask = bb.mask
@@ -83,7 +91,7 @@ def getVariableData(variable, scenario, year):
 
 	nc.close()
 
-	return bb, bbUnits, t, lat, lon
+	return bb, bbUnits, bbLongName, t, lat, lon
 
 def loadEmissionGridAttributes(lat, lon):
 	"""Load model grid cell atributes. These do not depend on time. Must be subset 
@@ -184,10 +192,11 @@ def makePcolorFig(ax, m, x, y, z, titleText, maxVal):
     # add colorbar.
     cbar = m.colorbar(cs, location='bottom', pad='5%')
     cbar.set_label(variable, fontsize=11)
-    
+    cbar.set_ticks([0, maxVal])    
+
     # add title
     ax.set_title(titleText, fontsize=16)
-    #plt.savefig(figureName, format='png')
+
     		    
     return(ax) 
 
@@ -241,7 +250,7 @@ def subsetModelEmissions(data, t, lat, lon, startMonth=1, endMonth=12,
     
     
     
-def timeSeries(ax1, s1, s2, s1Label, s2Label, t, titleText):    
+def timeSeries(ax1, s1, s2, s1Label, s2Label, t, maxValue, titleText):    
     '''kgPerDay1 and kgPerDay2 are emissions data (time, lat, lon). This 
     function will sum over time and lon to plot total emissions vs. time in
     the entire spatial domain of the passed arrays. '''
@@ -251,7 +260,8 @@ def timeSeries(ax1, s1, s2, s1Label, s2Label, t, titleText):
     ax1.plot(t, s1, 'b-', linewidth=1, label=s1Label)
     ax1.tick_params(axis='x', labelsize=11)
     ax1.tick_params(axis='y', labelsize=11)
-        
+    ax1.set_ylim([0, maxValue])
+    
     ax1.plot(t, s2, 'r-', linewidth=1, label=s2Label)
     ax1.tick_params(axis='y', labelsize=11)
     ax1.tick_params(axis='x', labelsize=11)
@@ -284,7 +294,7 @@ def monthlyTotals(s, t):
 	return sMonthTotal
 		
 		
-def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
+def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, maxValue, titleText):
     """Function makes lovely histogram (bar plot) for two series of data
     TODO: Make histogram actually lovely
     TODO: startMonth endMonth dynamic argument accept. 
@@ -301,8 +311,10 @@ def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
     rects1 = plt.bar(index, s1MonthTotal, bar_width,
                  	  alpha=opacity,
                 	  color='b',
-                 	  label=s1Label)
-
+                 	  label=s1Label
+					  )
+    plt.ylim(0, maxValue)
+	
     rects2 = plt.bar(index + bar_width, s2MonthTotal, bar_width,
                  	  alpha=opacity,
                  	  color='r',
@@ -320,118 +332,139 @@ def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, titleText):
     return(ax)
 
 
-###############################################################################
-# ------------------------- USER INPUT ---------------------------------------- 
-###############################################################################
-# TODO: Make sure these can work as agruments passed by the command line. 
+################################################################################
+## ------------------------- USER INPUT ---------------------------------------- 
+################################################################################
+## TODO: Make sure these can work as agruments passed by the command line. 
+#
+#variable   = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
+#startMonth = 1
+#endMonth   = 12
+#minLat     = 37    # 10.
+#maxLat     = 40    # 90.
+#minLon     = -109   # 190.
+#maxLon     = -102   # 320
+#
+#saveName = variable + "_" + str(startMonth) + "-" + str(endMonth) + "_" + \
+#           str(minLat) + "-" + str(maxLat) + "N_" + str(minLon) + "-" +\
+#           str(maxLon) + ".pdf"
+## Remove any "." in the saveName 
+##saveName = str_re	
+#
+################################################################################
+## ------------------------- exe envire ---------------------------------------- 
+################################################################################
+#if minLon < 0:
+#	minLon = minLon + 360.
+#	maxLon = maxLon + 360.
+#
+## Create loop[ that gives us output we want for plotting and saves
+## everything into python dictionaries.
+#kgTotals     = {}; kgTotals_max     = []
+#tSeries      = {}; tSeries_max      = []
+#sMonthTotals = {}; sMonthTotals_max = []
+#ts           = {}
+#for scenario in ['RCP45', 'RCP85']:
+#    for year in ['2050', '2100']:
+#
+#        # Key names
+#        NAME = scenario+year        
+#        
+#        # Load specified variable
+#        bb, bbUnits, bbLongName, t, lat, lon = getVariableData(variable, scenario, year)
+#
+#        # Subset variable
+#        bb, t, lat, lon = subsetModelEmissions(bb, t, lat, lon, 
+#                                               startMonth, endMonth, 
+#                                               minLat, maxLat,
+#                                               minLon, maxLon)
+#        ts[year] = t
+#                                              
+#        # Get Associated area mask
+#        area = loadEmissionGridAttributes(lat, lon)
+#
+#        # Summarize the data for plotting 
+#        kgPerDay, kgTotal = makeTotalEmissions(bb, area, t)
+#        kgTotals[NAME]    = kgTotal
+#        kgTotals_max.append(kgTotal.max())
+#        
+#        s                  = np.sum(kgPerDay, (1,2)) 
+#        tSeries[NAME]      = s 
+#        tSeries_max.append(s.max())
+#        
+#        sMonthTotals[NAME] = monthlyTotals(s, t)
+#        sMonthTotals_max.append(sMonthTotals[NAME].max())
+#        
+## Reduce max lists to single values
+#kgTotals_max     = max(kgTotals_max)
+#tSeries_max      = max(tSeries_max)
+#sMonthTotals_max = max(sMonthTotals_max)
+#
+################################################################################
+## north america plot setup area 
+## Set up the projection etc. Things that can be outside time loop
+## TODO: Make a map projection that adjust to tghe limts passed above.
+## TODO: Will probably have to go with a square projection. 
+################################################################################
+#
+#
+##m = Basemap(width=9000000, height=6000000,
+##            rsphere=(6378137.00, 6356752.3142),\
+##            resolution='l',area_thresh=10000.,projection='lcc',\
+##            lat_1=45.,lat_2=55,lat_0=50,lon_0=-105.)
+#
+#m = Basemap(projection='cyl', llcrnrlat=minLat, urcrnrlat=maxLat,\
+#            llcrnrlon=minLon, urcrnrlon=maxLon, lat_ts=20, resolution='c')
+#
+#lons, lats = np.meshgrid(lon, lat) # get lat/lons of ny by nx evenly space grid.
+#x, y = m(lons, lats) # compute map proj coordinates.
+#
+#fig = plt.figure(figsize=(12,12))
+#
+#ax1 = fig.add_subplot(421)
+#makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], 
+#              titleText='RCP45 2050', maxVal=kgTotals_max)
+#
+#ax2 = fig.add_subplot(422)
+#makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], 
+#              titleText='RCP45 2100', maxVal=kgTotals_max)
+#
+#ax3 = fig.add_subplot(423)
+#makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], 
+#              titleText='RCP85 2050', maxVal=kgTotals_max)
+#
+#ax4 = fig.add_subplot(424)
+#makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], 
+#              titleText='RCP85 2100', maxVal=kgTotals_max)
+#
+#ax5 = fig.add_subplot(425)
+#timeSeries(ax5, tSeries['RCP452050'], tSeries['RCP852050'], 
+#           s1Label='RCP45', s2Label='RCP85', t=ts['2050'], maxValue=tSeries_max, titleText='2050')
+#
+#ax6 = fig.add_subplot(426)
+#timeSeries(ax6, tSeries['RCP452100'], tSeries['RCP852100'], 
+#           s1Label='RCP45', s2Label='RCP85', t=ts['2100'], maxValue=tSeries_max, titleText='2100')
+#
+#ax7 = fig.add_subplot(427)
+#makeHist(ax7, sMonthTotals['RCP452050'], sMonthTotals['RCP852050'],
+#         s1Label='RCP45', s2Label='RCP85', maxValue=sMonthTotals_max,titleText='2050')
+#
+#ax8 = fig.add_subplot(428)
+#makeHist(ax8, sMonthTotals['RCP452100'], sMonthTotals['RCP852100'],
+#         s1Label='RCP45', s2Label='RCP85', maxValue=sMonthTotals_max, titleText='2100')
+#
+#
+## Handle the amount of space between plots 
+#plt.subplots_adjust(wspace=0.5, hspace=0.5)
+#
+#
+## Make overarching title 
+#plt.suptitle(bbLongName + ' Summary Figure')
+#
+#plt.show()
+#plt.savefig('../Figures/'+saveName)
 
-variable   = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
-startMonth = 1
-endMonth   = 12
-minLat     = 37.   # 10.
-maxLat     = 41.   # 90.
-minLon     = -109 + 360.  # 190.
-maxLon     = -102. + 360. # 320
 
-###############################################################################
-# ------------------------- exe envire ---------------------------------------- 
-###############################################################################
-
-# Create loop[ that gives us output we want for plotting and saves
-# everything into python dictionaries.
-kgTotals     = {}; kgTotals_max     = []
-tSeries      = {}; tSeries_max      = []
-sMonthTotals = {}; sMonthTotals_max = []
-ts           = {}
-for scenario in ['RCP45', 'RCP85']:
-    for year in ['2050', '2100']:
-
-        # Key names
-        NAME = scenario+year        
-        
-        # Load specified variable
-        bb, bbUnits, t, lat, lon = getVariableData(variable, scenario, year)
-
-        # Subset variable
-        bb, t, lat, lon = subsetModelEmissions(bb, t, lat, lon, 
-                                               startMonth, endMonth, 
-                                               minLat, maxLat,
-                                               minLon, maxLon)
-        ts[year] = t
-                                              
-        # Get Associated area mask
-        area = loadEmissionGridAttributes(lat, lon)
-
-        # Summarize the data for plotting 
-        kgPerDay, kgTotal = makeTotalEmissions(bb, area, t)
-        kgTotals[NAME]    = kgTotal
-        kgTotals_max.append(kgTotal.max())
-        
-        s                  = np.sum(kgPerDay, (1,2)) 
-        tSeries[NAME]      = s 
-        tSeries_max.append(s.max())
-        
-        sMonthTotals[NAME] = monthlyTotals(s, t)
-        sMonthTotals_max.append(sMonthTotals[NAME].max())
-        
-# Reduce max lists to single values
-kgTotals_max     = max(kgTotals_max)
-tSeries_max      = max(tSeries_max)
-sMonthTotals_max = max(sMonthTotals_max)
-
-###############################################################################
-# north america plot setup area 
-# Set up the projection etc. Things that can be outside time loop
-# TODO: Make a map projection that adjust to tghe limts passed above.
-# TODO: Will probably have to go with a square projection. 
-###############################################################################
-m = Basemap(width=9000000, height=6000000,
-            rsphere=(6378137.00, 6356752.3142),\
-            resolution='l',area_thresh=10000.,projection='lcc',\
-            lat_1=45.,lat_2=55,lat_0=50,lon_0=-105.)
-
-lons, lats = np.meshgrid(lon, lat) # get lat/lons of ny by nx evenly space grid.
-x, y = m(lons, lats) # compute map proj coordinates.
-
-fig = plt.figure(figsize=(12,12))
-
-ax1 = fig.add_subplot(421)
-makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], 
-              titleText='RCP45 2050', maxVal=kgTotals_max)
-
-ax2 = fig.add_subplot(422)
-makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], 
-              titleText='RCP45 2100', maxVal=kgTotals_max)
-
-ax3 = fig.add_subplot(423)
-makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], 
-              titleText='RCP85 2050', maxVal=kgTotals_max)
-
-ax4 = fig.add_subplot(424)
-makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], 
-              titleText='RCP85 2100', maxVal=kgTotals_max)
-
-ax5 = fig.add_subplot(425)
-timeSeries(ax5, tSeries['RCP452050'], tSeries['RCP852050'], 
-           s1Label='RCP45', s2Label='RCP85', t=ts['2050'], titleText='2050')
-
-ax6 = fig.add_subplot(426)
-timeSeries(ax6, tSeries['RCP452100'], tSeries['RCP852100'], 
-           s1Label='RCP45', s2Label='RCP85', t=ts['2100'], titleText='2100')
-
-ax7 = fig.add_subplot(427)
-makeHist(ax7, sMonthTotals['RCP452050'], sMonthTotals['RCP852050'],
-         s1Label='RCP45', s2Label='RCP85', titleText='2050')
-
-ax8 = fig.add_subplot(428)
-makeHist(ax8, sMonthTotals['RCP452100'], sMonthTotals['RCP852100'],
-         s1Label='RCP45', s2Label='RCP85', titleText='2100')
-
-
-# Handle the amount of space between plots 
-plt.subplots_adjust(wspace=0.5, hspace=0.5)
-
-plt.show()
 
 
 
