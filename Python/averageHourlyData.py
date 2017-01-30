@@ -5,23 +5,23 @@
 ###############################################################################
 # This script will be used to generate daily (and 6 hourly) fields of Air
 # qualility variables that are only available in hourly time steps.
-# TODO: Make generic for any hourly variable. Have that variable read in in 
-# TODO: as a passed argument from a shel script since this will be run as
-# TODO: a qsub job. 
 
 # TODO: Make this work for emissions also. 
-
-hourlyVAR = 'PSL'
-scenario  = '2000Base'
-year      = 2000
 
 # NOTE: Performance testing indicates that this script should take about 
 # NOTE: ~100 minutes to average a decades worth of hourly data to daily. 
 
+import sys
+print 'Number of arguments:', len(sys.argv), 'arguments.'
+print 'Argument List:', str(sys.argv)
+
+hourlyVAR =  str(sys.argv[1]) # e.g. 'PSL'
+scenario  =  str(sys.argv[2]) # e.g. '2000Base'
+year      =  int(sys.argv[3]) # e.g. 2000 # NOTE: Not needed except for emissions
+
 import cesm_nc_manager as cnm
 import os
 import numpy as np
-import sys
 from mpl_toolkits.basemap import Basemap, cm
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
@@ -59,7 +59,7 @@ t         = cnm.dateNumToDate(d)
 date_nc.close()
 
 print 'Working on the large loop averaging hourly values for each day'
-for i in np.arange(0, 10): # nDays
+for i in np.arange(0, nDays): # nDays
 
 	# We have to make a mask for each day of these hourly data.
 	# Since the units are time are days from origin, all integers
@@ -111,6 +111,11 @@ while os.path.isfile(outPutSavename):
 # This is the most important check. Do not want to overwrite orignal output. 
 if outPutSavename == HourlyFile:
 	raise ValueError('You are going to overwrite orignal data. Killing program.')
+
+print '----------------------------------------------------------------------'
+print 'outPutSavename used:'
+print outPutSavename
+print '----------------------------------------------------------------------'
 
 ###############################################################################
 # Write the daily averaged netCDF data
