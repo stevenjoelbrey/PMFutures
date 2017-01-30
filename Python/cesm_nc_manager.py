@@ -87,10 +87,10 @@ def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
 
 	rcp = {}
 	rcp['2000Base']  = ''
-	rcp['2050RCP45'] = 'rcp45'
-	rcp['2050RCP85'] = 'rcp85'
-	rcp['2100RCP45'] = 'rcp45'
-	rcp['2100RCP85'] = 'rcp85'
+	rcp['2050RCP45'] = 'rcp45_'
+	rcp['2050RCP85'] = 'rcp85_'
+	rcp['2100RCP45'] = 'rcp45_'
+	rcp['2100RCP85'] = 'rcp85_'
 	
 	# Data will always live in the same place on Yellowstone, static. 
 	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/'
