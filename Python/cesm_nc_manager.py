@@ -73,6 +73,8 @@ def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
 					    2100RCP85
 			tStep:      The time scale of the variable of interest. 
 				        "daily" | "hourly"	
+
+		return: A string that is the path of the file to load
 	"""
 
 	scenDec = scenario[0:4]
