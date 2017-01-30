@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy.ma as ma
 from datetime import date
 import matplotlib.ticker as tkr
-from datetime import date
+import datetime
 
 ###############################################################################
 # -----------------Air Quality File functions ---------------------------------
@@ -65,9 +65,15 @@ def dateNumToDate(dateNum):
 	return(Dates)
 
 
-def makeAQNCFile(NCVariable, scenario):
+def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
 	"""Function for getting path of desired AirQuality variable nc file path.
-     """
+		Parameters:
+			NCVariable: Any variable saved to AirQualityData/ directory
+			scenario:   2000Base | 2050RCP45 | 2050RCP85 | 2100RCP45 | 
+					    2100RCP85
+			tStep:      The time scale of the variable of interest. 
+				        "daily" | "hourly"	
+	"""
 
 	scenDec = scenario[0:4]
 	scenarioEmissions = scenario[4:len(scenario)]	
@@ -88,10 +94,11 @@ def makeAQNCFile(NCVariable, scenario):
 	
 	# Data will always live in the same place on Yellowstone, static. 
 	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/'
-	fileHead = 'cesm122_fmozsoa_f09f09_' 
-	fileMid  =  scenDate[scenDec+'center']+'_'+rcp[scenario]+'fires_00.'+ NCVariable
-	fileTail = '.daily.' + scenDate[scenDec+'tail'] + '.nc'
-	ncFile   = dataDirBase + "AirQualityData/" + scenario + '/' + fileHead + fileMid + fileTail
+	fileHead    = 'cesm122_fmozsoa_f09f09_' 
+	fileMid     =  scenDate[scenDec+'center']+'_'+rcp[scenario]+'fires_00.'+ NCVariable
+	fileTail    = '.' + tStep + '.' + scenDate[scenDec+'tail'] + '.nc'
+	ncFile      = dataDirBase + "AirQualityData/" + scenario + '/' + fileHead + fileMid +\
+                  fileTail
 
 	return ncFile
  
@@ -201,7 +208,8 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 
 
 def getUSGSTopo():
-	"""This function returns USGS ncobject"""
+	"""This function loads ground level geopotential file PHIS [kg/m**2/s**s]
+	and returns a dictionary with PHIS, units, and topo in [meters]."""
 	
 	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
 	ncFile= baseDir + 'USGS-gtopo30_0.9x1.25_remap_c051027.nc'
@@ -421,7 +429,28 @@ def getSurfaceWindScaler(scenario):
     # Now make a scaler wind from the vector coomponents
     scaler = np.sqrt(v**2 + u**2)
 
-    return scaler, MUnits, 'Scaler Wind', t, lat, lon      
+    return scaler, MUnits, 'Scaler Wind', t, lat, lon   
+
+
+def findStagnationDays():
+	
+	# Load daily surface pressure to en-route to make sea surface 
+	# geostrophic winds 
+	makeAQNCFile()
+	psFile = 'cesm122_fmozsoa_f09f09_2000_fires_00.PS.daily.200001-201012.nc'
+
+	# Find dates that sea-level geo winds are less than 8 m/s. Flag.
+
+	# Load 500 hPa geostrophic winds 
+
+	# Find locations where 500 hPa geostrophic winds are less then 13 m/s 
+
+	# Find locations where there is less then 0.01 inches of precipitation
+
+	# Return an equal size array equal to one where all of these conditions are
+    # met and 0 where they are not. Consider returning all individual masks if
+	# useful elsewhere. 
+   
 
 ###############################################################################
 # ------------------------- Description --------------------------------------- 
@@ -447,6 +476,9 @@ def getEmissionVariableData(variable, scenario, year):
          return value: bb, bbUnits, t, lat, lon
 
 	"""
+
+	# TODO: Change the handling of date to loading the date file and converting
+	# TODO: THOSE DATES MURRRRRRPHHHHHH
 
 	# Load the data
 	ncFile     = makeEmissionNCFile(variable, scenario, year)

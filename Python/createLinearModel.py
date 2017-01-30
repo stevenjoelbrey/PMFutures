@@ -28,6 +28,8 @@ import pandas as pd
 # 2) Make a scatterplot of T vs. emissions for a given month. Find a way to 
 #    visualize and report the summary of the observed relationship. 
 
+startMonth = 1
+endMonth   = 12
 
 ###############################################################################
 # Load Emissions grid for a selected variable
@@ -53,10 +55,27 @@ MVar      = 'T'
 MScenario = '2000Base'
 
                                               
-ncFile = cnm.makeAQNCFile(MVar, MScenario)                                                                   
+ncFile = cnm.makeAQNCFile(MVar,
+            			  MScenario)                                                                   
 M, MUnits, MLongName, Mt, Mlat, Mlon = cnm.getGroundAirQaulityData(MVar,\
                                                                    ncFile,\
-                                                                   MScenario) 
+																   MScenario)
+###############################################################################
+# This work is focussed on PM from fire and dust in the western U.S. Apply a 
+# western U.S. bounding condition to both Emissions and Air quality arrays.             ###############################################################################                                                                   
+minLon = 125.*-1 + 360. # Longitude of Cape Alava
+maxLon = 100.*-1 + 360. # Longitude of Eastern Border of Colorado and then some
+minLat = 31.            # Arizona Mexico border
+maxLat = 49.            # Oh Canada, the only place I might get a job.  
+
+# Meteorology first
+M, Mt, Mlat, Mlon = cnm.subsetModelEmissions(M, Mt, Mlat, Mlon, startMonth, endMonth, 
+                                             minLat, maxLat, minLon, maxLon)
+
+# Now Emissions Parameter
+E, Et, Elat, Elon = cnm.subsetModelEmissions(E, Et, Elat, Elon, startMonth, endMonth, 
+                                             minLat, maxLat, minLon, maxLon)
+
 
 # Check the sizes of the returned data arrays. Make sure dimensions and dates
 # match before any analysis is considered. 
@@ -73,8 +92,6 @@ maxLon = Elon[-1]
 maxLat = Elat[-1]
 minLat = Elat[0]             
 
-startMonth = 1
-endMonth   = 12
 
 MSubset, MtSubset, MlatSubset, MlonSubset = cnm.subsetModelEmissions(M, Mt, Mlat, Mlon, startMonth, endMonth, 
                                                                      minLat, maxLat, minLon, maxLon)
@@ -186,7 +203,7 @@ plt.scatter(t, dailyDomainESum, c=mon)
 ###############################################################################
 # Now plot monthy totals for the chosedomain, first make a handy pandas dataframe                                                                
 ###############################################################################
-d = {'time': t, 'dailyDomainMMean': dailyDomainMMean}
+#d = {'time': t, 'dailyDomainMMean': dailyDomainMMean}
         
     
                                                  
