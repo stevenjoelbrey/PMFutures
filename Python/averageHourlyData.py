@@ -15,9 +15,15 @@ import sys
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
-hourlyVAR =  str(sys.argv[1]) # e.g. 'PSL'
-scenario  =  str(sys.argv[2]) # e.g. '2000Base'
-year      =  int(sys.argv[3]) # e.g. 2000 # NOTE: Not needed except for emissions
+if len(sys.argv) != 1:
+	hourlyVAR =  str(sys.argv[1]) # e.g. 'PSL'
+	scenario  =  str(sys.argv[2]) # e.g. '2000Base'
+	year      =  int(sys.argv[3]) # e.g. 2000 # NOTE: Not needed except for emissions
+else: 
+	# Development environment. Set variables
+	hourlyVAR =  'PSL'
+	scenario  =  '2050RCP45'
+	year      =  2050 
 
 import cesm_nc_manager as cnm
 import os
@@ -97,8 +103,15 @@ outPutSavename = cnm.makeAQNCFile(hourlyVAR, scenario, 'daily')
 
 # Will have to change where this is placed becuase I do not own the output
 # This is temporary untill I can get permission to write in the scratch
-outPutSavenameTail = outPutSavename[69:]
-outPutDir = '/home/sbrey/projects/PMFutures/Python_output/' + '2000Base/'
+
+# Directory names have different charactor lengths between base and RCP 
+if scenario == '2000Base':
+	firstChar = 69
+else:
+	firstChar = 70
+	
+outPutSavenameTail = outPutSavename[firstChar:]
+outPutDir = '/home/sbrey/projects/PMFutures/Python_output/' + scenario + '/'
 outPutSavename =  outPutDir + outPutSavenameTail
 
 fileCount = -1
