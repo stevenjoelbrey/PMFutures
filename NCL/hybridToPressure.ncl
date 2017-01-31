@@ -32,9 +32,11 @@ begin ; begin main script
 	plot_lev   = 4 ; level that will be plotted on sanity plot 
 	onLev      = False  ; Set to False if variable vertical dim is on ilev, 
                         ; True if on lev. for
-	scenario   = "2050RCP85/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
-	midYear    = "2050_rcp85" ; 2000, 2050_rcp85, 2100_rcp45
+	rcpScenario= "rcp45"; can be "" (blank) for base scenario
+	scenario   = "2050RCP45/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
+	midYear    = "2050_"+rcpScenario ; 2000, 2050_rcp85, 2100_rcp45
 	yearString = "204001-205012" ; 200001-201012, 204001-205012, 209001-209912
+	year       = "2050"
 	dataDir    = "/fischer-scratch/sbrey/outputFromYellowstone/"
 
     ;===================================================================
@@ -66,7 +68,7 @@ begin ; begin main script
 	; close fcesm 
 	delete(meta)
 
-	; Now get the surface pressure. This is always required.  
+	; Now get the surface pressure. This is always required for vinth2p_ecmwf()  
 	PSFileBase = dataDir + "AirQualityData/" + scenario
 	PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_"+midYear+"_fires_00.PS.daily."+yearString+".nc"
 	print("Working on loading sea level pressure file")
@@ -75,6 +77,7 @@ begin ; begin main script
 	delete(fPS)
 
 	; Surface temperature is always needed as well
+	; e.g.cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.T.daily.204001-205012.nc
 	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_"+midYear+"_fires_00."
 	variableFile = variableFileBase + "T" + ".daily." + yearString + ".nc"
 	print("Working on loading temperature. Ground level temperature needed.")
@@ -92,7 +95,7 @@ begin ; begin main script
 	delete(T)
 
 	; Now get the variable to be interpolated to a new grid. 
-	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_2000_fires_00."
+	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_"+year + "_" + rcpScenario +"_fires_00."
 	variableFile = variableFileBase + variable + ".daily." + yearString + ".nc"
 	fccm = addfile(variableFile,"r")
 	print("Working on loading " + variable)
@@ -114,7 +117,12 @@ begin ; begin main script
 	phis = (usgs->PHIS) 
 	delete(usgs)
 
-	; calculate ground level in meters from PHIS
+	; calculate ground level in meters from PHIS. We convert this to m
+	; because HEIGHT (geopotential) is saved in units of m not m^2/s^s.
+	; When HEIGHT is passed we want to get from units of m above ground
+	; level to units of sea level, so we add topo height in meters to
+	; every level. That is only for when the var to be transformed is
+	; HEIGHT. 
 	topo = doubletofloat(phis/9.81) ; [m]
 	
 	; Add topo to HEIGHT in order to make true geopotential
@@ -123,13 +131,16 @@ begin ; begin main script
 	; last arg is what dimensions match
 	if(variable.eq."HEIGHT") then		
 		print("Working on adding ground level geopotential to each level of height")
+		; https://www.ncl.ucar.edu/Document/Functions/Built-in/conform.shtml
 		geopotential = VAR + conform(VAR, topo, (/2,3/))  
 		copy_VarCoords(VAR, geopotential)
 		VAR_ready = geopotential
 		delete(geopotential)
+		varflg = -1
 	else 
 		print("no addition of topo need for " + variable)
 		VAR_ready = VAR
+		varflg = 0 ; for interpreting all non geopotential and temperature layers. 
 	end if 
 	
 
@@ -137,7 +148,7 @@ begin ; begin main script
 	; Transform from Hybrid vertical levels to pressure levels	
 	;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
 	print("Regridding "+ variable)
-	VAR_P = vinth2p_ecmwf(VAR_ready, a_coef, b_coef, lev_p, ps, 1, P0mb, 1, True, -1, T_surface, phis)
+	VAR_P = vinth2p_ecmwf(VAR_ready, a_coef, b_coef, lev_p, ps, 1, P0mb, 1, True, varflg, T_surface, phis)
 
 	;===================================================================
 	; Sanity check plot for this variable 
@@ -172,8 +183,12 @@ begin ; begin main script
 
 	setfileoption("nc", "FileStructure", "Advanced")
 	; Make the nc file save name the same name as input but append _P
-	fon =  scenario + "cesm122_fmozsoa_f09f09_2000_fires_00." + variable + ".daily." + yearString + "_P.nc"
-	system("rm "+ fon) ; remove it because if it exists this wont write
+	; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
+	fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + "_fires_00." + variable + "_P.daily." + yearString + ".nc"
+
+	if (fileexists(fon)) then
+		system("rm "+ fon) ; remove it because if it exists this wont write
+	end if
 	fo = addfile(fon, "c")
 
 	;===================================================================
@@ -186,6 +201,7 @@ begin ; begin main script
 	fAtt@creation_date = systemfunc("date")        
 	fileattdef( fo, fAtt )            ; copy file attributes    
 
+	; label the pressure level dimension
 	VAR_P!1="plevel"
 	VAR_P&plevel = lev_p
 	fo->$variable$ = VAR_P
