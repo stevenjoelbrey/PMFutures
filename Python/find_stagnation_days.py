@@ -25,6 +25,7 @@ if len(sys.argv) != 1:
 	wind500Lim  = sys.argv[3]   # m/s
 	precLim     = sys.argv[4]   # inches/day
 else:
+	print 'Using default arguments.'
 	# These are the defualt definitions of stagnation defined:
 	# http://www.arl.noaa.gov/documents/reports/atlas.pdf
 	scenario    = '2000Base'
@@ -76,15 +77,20 @@ inchPerM = 39.3701      # [inch/m]
 secondsPerDay = 86400.  # [s/day]
 mPersToInPerDay = inchPerM * secondsPerDay # [(inch s) / (m day)]
 
+# Convert m/s to inches/day
+prec = prec[:] * mPersToInPerDay
+
 # Find dates that sea-level and 500 hPa geo winds are less than 8 m/s 
 # 13 m/s respectivly
 wind1000Index = np.where(plevel==1000.)[0][0]
 wind500Index  = np.where(plevel==500.)[0][0]
 
 # Create numpy arrays to store mask of stagnation events
-stagnationMask = np.zeros(prec.shape, dtype=bool)
+stagnationMask = np.zeros(prec.shape, dtype=int)
 
-for i in range(nTime):
+for i in range(nTime):  
+
+	print i 
 
 	# Handle 1000 mb geo winds and crazy high values that are near eq.
 	ug1000 = ug[i, wind1000Index, :, :]
@@ -106,12 +112,25 @@ for i in range(nTime):
 	mask500    = np.array(wind500Mag < wind500Lim, dtype=bool) 
 
 	# Convert m/s to inches per day
-	inchesOfPrec = prec[i, :, :] * mPersToInPerDay
-	maskRain     = inchesOfPrec < precLim
+	maskRain     = prec[i,:,:] < precLim
 
 	# Create a mask of where all three are true
-	m = mask1000 & mask500 & maskRain
+	m = np.array(mask1000 & mask500 & maskRain, dtype=int)
+	print np.unique(m)
 	stagnationMask[i, :, :] = m
+
+###############################################################################
+# Sanity check the output before writing the mask to an nc file 
+###############################################################################
+stagPrec  = ma.masked_where(stagnationMask == 0, prec, False)
+
+print 'The max value of stagPrec is: ' + str(stagPrec.max())
+print 'The unique values in stagnationMask are: ' + str(np.unique(stagnationMask))
+
+# Make sure min values of these masked arrays is above the desired threshold
+if stagPrec.max() >= precLim:
+	print 'The maximum value of precip on stangation days exceeds threshold!'
+	raise ValueError("This means creating the mask has failed!!!!!")
 
 
 ###############################################################################
@@ -129,8 +148,8 @@ ncFile.createDimension('lat', nLat )
 ncFile.createDimension('lon', nLon )
 
 # Create variables on the dimension they live on 
-maskVar = ncFile.createVariable('stagnationMask', 'f4', ('time','lat','lon'))
-maskVar.units = 'True means stagnition condition is present'
+maskVar = ncFile.createVariable('stagnationMask', 'i', ('time','lat','lon'))
+maskVar.units = '1 indicates stagnition condition is present. 0 means it is not.'
 
 time_var = ncFile.createVariable('time', 'i4', ('time',))
 time_var.units = 'days from origin'
@@ -154,6 +173,17 @@ dt = (writingComplete - startTime) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the entire script.'
 print '----------------------------------------------------------------------'
+
+
+
+
+
+
+
+
+
+
+
 
 
 	
