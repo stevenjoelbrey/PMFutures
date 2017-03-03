@@ -25,7 +25,7 @@ if len(sys.argv) != 1:
 	wind500Lim  = sys.argv[3]   # m/s
 	precLim     = sys.argv[4]   # inches/day
 else:
-	print 'Using default arguments.'
+	print 'Using default '
 	# These are the defualt definitions of stagnation defined:
 	# http://www.arl.noaa.gov/documents/reports/atlas.pdf
 	scenario    = '2000Base'

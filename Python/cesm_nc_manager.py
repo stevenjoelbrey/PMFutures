@@ -65,6 +65,24 @@ def dateNumToDate(dateNum):
 	return(Dates)
 
 
+def getSelf(scenario, species):
+	"""Quick function for returning nc file connection.
+		Parameters:
+			scenario: scenario stringfor getting file connection. 
+			          e.g. 2000Base
+			species:  The species name for which you are returning
+					  a file connection. 
+
+		return: NC variable connection. 
+
+		
+"""
+	ncFile = cnm.makeAQNCFile(species, scenario, 'daily')
+	nc     = Dataset(ncFile, 'r')
+	ncVar  = nc.variables[species]
+	return ncVar 
+
+
 def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
 	"""Function for getting path of desired AirQuality variable nc file path.
 		Parameters:
@@ -766,6 +784,3 @@ def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, maxValue, titleTe
     return(ax)
 
 
-
-                                              
-	
