@@ -14,6 +14,8 @@
 # TODO: Make this into a class. Copy the stucture of Sam Atwoods code. 
 # TODO: Update function documentation to be the accepted format. 
 
+# As needed for the April 1 EPA report. 
+
 # Load resources
 import cesm_nc_manager as cnm
 import os
@@ -27,145 +29,152 @@ from datetime import date
 from datetime import timedelta
 import matplotlib.ticker as tkr
 
-# TODO: Dynamic map object range extension based on the bounds of analysis
-# TODO: Save the figure in a sensible place with a sensible name. 
-# TODO: Integrate into a shiny app that I can run on ozone. 
+################################################################################
+# Load particulate species emissions 
+################################################################################
+EmissionScenario = "RCP85"
+EmissionYear     = "2010"
 
+# Get Particulate species emissions
+BC, BCunits, BCLongName, t, ELat, ELon = cnm.getEmissionVariableData("BC","RCP85","2010")
+OC, OCunits, OCLongName, t, ELat, ELon = cnm.getEmissionVariableData("OC","RCP85","2010")
+
+# Combine emissions
+secondsPerDay = 24. * 60**2
+E = OC + BC
 
 ################################################################################
-## ------------------------- USER INPUT ---------------------------------------- 
+#------------------ Subset model emissions in space and time ------------------
 ################################################################################
-## TODO: Make sure these can work as agruments passed by the command line. 
+# For report use western U.S. only
 
-variable   = 'BC'    # Anything listed in outputFromYellowstone/FireEmissions
-startMonth = 1
-endMonth   = 12
-minLat     = 37    # 10.
-maxLat     = 40    # 90.
-minLon     = -109   # 190.
-maxLon     = -102   # 320
+startMonth = 6
+endMonth   = 9
+minLat     = 30.    # 10.
+maxLat     = 50.    # 90.
+minLon     = 234.   # 190.
+maxLon     = 259.   # 320
 
-saveName = variable + "_" + str(startMonth) + "-" + str(endMonth) + "_" + \
-           str(minLat) + "-" + str(maxLat) + "N_" + str(minLon) + "-" +\
-           str(maxLon) + ".pdf"
-# Remove any "." in the saveName 
-#saveName = str_re	
+E, t, ELat, ELon  =  cnm.subsetModelEmissions(E, t, ELat, ELon,\
+                                              startMonth, endMonth,\
+                                              minLat, maxLat, minLon, maxLon)
+
+# Load area onces final domain of emissions analysis is set
+area = cnm.loadEmissionGridAttributes(ELat, ELon)
 
 ################################################################################
-## ------------------------- exe envire ---------------------------------------- 
+#----------------------- Load desired met event masks --------------------------
 ################################################################################
-if minLon < 0:
-	minLon = minLon + 360.
-	maxLon = maxLon + 360.
 
-# Create loop[ that gives us output we want for plotting and saves
-# everything into python dictionaries.
-kgTotals     = {}; kgTotals_max     = []
-tSeries      = {}; tSeries_max      = []
-sMonthTotals = {}; sMonthTotals_max = []
-ts           = {}
-for scenario in ['RCP45', 'RCP85']:
-    for year in ['2050', '2100']:
+highWindMask = cnm.getSelf('2000Base', 'highWindMask_9')
+highTMask    = cnm.getSelf('2000Base', 'highTMask_298')
+lowPrecMask  = cnm.getSelf('2000Base', 'lowPRECTMask_0.01')
+#stagMask     = cnm.getSelf('2000Base', 'stagnation_mask') # needs to be rerun 
 
-        # Key names
-        NAME = scenario+year        
-        
-        # Load specified variable
-        bb, bbUnits, bbLongName, t, lat, lon = cnm.getVariableData(variable, scenario, year)
-#
-#        # Subset variable
-#        bb, t, lat, lon = cnm.subsetModelEmissions(bb, t, lat, lon, 
-#                                               startMonth, endMonth, 
-#                                               minLat, maxLat,
-#                                               minLon, maxLon)
-#        ts[year] = t
-#                                              
-#        # Get Associated area mask
-#        area = cnm.loadEmissionGridAttributes(lat, lon)
-#
-#        # Summarize the data for plotting 
-#        kgPerDay, kgTotal = cnm.makeTotalEmissions(bb, area, t)
-#        kgTotals[NAME]    = kgTotal
-#        kgTotals_max.append(kgTotal.max())
-#        
-#        s                  = np.sum(kgPerDay, (1,2)) 
-#        tSeries[NAME]      = s 
-#        tSeries_max.append(s.max())
-#        
-#        sMonthTotals[NAME] = cnm.monthlyTotals(s, t)
-#        sMonthTotals_max.append(sMonthTotals[NAME].max())
-#        
-## Reduce max lists to single values
-#kgTotals_max     = max(kgTotals_max)
-#tSeries_max      = max(tSeries_max)
-#sMonthTotals_max = max(sMonthTotals_max)
-#
+ncFile = cnm.makeAQNCFile('stagnation_mask','2000Base', 'daily')
+nc     = Dataset(ncFile, 'r')
+stagMask = nc.variables['stagnationMask'][:]
+AQLat  = nc.variables['lat'][:]
+AQLon  = nc.variables['lon'][:]
+nc.close()
+
+# Get mask dates so we can match with emissions
+dateNum      = cnm.getSelf('2000Base', 'date') 
+mTime        = cnm.dateNumToDate(dateNum)
+
 ################################################################################
-## north america plot setup area 
-## Set up the projection etc. Things that can be outside time loop
-## TODO: Make a map projection that adjust to tghe limts passed above.
-## TODO: Will probably have to go with a square projection. 
+# Subset each of the masks to match the emissions area
 ################################################################################
-#
-#
-##m = Basemap(width=9000000, height=6000000,
-##            rsphere=(6378137.00, 6356752.3142),\
-##            resolution='l',area_thresh=10000.,projection='lcc',\
-##            lat_1=45.,lat_2=55,lat_0=50,lon_0=-105.)
-#
-#m = Basemap(projection='cyl', llcrnrlat=minLat, urcrnrlat=maxLat,\
-#            llcrnrlon=minLon, urcrnrlon=maxLon, lat_ts=20, resolution='c')
-#
-#lons, lats = np.meshgrid(lon, lat) # get lat/lons of ny by nx evenly space grid.
-#x, y = m(lons, lats) # compute map proj coordinates.
-#
-#fig = plt.figure(figsize=(12,12))
-#
-#ax1 = fig.add_subplot(421)
-#cnm.makePcolorFig(ax1, m, x, y, z=kgTotals['RCP452050'], 
-#              titleText='RCP45 2050', maxVal=kgTotals_max)
-#
-#ax2 = fig.add_subplot(422)
-#cnm.makePcolorFig(ax2, m, x, y, z=kgTotals['RCP452100'], 
-#              titleText='RCP45 2100', maxVal=kgTotals_max)
-#
-#ax3 = fig.add_subplot(423)
-#cnm.makePcolorFig(ax3, m, x, y, z=kgTotals['RCP852050'], 
-#              titleText='RCP85 2050', maxVal=kgTotals_max)
-#
-#ax4 = fig.add_subplot(424)
-#cnm.makePcolorFig(ax4, m, x, y, z=kgTotals['RCP852100'], 
-#              titleText='RCP85 2100', maxVal=kgTotals_max)
-#
-#ax5 = fig.add_subplot(425)
-#cnm.timeSeries(ax5, tSeries['RCP452050'], tSeries['RCP852050'], 
-#           s1Label='RCP45', s2Label='RCP85', t=ts['2050'], maxValue=tSeries_max, titleText='2050')
-#
-#ax6 = fig.add_subplot(426)
-#cnm.timeSeries(ax6, tSeries['RCP452100'], tSeries['RCP852100'], 
-#           s1Label='RCP45', s2Label='RCP85', t=ts['2100'], maxValue=tSeries_max, titleText='2100')
-#
-#ax7 = fig.add_subplot(427)
-#cnm.makeHist(ax7, sMonthTotals['RCP452050'], sMonthTotals['RCP852050'],
-#         s1Label='RCP45', s2Label='RCP85', maxValue=sMonthTotals_max,titleText='2050')
-#
-#ax8 = fig.add_subplot(428)
-#cnm.makeHist(ax8, sMonthTotals['RCP452100'], sMonthTotals['RCP852100'],
-#         s1Label='RCP45', s2Label='RCP85', maxValue=sMonthTotals_max, titleText='2100')
-#
-#
-## Handle the amount of space between plots 
-#plt.subplots_adjust(wspace=0.5, hspace=0.5)
-#
-#
-## Make overarching title 
-#plt.suptitle(bbLongName + ' Summary Figure')
-#
-#plt.show()
-#plt.savefig('../Figures/'+saveName)
+highWindMask, mt, mLat, mLon  =  cnm.subsetModelEmissions(
+                                              highWindMask, mTime, AQLat, AQLon,\
+                                              startMonth, endMonth,\
+                                              minLat, maxLat, minLon, maxLon)
+
+highTMask, mt, mLat, mLon  =  cnm.subsetModelEmissions(
+                                              highTMask, mTime, AQLat, AQLon,\
+                                              startMonth, endMonth,\
+                                              minLat, maxLat, minLon, maxLon)
+
+lowPrecMask, mt, mLat, mLon  =  cnm.subsetModelEmissions(
+                                              lowPrecMask, mTime, AQLat, AQLon,\
+                                              startMonth, endMonth,\
+                                              minLat, maxLat, minLon, maxLon)
+
+stagMask, mt, mLat, mLon  =  cnm.subsetModelEmissions(
+                                              stagMask, mTime, AQLat, AQLon,\
+                                              startMonth, endMonth,\
+                                              minLat, maxLat, minLon, maxLon)
+
+################################################################################
+# Count the number of events at each grid cell for each type 
+################################################################################
+nHighWindGrid = np.sum(highWindMask, axis=0)
+nHighTGrid    = np.sum(highTMask,    axis=0)
+nLowPrecGrid  = np.sum(lowPrecMask,  axis=0)
+nStagMaskGrid = np.sum(stagMask,     axis=0)
+
+nHighWind = np.sum(highWindMask)
+nHighT    = np.sum(highTMask)
+nLowPrec  = np.sum(lowPrecMask)
+nStagMask = np.sum(stagMask)
 
 
+# Make masked arrays for each emission day type
+highWindE = ma.masked_where(highWindMask == 1, E)
+HighTE    = ma.masked_where(highTMask == 1, E)
+LowPrecE  = ma.masked_where(lowPrecMask == 1, E)
+stagE     = ma.masked_where(stagMask == 1, E)
+# NOTE: This implies that E is all summer E
+
+# We also need to mask where emissions are zero 
+highWindE = ma.masked_where(highWindE == 0, highWindE)
+HighTE    = ma.masked_where(HighTE == 0, HighTE)
+LowPrecE  = ma.masked_where(LowPrecE == 0, LowPrecE)
+stagE     = ma.masked_where(stagE == 0, stagE)
+E         = ma.masked_where(E == 0, E)
+
+# Flatten all of these values, trailing _ indicates flattened to 1D
+highWindE_ = ma.compressed(highWindE)
+HighTE_    = ma.compressed(HighTE)
+LowPrecE_  = ma.compressed(LowPrecE)
+stagE_     = ma.compressed(stagE)
+E_         = ma.compressed(E)
 
 
+boxLabel = ['All days', 'High Wind', 'High T', 'No Precip', 'Stagnation']
+
+# Make the kg/s/m2 raw plot
+data = [E_, highWindE_, HighTE_, LowPrecE_, stagE_]
+
+fig = plt.figure()
+ax = plt.subplot(1, 1, 1)
+ax.boxplot(data, sym="", labels=boxLabel, whis=[10, 90])
+ax.set_ylabel(BCunits)
+ax.set_yscale('log')
+plt.show()
+
+# Now sum over the days dimensions
+highWindE_days = np.sum(highWindE, 0)
+HighTE_days    = np.sum(HighTE, 0)
+LowPrecE_days  = np.sum(LowPrecE, 0)
+stagE_days     = np.sum(stagE, 0)
+E_days         = np.sum(E, 0)
+
+# Flatten and make a boxplot again
+highWindE_days_ = ma.compressed(highWindE_days)
+HighTE_days_    = ma.compressed(HighTE_days)
+LowPrecE_days_  = ma.compressed(LowPrecE_days)
+stagE_days_     = ma.compressed(stagE_days)
+E_days_         = ma.compressed(E_days)
+
+data = [ E_days_, highWindE_days_, HighTE_days_, LowPrecE_days_, stagE_days_]
+
+fig = plt.figure()
+ax = plt.subplot(1, 1, 1)
+ax.boxplot(data,  sym="", labels=boxLabel, whis=[10, 90])
+ax.set_yscale('log')
+plt.show()
+
+# TODO Make a map of the total emissions by day type! 
 
 
