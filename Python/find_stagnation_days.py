@@ -49,6 +49,8 @@ import time as timer
 
 startTime = timer.time()
 
+# TODO: consider replacing these three line snipets with cnm.getSelf()
+
 # Load geostophic wind components
 ugFile = cnm.makeAQNCFile('ug_P', scenario, 'daily')
 ug_nc  = Dataset(ugFile, 'r')
@@ -58,7 +60,16 @@ vgFile = cnm.makeAQNCFile('vg_P', scenario, 'daily')
 vg_nc  = Dataset(vgFile, 'r')
 vg     = vg_nc.variables['vg']
 
-# Get the wind dimensions from vg file
+# Load model wind components
+UFile = cnm.makeAQNCFile('U', scenario, 'daily')
+U_nc  = Dataset(UFile, 'r')
+U     = U_nc.variables['U']
+
+VFile = cnm.makeAQNCFile('V', scenario, 'daily')
+V_nc  = Dataset(VFile, 'r')
+V     = V_nc.variables['V']
+
+# Get the geostrophic wind dimensions from vg file
 plevel  = vg_nc.variables['plevel'][:]  
 lat     = vg_nc.variables['lat'][:]
 lon     = vg_nc.variables['lon'][:]
@@ -67,14 +78,17 @@ nTime   = len(time)
 nLat    = len(lat)
 nLon    = len(lon) 
 
+# Get the wind vertical dimensions from V file
+windLev = V_nc.variables['lev'][:]
+
 # Open the precipitation file
 precFile = cnm.makeAQNCFile('PRECT', scenario, 'daily')
 prec_nc  = Dataset(precFile, 'r')
 prec     = prec_nc.variables['PRECT'] # [m/s]
 
 # prec needs to be converted from m/s to incher/day
-inchPerM = 39.3701      # [inch/m]
-secondsPerDay = 86400.  # [s/day]
+inchPerM        = 39.3701      # [inch/m]
+secondsPerDay   = 86400.  # [s/day]
 mPersToInPerDay = inchPerM * secondsPerDay # [(inch s) / (m day)]
 
 # Convert m/s to inches/day
@@ -84,6 +98,7 @@ prec = prec[:] * mPersToInPerDay
 # 13 m/s respectivly
 wind1000Index = np.where(plevel==1000.)[0][0]
 wind500Index  = np.where(plevel==500.)[0][0]
+windSrfIndex  = np.where(np.max(windLev) == windLev)[0][0]
 
 # Create numpy arrays to store mask of stagnation events
 stagnationMask = np.zeros(prec.shape, dtype=int)
@@ -93,13 +108,18 @@ for i in range(nTime):
 	print i 
 
 	# Handle 1000 mb geo winds and crazy high values that are near eq.
-	ug1000 = ug[i, wind1000Index, :, :]
-	vg1000 = vg[i, wind1000Index, :, :]
-	ug1000 = ma.masked_where(ug1000 > 200., ug1000)
-	vg1000 = ma.masked_where(vg1000 > 200., vg1000)
+	#ug1000 = ug[i, wind1000Index, :, :]
+	#vg1000 = vg[i, wind1000Index, :, :]
+	#ug1000 = ma.masked_where(ug1000 > 200., ug1000)
+	#vg1000 = ma.masked_where(vg1000 > 200., vg1000)
 
-	wind1000Mag = np.sqrt(ug1000**2 + vg1000**2)
-	mask1000    = np.array(wind1000Mag < wind1000Lim, dtype=bool)
+	#wind1000Mag = np.sqrt(ug1000**2 + vg1000**2)
+	#mask1000    = np.array(wind1000Mag < wind1000Lim, dtype=bool)
+
+	U_srf = U[i, windSrfIndex, :, :]
+	V_srf = V[i, windSrfIndex, :, :]
+	srfWindMag = np.sqrt(U_srf**2 + V_srf**2)
+	maskSrf = np.array(srfWindMag < wind1000Lim, dtype=bool)
 
 	# Handle 500 mb geo winds and crazy high values that are near eq.
 	ug500 = ug[i, wind500Index, :, :]
@@ -112,11 +132,12 @@ for i in range(nTime):
 	mask500    = np.array(wind500Mag < wind500Lim, dtype=bool) 
 
 	# Convert m/s to inches per day
-	maskRain     = prec[i,:,:] < precLim
+	maskRain = prec[i,:,:] < precLim
 
 	# Create a mask of where all three are true
-	m = np.array(mask1000 & mask500 & maskRain, dtype=int)
-	print np.unique(m)
+	# NOTE: mask1000 previously used for low level wind mask
+	m = np.array(maskSrf & mask500 & maskRain, dtype=int)
+	#print np.unique(m)
 	stagnationMask[i, :, :] = m
 
 ###############################################################################
@@ -137,7 +158,7 @@ if stagPrec.max() >= precLim:
 # Write the stagnation mask as daily netCDF data
 ###############################################################################
 
-saveName = cnm.makeAQNCFile('stagnation_mask', scenario, 'daily')
+saveName = cnm.makeAQNCFile('stagnationMask', scenario, 'daily')
 outPutSavename = saveName
 
 ncFile = Dataset(outPutSavename, 'w', format='NETCDF4')
