@@ -5,14 +5,15 @@
 ;;                                                                             ;;
 ;; AUTHOR                                                                      ;;
 ;; -> Steven Brey, sjbrey@rams.colostate.edu                                   ;;
-;;                                                                             ;;
+;;                                                                  	       ;;
 ;; DESCRIPTION                                                                 ;;
-;; -> 	Function being put to use to transform from hybrid coords to pressure  ;;
-;; 		coords								                                   ;;
+;; -> Function used to transform CESM output from hybrid coords to pressure using
+;;    vinth2p_ecmwf                                                            ;;
+;;                           						       ;;	
 ;;                                                                             ;;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-loadscript("substring.ncl")
+loadscript("substring.ncl") ;; allows for subsettting strings 
 
 ; TODO: Only load parts of nc files that are needed. Most important
 ;       with T, because it is huge. 
@@ -28,18 +29,30 @@ begin ; begin main script
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	; Set static directory path variables 
-	; TODO: PASS THESE AS ARGUMENTS
-	variable   = "T" 
-
+	; NOTE: PASS THESE AS ARGUMENTS when running as qsub job (and comment out)
+	;variable   = "Z3" 
+	;scenario = "2000NoFirev1" 
+	;fmod = "_nofires_01."
+	makePlot = False
+	
+	;;;;;;;;;;;;;;;;;;;;
 	; make grid on these
+	;;;;;;;;;;;;;;;;;;;;
 	lev_p      = (/ 200,250,300,400,500,600,700,850,925,1000 /)  
 	plot_lev   = 4 ; level that will be plotted on sanity plot 
 	onLev      = True  ; Set to False if variable vertical dim is on ilev, 
-		                ; True if on lev. 
+		           ; True if on lev. 
+	
 
-	; scenario options
-	; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
-	scenario = "2050RCP45" 
+	dataDir    = "/pierce-scratch/mariavm/"
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; scenarios options listed in 'dataDir'
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+	; 2000Firev1 2050RCP45Firev1 2050RCP85Firev1 2100RCP45Firev1 2100RCP85Firev1
+	; 2000NoFirev1 2050RCP45NoFirev1 2050RCP85NoFirev1 2100RCP45NoFirev1 2100RCP85NoFirev1
+	; 2050RCP45FireHIv1  2050RCP85FireHIv1  2100RCP45FireHIv1  2100RCP85FireHIv1  
+	
 	nl       = strlen(scenario)          
 	year     = substring(scenario, 0, 3)
 	scenRCP  = substring(scenario, 4, nl)
@@ -48,33 +61,78 @@ begin ; begin main script
 	; Set string variables required for loading files              ; 
 	; May the coding gods have mercy on me for this repeating mess ;
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-	dataDir    = "/fischer-scratch/sbrey/outputFromYellowstone/"
-	if(scenRCP.eq."Base") then
 	
-		rcpScenario = ""; rcp45 | rcp85 | "" (blank) for base scenario
-		scenario    = scenario + "/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
-		midYear     = year + rcpScenario ; 2000, 2050_rcp85, 2100_rcp45
+	; base scenarios
+	if(scenRCP.eq."Firev1") then
+	
+		rcpScenario = ""
+		scenario    = scenario + "/" 
+		midYear     = year + rcpScenario 
 
 	end if
 
-	if(scenRCP.eq."RCP45") then
+	if(scenRCP.eq."NoFirev1") then
+	
+		rcpScenario = ""
+		scenario    = scenario + "/" 
+		midYear     = year + rcpScenario 
+
+	end if
+
+	; RCP45 scenarios	
+	if(scenRCP.eq."RCP45Firev1") then
 
 		rcpScenario = "rcp45"
 		scenario    = scenario + "/"
 		midYear     = year + "_" + rcpScenario 
 
 	end if 
-	
-	if(scenRCP.eq."RCP85") then
-	
-		rcpScenario = "rcp485"
-		scenario    = scenario + "/" 
+
+	if(scenRCP.eq."RCP45NoFirev1") then
+
+		rcpScenario = "rcp45"
+		scenario    = scenario + "/"
 		midYear     = year + "_" + rcpScenario 
 
-	end if
+	end if 
 
+	if(scenRCP.eq."RCP45FireHIv1") then
+
+		rcpScenario = "rcp45"
+		scenario    = scenario + "/"
+		midYear     = year + "_" + rcpScenario 
+
+	end if 
+
+	; RCP88 scenarios
+	if(scenRCP.eq."RCP85Firev1") then
+
+		rcpScenario = "rcp85"
+		scenario    = scenario + "/"
+		midYear     = year + "_" + rcpScenario 
+
+	end if 
+
+	if(scenRCP.eq."RCP85NoFirev1") then
+
+		rcpScenario = "rcp85"
+		scenario    = scenario + "/"
+		midYear     = year + "_" + rcpScenario 
+
+	end if 
+
+	if(scenRCP.eq."RCP85FireHIv1") then
+
+		rcpScenario = "rcp85"
+		scenario    = scenario + "/"
+		midYear     = year + "_" + rcpScenario 
+
+	end if 
+
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	; yearString depnds on only year
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	if(year.eq."2000") then
 	
 		yearString = "200001-201012" 
@@ -111,7 +169,8 @@ begin ; begin main script
 
 	; NOTE: These variables are static. They do not change as a function of date
 	; NOTE: or scenario
-	coordData = dataDir+"cesm122_fmozsoa_f09f09_2000_fires_00.cam.h0.2000-01.nc"
+	metadir  = "/home/sbrey/projects/PMFutures/Fire_module/"
+	coordData = metadir + "cesm122_fmozsoa_f09f09_2000_fires_00.cam.h0.2000-01.nc"
 	meta = addfile(coordData, "r")
 
 	; get hyam and hybm | hyai and hybi
@@ -139,8 +198,8 @@ begin ; begin main script
 	print("------------------------------------------------------------")
 
 	; Now get the surface pressure. This is always required for vinth2p_ecmwf()  
-	PSFileBase = dataDir + "AirQualityData/" + scenario
-	PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_" + midYear + "_fires_00.PS.daily."+yearString+".nc"
+	PSFileBase = dataDir + scenario
+	PSFile = PSFileBase + "cesm122_fmozsoa_f09f09_" + midYear + fmod +"PS.daily."+yearString+".nc"
 	print("Working on loading sea level pressure file")
 	fPS = addfile(PSFile,"r")
 	ps = fPS->PS
@@ -156,29 +215,24 @@ begin ; begin main script
 	print("------------------------------------------------------------")
 	; Surface temperature is always needed as well
 	; e.g.cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.T.daily.204001-205012.nc
-	variableFileBase = dataDir + "AirQualityData/" + scenario + "cesm122_fmozsoa_f09f09_"+midYear+"_fires_00."
+	variableFileBase = dataDir + scenario + "cesm122_fmozsoa_f09f09_"+ midYear+ fmod
 	variableFile = variableFileBase + "T" + ".daily." + yearString + ".nc"
 	fccT = addfile(variableFile,"r")
-	T = fccT->T
 	T_lev = fccT->lev
-	nTLev = dimsizes(T_lev)
-	srf_index = nTLev-1 ; lev is the second dimension. 
-
-	; T is on lev not ilev (HEIGHT), 25 is the closest level to ground. 
-	; we want all times and points 
-	T_surface = T(:,srf_index,:,:)  
+	nTLev = dimsizes(T_lev) ; should be 26, 25 index closest to ground
+	srf_index = nTLev-1  ; 0 based indicies
+	T_surface = fccT->T(:,srf_index,:,:) ; lev is the second dimension.
 
 	delete(fccT)
-	delete(T)
 
 	print("------------------------------------------------------------")
 	print("Working on loading " + variable +  " into the workspace.....")
 	print("------------------------------------------------------------")
 
 	; Now get the variable to be interpolated to a new grid. 
-	variableFileBase = dataDir + "AirQualityData/" + scenario
+	variableFileBase = dataDir + scenario
 	variableFileMid  = variableFileBase + "cesm122_fmozsoa_f09f09_" + midYear
-	variableFile = variableFileMid + "_fires_00."+variable+".daily."+yearString+".nc"
+	variableFile = variableFileMid + fmod + variable+".daily."+yearString+".nc"
 
 	fccm = addfile(variableFile, "r")
 	print("Working on loading " + variable)
@@ -194,6 +248,13 @@ begin ; begin main script
 	delete(fccm)
 
 
+	; Ground level geopotential is needed for regridding function. 
+	print("Working on loading ground level groupotential PHIS")
+	usgsFile= metadir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
+	usgs = addfile(usgsFile,"r")
+	phis = (usgs->PHIS) 
+	delete(usgs)
+
 	; last arg is what dimensions match
 	if(variable.eq."HEIGHT") then		
 
@@ -201,12 +262,6 @@ begin ; begin main script
 		print("Wierd units of HEIGHT require regridding.")
 		print("------------------------------------------------------------")
 
-		; Ground level geopotential is needed for regridding function. 
-		print("Working on loading ground level groupotential PHIS")
-		usgsFile= dataDir + "USGS-gtopo30_0.9x1.25_remap_c051027.nc"
-		usgs = addfile(usgsFile,"r")
-		phis = (usgs->PHIS) 
-		delete(usgs)
 
 		; calculate ground level in meters from PHIS. We convert this to m
 		; because HEIGHT (geopotential) is saved in units of m not m^2/s^s.
@@ -224,21 +279,32 @@ begin ; begin main script
 		geopotential = VAR + conform(VAR, topo, (/2,3/))  
 		copy_VarCoords(VAR, geopotential)
 		VAR_ready = geopotential
-		VAR_ready@units = "m"
-		VAR_ready@long_name = "geopotential above sea level in meters"
+		;VAR_ready@units = "m"
+		;VAR_ready@long_name = "geopotential above sea level in meters"
 		delete(geopotential)
 		varflg = -1
 
-	else 
-		print("No addition of topo need for: " + variable)
+	else
+		print("------------------------------------------------------------")
+		print("No addition of topo needed for: " + variable)
+		print("------------------------------------------------------------")
 		VAR_ready = VAR
 		varflg = 0 ; for interpreting all non geopotential and temperature layers. 
 	end if 
 
+	; make sure Z3 is treated as geopotential height
+	if(variable.eq."Z3") then
+		varflg = -1
+	end if
+
+	if(variable.eq."T") then
+		varflg = 1
+	end if
 
 	;===================================================================
 	; Transform from Hybrid vertical levels to pressure levels	
 	;https://www.ncl.ucar.edu/Document/Functions/Built-in/vinth2p_ecmwf.shtml
+	;===================================================================
 	print("------------------------------------------------------------")
 	print("Regridding: " + variable + " to pressure coords.............")
 	print("------------------------------------------------------------")
@@ -248,21 +314,22 @@ begin ; begin main script
 	; Sanity check plot for this variable 
 	; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
 	;===================================================================
-	;print("plotting "+variable)
-	;wks  = gsn_open_wks("png",variable+lev_p(plot_lev)+"_Topo")   ; send graphics to PNG file
+	if(makePlot) then	
+		print("plotting "+variable)
+		wks  = gsn_open_wks("png",variable+lev_p(plot_lev)+"_Topo")   ; send graphics to PNG file
 
-	;res                     = True          ; plot mods desired
-	;res@tiMainString        = Variable+"on"+lev_p(plot_lev)+"pressure surface"
-	;res@cnFillOn            = True          ; turn on color
-	;res@cnFillPalette       = "gui_default" ; set color map
-	;res@vpWidthF            = 0.5           ; change aspect ratio of plot
-	;res@vpHeightF           = 0.3
-	;res@gsnMaximize         = True          ; maximize plot size
+		res                     = True          ; plot mods desired
+		res@tiMainString        = Variable+"on"+lev_p(plot_lev)+"pressure surface"
+		res@cnFillOn            = True          ; turn on color
+		res@cnFillPalette       = "gui_default" ; set color map
+		res@vpWidthF            = 0.5           ; change aspect ratio of plot
+		res@vpHeightF           = 0.3
+		res@gsnMaximize         = True          ; maximize plot size
 
-	; always plot the 0th day for sanitck check plot. 
-	;x = VAR_P(0,plot_lev,:,:) + topo; add topo if needed in analysis phases
-	;plot = gsn_csm_contour(wks, VAR_P(0,4,:,:), res)
-
+		; always plot the 0th day for sanitck check plot. 
+		x = VAR_P(0,plot_lev,:,:) + topo; add topo if needed in analysis phases
+		plot = gsn_csm_contour(wks, VAR_P(0,4,:,:), res)
+	end if
 	;===================================================================
 	; http://www.ncl.ucar.edu/Applications/netcdf4.shtml
 	; save output 
@@ -278,7 +345,7 @@ begin ; begin main script
 	setfileoption("nc", "FileStructure", "Advanced")
 	; Make the nc file save name the same name as input but append _P
 	; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
-	fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + "_fires_00." + variable + "_P.daily." + yearString + ".nc"
+	fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + fmod + variable + "_P.daily." + yearString + ".nc"
 
 	if (fileexists(fon)) then
 		system("rm "+ fon) ; remove it because if it exists this wont write
@@ -292,7 +359,7 @@ begin ; begin main script
 	fAtt@title         = variable + " regridded to pressure coords"  
 	fAtt@source_file   = variableFile
 	fAtt@Conventions   = "hybrid coords to pressure coords using vinth2p_ecmwf"   
-	fAtt@creation_date = systemfunc("date")        
+	;fAtt@creation_date = systemfunc("date")        
 	fileattdef( fo, fAtt )            ; copy file attributes    
 
 
