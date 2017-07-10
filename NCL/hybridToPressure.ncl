@@ -374,54 +374,6 @@ begin ; begin main script
 
 	; close the file connection
 	delete(fo)
-	;===================================================================
-	; explicitly declare file definition mode. Improve efficiency.
-	;===================================================================
-		;setfileoption(fo,"DefineMode",True)
 
 
-
-	;===================================================================
-	; predefine the coordinate variables and their dimensionality
-	; Note: to get an UNLIMITED record dimension, we set the dimensionality
-	; to -1 (or the actual size) and set the dimension name to True.
-	;===================================================================
-		;dimNames = (/"time", "lev_p", "lat", "lon"/)
-		;dimSizes = (/ 1 ,   nlev,  nlat,  nlon /)
-		;dimUnlim = (/ True , False, False, False/)
-		;filedimdef(fo, dimNames, dimSizes, dimUnlim)
-
-	; predefine the the dimensionality of the variables to be written out
-	;===================================================================
-	; Here we are using NCL functions to facilitate defining
-	; each variable's dimension name(s) and type.
-	;===================================================================
-	;filevardef(fo, "time", typeof(time), getvardims(time))
-	;filevarattdef(fo,"time", time)                   ; copy time attributes
-	;fo->time   = (/time/)
-
-	;lev = levs(0:9)
-	;lev(0:9) = (/lev_p/)
-	;filevardef(fo, "lev", typeof(lev), getvardims(lev) )
-	;filevarattdef(fo,"lev", lev)                     ; copy lev attributes
-	;fo->lev    = (/lev/)
-
-	;filevardef(fo, "lat", typeof(lat), getvardims(lat))
-	;filevarattdef(fo,"lat", lat)                     ; copy lat attributes
-	;fo->lat    = (/lat/)
-
-	;filevardef(fo, "lon", typeof(lon), getvardims(lon))
-	;filevarattdef(fo,"lon", lon)                     ; copy lon attributes
-	;fo->lon    = (/lon/)
-
-	;filevardef(fo, variable, typeof(VAR_P), getvardims(VAR_P))
-	;filevarattdef(fo,variable, VAR_P)                         ; copy T attributes
-	;filevarchunkdef(fo, variable, chunkSizes)
-	;filevarcompressleveldef(fo, variable, 2)
-	;fo->variable     = (/VAR_P/)
-	;print(fo)
-	;printVarSummary(t)
-	;exit
-
-end   ; end main script
-
+end   

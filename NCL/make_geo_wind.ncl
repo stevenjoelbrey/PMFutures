@@ -9,13 +9,11 @@
 ;; DESCRIPTION                                                                 ;;
 ;; -> 	This script is used to calculated geostrophic winds using geopotential ;;
 ;;       height fields. The NCL function z2geouv() is used to estimate the u_g ;;
-;;       and v_g               
-;;
-;;                                                                    
-;;  
-;;     scenario options
-;;	   2000Base, 2050RCP45, 2050RCP85, 2100RCP45,2100RCP85                     ;; 		                                                                           ;;
-;;                                                                             ;;	
+;;       and v_g                                                               ;;
+;;									       ;;	
+;;                                                                             ;; 
+;;  									       ;;
+;;    									       ;;	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 loadscript("substring.ncl")
@@ -32,7 +30,8 @@ begin ; begin main script
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;variable   = "Z3" 
-scenario = "2000Base" 
+;scenario = "2000Firev1" 
+fmod = "_fires_01."
 
 nl       = strlen(scenario)          
 year     = substring(scenario, 0, 3)
@@ -43,16 +42,31 @@ scenRCP  = substring(scenario, 4, nl)
 ; May the coding gods have mercy on me for this repeating mess ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-dataDir    = "/fischer-scratch/sbrey/outputFromYellowstone/"
-if(scenRCP.eq."Base") then
+dataDir    = "/pierce-scratch/mariavm/"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Set string variables required for loading files              ; 
+; May the coding gods have mercy on me for this repeating mess ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	rcpScenario = ""; rcp45 | rcp85 | "" (blank) for base scenario
-	scenario    = scenario + "/" ; 2000Base, 2050RCP45, 2050RCP85, 2100RCP45, 2100RCP85
-	midYear     = year + rcpScenario ; 2000, 2050_rcp85, 2100_rcp45
+; base scenarios
+if(scenRCP.eq."Firev1") then
+
+	rcpScenario = ""
+	scenario    = scenario + "/" 
+	midYear     = year + rcpScenario 
 
 end if
 
-if(scenRCP.eq."RCP45") then
+if(scenRCP.eq."NoFirev1") then
+
+	rcpScenario = ""
+	scenario    = scenario + "/" 
+	midYear     = year + rcpScenario 
+
+end if
+
+; RCP45 scenarios	
+if(scenRCP.eq."RCP45Firev1") then
 
 	rcpScenario = "rcp45"
 	scenario    = scenario + "/"
@@ -60,15 +74,51 @@ if(scenRCP.eq."RCP45") then
 
 end if 
 
-if(scenRCP.eq."RCP85") then
+if(scenRCP.eq."RCP45NoFirev1") then
 
-	rcpScenario = "rcp485"
-	scenario    = scenario + "/" 
+	rcpScenario = "rcp45"
+	scenario    = scenario + "/"
 	midYear     = year + "_" + rcpScenario 
 
-end if
+end if 
 
+if(scenRCP.eq."RCP45FireHIv1") then
+
+	rcpScenario = "rcp45"
+	scenario    = scenario + "/"
+	midYear     = year + "_" + rcpScenario 
+
+end if 
+
+; RCP88 scenarios
+if(scenRCP.eq."RCP85Firev1") then
+
+	rcpScenario = "rcp85"
+	scenario    = scenario + "/"
+	midYear     = year + "_" + rcpScenario 
+
+end if 
+
+if(scenRCP.eq."RCP85NoFirev1") then
+
+	rcpScenario = "rcp85"
+	scenario    = scenario + "/"
+	midYear     = year + "_" + rcpScenario 
+
+end if 
+
+if(scenRCP.eq."RCP85FireHIv1") then
+
+	rcpScenario = "rcp85"
+	scenario    = scenario + "/"
+	midYear     = year + "_" + rcpScenario 
+
+end if 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; yearString depnds on only year
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 if(year.eq."2000") then
 
 	yearString = "200001-201012" 
@@ -88,6 +138,7 @@ if(year.eq."2100") then
 end if
 
 
+
 print("------------------------------------------------------------")
 print("User written variables are set.")
 print("------------------------------------------------------------")
@@ -97,12 +148,12 @@ print("Loading geopotential heights................................")
 print("------------------------------------------------------------")
 
 
-variableFileBase = dataDir + "AirQualityData/" + scenario
+variableFileBase = dataDir + scenario
 variableFileMid  = variableFileBase + "cesm122_fmozsoa_f09f09_" + midYear
-variableFile = variableFileMid + "_fires_00."+"Z3_P"+".daily."+yearString+".nc"
+variableFile = variableFileMid + fmod +"Z3_P"+".daily." + yearString + ".nc"
 
-Z_nc = addfile(variableFile, "r")
-print("Working on loading " + variable)
+Z_nc = addfile(variableFile, "r") ; NEED CREATED FILES TO BE MOVED HERE
+print("Working on loading Z3_P")
 print("file="+variableFile)
 
 ; take the descriptive variables needed for saving
@@ -121,7 +172,7 @@ print("------------------------------------------------------------")
 ; Assume z is a global grid with dimension sizes (ntim,klev,nlat,mlon). 
 ; There are no missing values and the data are periodic in longitude. Then:
 
-uv = z2geouv(Z, lat, lon, 1)
+uv = z2geouv(Z, lat, lon, 1) ; 1 indicates Z cyclic in longitude
 
 
 ; create u component variable 
@@ -155,7 +206,7 @@ v&lon    =  lon
 ; Sanity check plot for this variable 
 ; https://www.ncl.ucar.edu/Applications/Scripts/conwomap_2.ncl 
 ;===================================================================
-print("plotting "+variable)
+print("plotting geo winds at the surface")
 wks  = gsn_open_wks("png", "1000_mb_Ug")   ; send graphics to PNG file
 
 res                     = True          ; plot mods desired
@@ -184,7 +235,7 @@ print("Working on saving u component as netcdf")
 
 ; Make the nc file save name the same name as input but append _P
 ; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
-fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + "_fires_00." + "ug_P.daily." + yearString + ".nc"
+fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "ug_P.daily." + yearString + ".nc"
 
 if (fileexists(fon)) then
 	system("rm "+ fon) ; remove it because if it exists this wont write
@@ -244,7 +295,7 @@ print("------------------------------------------------------------")
 
 ; Make the nc file save name the same name as input but append _P
 ; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
-fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + "_fires_00." + "vg_P.daily." + yearString + ".nc"
+fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "vg_P.daily." + yearString + ".nc"
 
 if (fileexists(fon)) then
 	system("rm "+ fon) ; remove it because if it exists this wont write
