@@ -235,7 +235,7 @@ print("Working on saving u component as netcdf")
 
 ; Make the nc file save name the same name as input but append _P
 ; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
-fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "ug_P.daily." + yearString + ".nc"
+fon =  variableFileBase + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "ug_P.daily." + yearString + ".nc"
 
 if (fileexists(fon)) then
 	system("rm "+ fon) ; remove it because if it exists this wont write
@@ -295,7 +295,7 @@ print("------------------------------------------------------------")
 
 ; Make the nc file save name the same name as input but append _P
 ; cesm122_fmozsoa_f09f09_2050_rcp45_fires_00.HEIGHT.daily.204001-205012.nc
-fon =  "../NCL_output/" + scenario + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "vg_P.daily." + yearString + ".nc"
+fon =  variableFileBase + "cesm122_fmozsoa_f09f09_" + midYear + fmod + "vg_P.daily." + yearString + ".nc"
 
 if (fileexists(fon)) then
 	system("rm "+ fon) ; remove it because if it exists this wont write

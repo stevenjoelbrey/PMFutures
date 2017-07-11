@@ -108,8 +108,6 @@ def makeAQNCFile(dataDirBase="/pierce-scratch/mariavm",\
 			scenario:   see /pierce-scratch/mariavm
 			tStep:      The time scale of the variable of interest. 
 				        "daily" | "hourly"	
-			fireModelv: Sometimes (without warning) the fire module is updated
-                                    we are now on v 01 "fires_01"
 
 		return: A string that is the path of the file to load
 	"""
@@ -132,40 +130,46 @@ def makeAQNCFile(dataDirBase="/pierce-scratch/mariavm",\
 
 	return ncFile
  
-def makeEmissionNCFile(NCVariable, scenario, year):
-	"""function for getting path of desired variable nc file path"""
 
-	dateSpan = {}
-	dateSpan['2010']   = '20000101-20101231'
-	dateSpan['2050']   = '20400101-20501231'
-	dateSpan['2100']   = '20900101-21001231'
+def makeEmissionNCFile(dataDirBase="/pierce-scratch/mariavm",\
+                       NCVariable="CO",\
+                       RCPScenario="RCP85",\
+                       decade="20000101-20101231"):
+
+	"""function for getting path of desired variable nc file path
+		Parameters: 
+                        dataDirBase: refers to hard drive with data
+			RCPScenario: RCP85, RCP45
+			decade: '20000101-20101231', '20400101-20501231' , 
+                                '20900101-21001231'
+	"""
 	
-	# Data will always live in the same place on Yellowstone, static. 
-	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
+	dataDir = os.path.join(dataDirBase, "FIRE_EMISSIONS")
 	fileHead = 'cesm130_clm5_firemodule_' 
-	fileMid  =  scenario + '_02.' + NCVariable
-	fileTail = '.daily.NA.' + dateSpan[year] + '.nc'
-	ncFile   = dataDirBase + fileHead + fileMid + fileTail
+	fileMid  =  RCPScenario + '_02.' + NCVariable
+	fileTail = '.daily.NA.' + decade + '.nc'
+	fileName = fileHead + fileMid + fileTail
+	ncFile   = os.path.join(dataDirBase, fileName)
 
 	return ncFile 
 
 
-def getEmissionSelf(species, RCP, year):
+def getEmissionSelf(dataDirBase, NCVariable, RCPScenario, decade):
 	"""This function uses makeEmissionNCFile() to get the nc file path
-    of the desired species arguemnt and returns the nc connection to 
-	that species. 
-		Parameters: 
-			species: Fire emission species to make nc file connection to.
-			RCP:     RCP scenario for file to load. Either 'RCP45' | 'RCP85'.
-					 The decade 2000-2010 (year = 2010) is RCP85.
-			year:    The year is the last year of the decade of interest.
-                     See makeEmissionNCFile for details. Options are 
-					 '2010' | '2050' | '2100'			
+           of the desired species arguemnt and returns the nc connection to 
+	   that species. 
+		Parameters: Same as makeEmissionNCFile()
+ 			dataDirBase:  Working hardrive 
+			NCVariable:   Fire emission species to make nc file connection to.
+			RCPScenario:  RCP scenario for file to load. Either 'RCP45' | 'RCP85'.
+				      The decade 2000-2010 (year = 2010) is RCP85.
+			decade:       '20000101-20101231', '20400101-20501231' , 
+                                      '20900101-21001231' 	
 
 		return: Returns nc file connection for given arguments. 
 
 	"""
-	ncFile = makeEmissionNCFile(species, RCP, year)
+	ncFile = makeEmissionNCFile(dataDirBase, NCVariable, RCPScenario, decade)
 	nc     = Dataset(ncFile, 'r')
 	ncVar  = nc.variables["bb"] # For some reason all emissions are bb
 	
@@ -175,7 +179,7 @@ def getEmissionSelf(species, RCP, year):
 
 def getNCVarDims(ncFile, NCVariable):
 	""""Function takes NCVariable and RCP scenario and returns the dimensions 
-     of that variable in a dictionary."""	
+            of that variable in a dictionary."""	
 	
 	nc     = Dataset(ncFile, 'r')
 	ncDims = nc.variables[NCVariable].dimensions
@@ -199,17 +203,17 @@ def getNCVarDims(ncFile, NCVariable):
 	return dimDict
 	
  
-def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
+def getNCData(dataDirBase, NCVariable, scenario, analysisDay, analysisLevel):
 	"""Get the data for a selected level of NCVariable. This function will 
-     automatically determine if the dataset has multiple levels. If there
-     is only one dimension in the vertical analysisLevel arugment is ignored.
-     TODO: Make this work for a passed time mask instead of a single date.
-         Parameters:
-             NCVarialbe:     String , the variable to be loaded. 
-             scemario:       String, RCP scenario, helps select data 
-             analysisDay:    String, YYYYMMDD for which to get data
-             analysisLevel:  Float, the pressure surface of interest for data
-                             defined on pressure surfaces.
+     	   automatically determine if the dataset has multiple levels. If there
+           is only one dimension in the vertical analysisLevel arugment is ignored.
+           TODO: Make this work for a passed time mask instead of a single date.
+           	Parameters:
+                	NCVarialbe:     String , the variable to be loaded. 
+             		scemario:       String, RCP scenario, helps select data 
+             		analysisDay:    String, YYYYMMDD for which to get data
+             		analysisLevel:  Float, the pressure surface of interest for data
+                        		defined on pressure surfaces.
 	
 	"""
 
@@ -230,7 +234,7 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 
 	# Find the ilev to pull from the data, if relevent
 	# TODO: Make dynamic based on what dimensions exist and in that order
-    # subcalls 
+        # TODO: subcalls 
 
 		
 	if 'ilev' in dimDict.keys():
@@ -250,7 +254,7 @@ def getNCData(NCVariable, scenario, analysisDay, analysisLevel):
 	
 	# Now get the land mask
 	fireBase = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
-	nc = Dataset(fireBase + 'cesm130_clm5_firemodule_landmask_f09x125.nc')
+	nc = Dataset(os.path.join(dataDirBase,'cesm130_clm5_firemodule_landmask_f09x125.nc'))
 	landMask = nc.variables[u'landmask'][:]
 	nc.close
 
@@ -264,8 +268,8 @@ def getUSGSTopo():
 	"""This function loads ground level geopotential file PHIS [kg/m**2/s**s]
 	and returns a dictionary with PHIS, units, and topo in [meters]."""
 	
-	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
-	ncFile= baseDir + 'USGS-gtopo30_0.9x1.25_remap_c051027.nc'
+	metaDir = '/home/sbrey/projects/PMFutures/Fire_module'
+	ncFile= os.path.join(metaDir, 'USGS-gtopo30_0.9x1.25_remap_c051027.nc')
 		
 	nc = Dataset(ncFile,'r')
 	srf_geo = {}
@@ -279,76 +283,8 @@ def getUSGSTopo():
 	return srf_geo
 
 
-def getCESMPHIS():
-	"""This function extracts and returns surface geopotential 
-	   m**2/s**2."""
-
-	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
-	ncFile= baseDir + 'cesm122_fmozsoa_f09f09_2000_fires_00.PHIS.monthly.200001-201012.nc'
-		
-	nc = Dataset(ncFile,'r')
-	srf_PHIS = {}
-	# All times are the same, does not change, so just grab first
-	srf_PHIS['PHIS'] = nc.variables[u'PHIS'][0,:,:] 
-	srf_PHIS['Z_srf'] = srf_PHIS['PHIS'] / 9.81 # (m**2/s**2) / (m/s**2) = [m]
-	srf_PHIS['units'] = nc.variables[u'PHIS'].units
-	srf_PHIS['longName'] = nc.variables[u'PHIS'].long_name
-	nc.close()
-
-	return srf_PHIS
-
-def getZ3():
-	"""This function gets a month geopotential heights"""
-	
-	baseDir = '/fischer-scratch/sbrey/outputFromYellowstone/'
-	ncFile= baseDir + 'cesm122_fmozsoa_f09f09_2000_fires_00.Z3.monthly.200001-201012.nc'
-		
-	nc = Dataset(ncFile,'r')
-	Z = {}
-	Z['Z3'] = nc.variables[u'Z3'][0,:,:,:] 
-	Z['units'] = nc.variables[u'Z3'].units
-	Z['longName'] = nc.variables[u'Z3'].long_name
-	nc.close()
-
-	return Z	
-
-def contourPlot(Z, titleText, units):
-	"""Plots a Single date model layer on global projection centered over NA"""
-	# TODO: PLACE ALL ARGUMENTS INTO DICTIONARY
-
-	# set up orthographic map projection with
-	# perspective of satellite looking down at 50N, 100W.
-	# use low resolution coastlines.
-
-	fig = plt.figure(figsize=(6, 6))
-
-	m = Basemap(projection='ortho',lat_0=45,lon_0=-100,resolution='l')
-	# draw coastlines, country boundaries, fill continents.
-	m.drawcoastlines(linewidth=0.25)
-	m.drawcountries(linewidth=0.25)
-	m.fillcontinents(color='coral',lake_color='aqua')
-	# draw the edge of the map projection region (the projection limb)
-	m.drawmapboundary(fill_color='aqua')
-	# draw lat/lon grid lines every 30 degrees.
-	m.drawmeridians(np.arange(0,360,30))
-	m.drawparallels(np.arange(-90,90,30))
-
-	# make up some data on a regular lat/lon grid.
-	lons, lats = np.meshgrid(data['lon'], data['lat']) 
-	x, y = m(lons, lats) # compute map proj coordinates.
-
-	# contour data over the map.
-	cs = m.contourf(x, y, Z, 16,linewidths=3)
-	csFill = m.pcolor(x, y, Z, visible=False)
-	cbar = m.colorbar(csFill, location='bottom', pad="1%")
-	cbar.set_label(units, fontsize=17)
-	#titleText= dateLab+' '+scenario + ' ' + str(analysisLevel) + 'hPa ' +NCVariable
-	plt.title(titleText, fontsize=15)
-	#plt.draw()
-	plt.show(block=False)
-
 ###############################################################################
-# ------------------------- Description --------------------------------------- 
+# ------------ MET EVENT FINDING FUNCTIONS Description ------------------------
 ###############################################################################
 # These functions are used to identify meteorogy events 
 # relevent for air quality and climate change impact assesment in the EPA
@@ -360,13 +296,13 @@ def detectStringInList(string, some_list):
 
 def getGroundAirQaulityData(variable, ncFile, scenario):
     """This function loads nc data of given variable and scenario into
-    the working environment using numpy arrays.
-        Parameters:
-            variable:   The AQ variable to be loaded (T, U, V, Precip?)
-            ncFile:     The path of the ncFile to be loaded
-            scenario:   The RCP scenario of the data to be loaded
+       the working environment using numpy arrays.
+            Parameters:
+            	variable:   The AQ variable to be loaded (T, U, V, PRECT)
+            	ncFile:     The path of the ncFile to be loaded
+            	scenario:   The RCP scenario of the data to be loaded
             
-        return: M, MUnits, MLongName, t, lat, lon     
+        	return: M, MUnits, MLongName, t, lat, lon     
     """
         
     nc = Dataset(ncFile, 'r')
@@ -416,14 +352,14 @@ def getGroundAirQaulityData(variable, ncFile, scenario):
 
 def findHighValueDays(M, t, percentile):
     """This function accepts a numeric array (t, lat, lon) and returns
-    an equal size array of 1s and 0s. The 1s indicate dates where M exceeded
-    monthly percentile threshold for that location and 0s dates when they did
-    not.
-        Parameters:
-            M:           Met variuable array to be passed. format (t, lat, lon)
-            t:           datetime.date array that defines time diemsion of T
-            percentile:  value between 0 and 100 that determines value used for
-                         a given month and grid cells threshold. 
+    	an equal size array of 1s and 0s. The 1s indicate dates where M exceeded
+    	monthly percentile threshold for that location and 0s dates when they did
+    	not.
+        	Parameters:
+        	    M:           Met variuable array to be passed. format (t, lat, lon)
+            	    t:           datetime.date array that defines time diemsion of T
+           percentile:           value between 0 and 100 that determines value used for
+                                 a given month and grid cells threshold. 
                          
         return: 
             mask:       True and False values indicating if temperature for day 

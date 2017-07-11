@@ -8,6 +8,8 @@
 # Please refer to the Make_PM25_README in /FIRE_EMissions and the recomended 
 # publications for a better understanding of the formula in this script. 
 
+# TODO: Save a separate file that saves out fire emitted PM25 seperately?
+
 import sys
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
@@ -232,7 +234,6 @@ longitude[:]     = lon
 time_var[:]      = time
 
 ncFile.close()
-
 
 writingComplete = timer.time()
 dt = (writingComplete - startTime) / 60. 

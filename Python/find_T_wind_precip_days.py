@@ -137,18 +137,20 @@ if threshType == 'usePercentile':
 	print 'using percentile thresholds for masking'
 
 	TMask, TLimVals = cnm.findHighValueDays(T,\
-											dateTime,\
-			                                TThresh)
+						dateTime,\
+			                        TThresh)
+
 	TMask = np.array(TMask, dtype=int)
 
 	WindMask, WindLimVals = cnm.findHighValueDays(windMag,\
-											      dateTime,\
-			                                      WindThresh)
+						      dateTime,\
+			                              WindThresh)
 	WindMask = np.array(WindMask, dtype=int)
 
 	PRECTMask, PrecLimVals = cnm.findHighValueDays(PRECT,\
-												   dateTime,\
-												   PRECTThresh)
+						       dateTime,\
+					               PRECTThresh)
+
 	PRECTMask = np.array(PRECTMask, dtype=int)
 
 elif threshType == 'useValue':

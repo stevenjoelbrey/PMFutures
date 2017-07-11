@@ -5,7 +5,7 @@
 ###############################################################################
 # This script is designed to create a mask of stagnation days as defined by 
 # Wang and Angell [1999]. The three variables read in and assessed for 
-# stagnation condition are 500, 1000 (taken as SLP) geostrophic winds, and 
+# stagnation condition are 500mb , 1000mb (taken as SLP) geostrophic winds, and 
 # precipitation. 
 
 # Read arguments passed via the command line if there are any. Otherwise use the
@@ -194,16 +194,6 @@ dt = (writingComplete - startTime) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the entire script.'
 print '----------------------------------------------------------------------'
-
-
-
-
-
-
-
-
-
-
 
 
 
