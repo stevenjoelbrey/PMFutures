@@ -12,7 +12,8 @@
 # and then gradually become pure pressure coordinates somewhere around 100 hPa
 
 # TODO: Change every instance of adding paths together to using 
-#       os.path.join(a, b)
+#       os.path.join(a, b) and make this work on my laptop pulling from
+#       external drive backups. 
 
 import os
 import numpy as np
@@ -20,7 +21,6 @@ import sys
 from mpl_toolkits.basemap import Basemap, cm
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
-#import pickle
 import numpy.ma as ma
 from datetime import date
 import matplotlib.ticker as tkr
@@ -30,13 +30,23 @@ import datetime
 # -----------------Air Quality File functions ---------------------------------
 ###############################################################################
 
-#scenario = '2000Base'
-#AQ_or_fire = 'AirQuality' # TODO: Decide if this is needed 
-#NCVariable = 'HEIGHT'
-#analysisDay = date(2005, 3, 1) # will be something that is eventually looped over 
-#analysisLevel = 100 # mb
+#scenario = '2000Firev1'
+#NCVariable = 'Z3'
+
 
 # TODO: Make these functions into a class
+
+
+def metersPerSecToMetersPerDay(prec):
+	"""Converts precip from m/s for a day to total inches of rain per
+    grid cell for that day."""
+	
+    # prec needs to be converted from m/s to incher/day
+	inchPerM = 39.3701      # [inch/m]
+	secondsPerDay = 86400.  # [s/day]
+	mPersToInPerDay = inchPerM * secondsPerDay # [(inch s) / (m day)]
+	precInch = prec[:] * mPersToInPerDay
+	return precInch
 
 def KtoF(T):
 	F = T * 9/5. - 459.67
@@ -77,10 +87,11 @@ def getSelf(scenario, species):
 
 		
 """
-	ncFile = cnm.makeAQNCFile(species, scenario, 'daily')
+	ncFile = makeAQNCFile(species, scenario, 'daily')
 	nc     = Dataset(ncFile, 'r')
 	ncVar  = nc.variables[species]
-	return ncVar 
+
+	return ncVar
 
 
 def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
@@ -138,6 +149,29 @@ def makeEmissionNCFile(NCVariable, scenario, year):
 	ncFile   = dataDirBase + fileHead + fileMid + fileTail
 
 	return ncFile 
+
+
+def getEmissionSelf(species, RCP, year):
+	"""This function uses makeEmissionNCFile() to get the nc file path
+    of the desired species arguemnt and returns the nc connection to 
+	that species. 
+		Parameters: 
+			species: Fire emission species to make nc file connection to.
+			RCP:     RCP scenario for file to load. Either 'RCP45' | 'RCP85'.
+					 The decade 2000-2010 (year = 2010) is RCP85.
+			year:    The year is the last year of the decade of interest.
+                     See makeEmissionNCFile for details. Options are 
+					 '2010' | '2050' | '2100'			
+
+		return: Returns nc file connection for given arguments. 
+
+	"""
+	ncFile = makeEmissionNCFile(species, RCP, year)
+	nc     = Dataset(ncFile, 'r')
+	ncVar  = nc.variables["bb"] # For some reason all emissions are bb
+	
+	return ncVar
+
 
 
 def getNCVarDims(ncFile, NCVariable):
@@ -452,30 +486,12 @@ def getSurfaceWindScaler(scenario):
     return scaler, MUnits, 'Scaler Wind', t, lat, lon   
 
 
-def findStagnationDays():
-	
-	# Load daily surface pressure to en-route to make sea surface 
-	# geostrophic winds 
-	makeAQNCFile()
-	psFile = 'cesm122_fmozsoa_f09f09_2000_fires_00.PS.daily.200001-201012.nc'
 
-	# Find dates that sea-level geo winds are less than 8 m/s. Flag.
-
-	# Load 500 hPa geostrophic winds 
-
-	# Find locations where 500 hPa geostrophic winds are less then 13 m/s 
-
-	# Find locations where there is less then 0.01 inches of precipitation
-
-	# Return an equal size array equal to one where all of these conditions are
-    # met and 0 where they are not. Consider returning all individual masks if
-	# useful elsewhere. 
-   
 
 ###############################################################################
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
-# This script will be used to summarize and plot emissions from CESM. 
+# This section will be used to summarize and plot emissions from CESM. 
 # A Multipanel plot will sumarize the present day, 2050, 2100 emissions for a 
 # selected variable. Later on, this script will be able to make the standard 
 # plots for desired time and season subsets. Much later, this code will be
@@ -484,9 +500,9 @@ def findStagnationDays():
 
 def getEmissionVariableData(variable, scenario, year):
 	"""This function loads the emission 'variable' for the given secenario
-     and year (ending decade of 11 year period of data). The time variable
+    and year (ending decade of 11 year period of data). The time variable
 	is transformed to a python datetime.date object and assumes that there
-     are no leap years in the model output (tested). 
+    are no leap years in the model output (tested). 
          Paremeters: 
              variable:  The emission variable to be loaded
              scenario:  The RCP scenario to load data for 
@@ -553,7 +569,8 @@ def loadEmissionGridAttributes(lat, lon):
            lon: longitude that defines the grid of emission data.
            lat: latitude that defines the grid of emission data. 
 	
-           return value: area of grid cells in units of m^2
+           return value: area (grid cells in units of m^2), 
+						 landMask (0=ocean, 1=land)
 	"""
 
 	dataDir = '/fischer-scratch/sbrey/outputFromYellowstone/FireEmissions/'
@@ -586,7 +603,9 @@ def loadEmissionGridAttributes(lat, lon):
 	#fill_value = area.fill_value
 	area = areaSubset
 
-	return area # later others may be needed as well. 
+	landMaskSubset = layer['landmask'][latI.min():(latI.max()+1) , lonI.min():(lonI.max()+1)]
+
+	return area, landMaskSubset # later others may be needed as well. 
 
 def makeTotalEmissions(bb, area, t): 
 	"""This function takes change the units of emissions from kg/sec/m^2 to 
@@ -693,10 +712,10 @@ def subsetModelEmissions(data, t, lat, lon, startMonth=1, endMonth=12,
         
     tMask = (mon >= startMonth) & (mon <= endMonth)
     ti = np.where(tMask == True)[0] # you can have whatever you like
-    tSubset = t[ti[0]:(ti[-1]+1)]
+    tSubset = t[tMask]
     
     # Super ugly statement for getting the subset of lat and lon
-    dataSubset = data[ti[0]:(ti[-1]+1), lati[0]:(lati[-1]+1), loni[0]:(loni[-1]+1)]
+    dataSubset = data[tMask, lati[0]:(lati[-1]+1), loni[0]:(loni[-1]+1)]
 
     return dataSubset, tSubset, latSubset, lonSubset    
     

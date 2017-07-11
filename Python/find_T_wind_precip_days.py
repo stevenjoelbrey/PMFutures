@@ -4,13 +4,17 @@
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
 # This script is used to identify high wind days, precipitation days, and
-# high temperature days. 
+# high temperature days. This script can be passed a rather confusing set of 
+# arguments. 
 
 import sys
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 # TODO: Make it possible to pass absolute thresholds. 
+
+
+threshDict = {}
 
 if len(sys.argv) != 1:
 
@@ -22,21 +26,41 @@ if len(sys.argv) != 1:
 
 		TThresh    = sys.argv[3] # percentile
 		WindThresh = sys.argv[4] # percentile
-		PRECThresh = sys.argv[5] # percentile
+		PRECTThresh = sys.argv[5] # percentile
+
+		threshDict['T']     = str(TThresh) + 'percentile'
+		threshDict['Wind']  = str(WindThresh) + 'percentile'
+		threshDict['PRECT'] = str(PRECTThresh) + 'percentile'
 
 	if threshType == 'useValue':
 
-		TThresh    = sys.argv[3] # K
-		WindThresh = sys.argv[4] # m/s
-		PRECThresh = sys.argv[5] # inches/day
+		TThresh     = sys.argv[3] # K
+		WindThresh  = sys.argv[4] # m/s
+		PRECTThresh = sys.argv[5] # inches/day
+
+		threshDict['T']     = TThresh
+		threshDict['Wind']  = WindThresh
+		threshDict['PRECT'] = PRECTThresh
 
 else:
 
 	print 'Using defualt arguments. None passed via command line.'
-	threshType = 'usePercentile'
-	TThresh    = 95 # percentile
-	WindThresh = 95 # percentile
-	PRECThresh = 95 # percentile
+	threshType  = 'usePercentile'
+	scenario    = '2000Base'
+	TThresh     = 95 #298 # K, 90th percentile of all 20-60 North days daily temeperate
+	WindThresh  = 95 #9 #m/s = 20 mph 1hr, NWS fire weather warning
+	PRECTThresh = 1  # 0.01  # percentile # TODO: Think carefully about this percentile value
+    
+	if threshType == 'useValue':                         # TODO: selection
+		threshDict['T']     = TThresh
+		threshDict['Wind']  = WindThresh
+		threshDict['PRECT'] = PRECTThresh
+
+	if threshType == 'usePercentile':
+		threshDict['T']     = str(TThresh) + 'percentile'
+		threshDict['Wind']  = str(WindThresh) + 'percentile'
+		threshDict['PRECT'] = str(PRECTThresh) + 'percentile'	
+
 
 import os
 import numpy as np
@@ -57,62 +81,144 @@ startTime = timer.time()
 U = cnm.getSelf(scenario, "U")
 V = cnm.getSelf(scenario, "V")
 T = cnm.getSelf(scenario, "T")
-Prec = cnm.getSelf(scenario, "T")
+PRECT = cnm.getSelf(scenario, "PRECT")
 
-# COPPIED FROM cesm_nc_manager.py, review to make sure it makes sense and use
-# it as needed to create these three masks. 
-def findHighValueDays(M, t, percentile):
-    """This function accepts a numeric array (t, lat, lon) and returns
-    an equal size array of 1s and 0s. The 1s indicate dates where M exceeded
-    monthly percentile threshold for that location and 0s dates when they did
-    not.
-        Parameters:
-            M:           Met variuable array to be passed. format (t, lat, lon)
-            t:           datetime.date array that defines time diemsion of T
-            percentile:  value between 0 and 100 that determines value used for
-                         a given month and grid cells threshold. 
-                         
-        return: 
-            mask:       True and False values indicating if temperature for day 
-                        and location exceeds percentile threshold value for 
-                        that month. True equals high T days. 
-            threshold:  An array (month, lat, lon) that contains the percentile
-                        threshold value for each month and location used to 
-                        make 'mask'.    
-    """
-    # set the size of output based on the size of passed temperature array
-    nDays = len(t)
-    nLat = M.shape[1]
-    nLon = M.shape[2]    
-    
-    # make arrray that is month of t    
-    mon = np.zeros(nDays,dtype=int)
-    for i in range(nDays):
-        mon[i] = t[i].month
-        
-    # monthly threshold array
-    threshold = np.zeros((12, nLat, nLon))
-    mask      = np.zeros(M.shape, dtype=bool) 
-    
-    # Loop through each month of the year and each grid cell to find
-    # that months locations percentile thresh value. Create a mask.
-    for i in range(12):
-        month = i + 1
-        monthMask = np.where(mon == month)[0]       
-        
-        for LAT in range(nLat):
-            for LON in range(nLon):
-                M_cell = M[monthMask, LAT, LON]
-                threshValue = np.percentile(M_cell, percentile)
-                threshold[i, LAT, LON] = threshValue 
-                mask[monthMask, LAT, LON] = M_cell >= threshValue
-                
-    return mask, threshold
+# Use T to get dimension information
+TFile  = cnm.makeAQNCFile('T', scenario, 'daily')
+Tnc    = Dataset(TFile, 'r')
+t      = Tnc.variables['time'][:]
+lat    = Tnc.variables['lat'][:]
+lon    = Tnc.variables['lon'][:]
+lev    = Tnc.variables['lev'][:]
+Tnc.close()
+
+# Get the surface index from lev. This is index used to make masks.
+# NOTE: U, V, and T all on lev NOT ilev
+srf_index = np.where(lev == lev.max())[0][0]
+
+####################################################
+# Get all variables massive arrays into useful forms
+####################################################
+
+# convert precip to inches per day 
+PRECT = cnm.metersPerSecToMetersPerDay(PRECT)
+
+print '-----------------------------------------------------------------'
+print 'working on getting full size surface arrays'
+print '-----------------------------------------------------------------'
+T = T[:, srf_index, :, :]
+print 'done with T'
+
+U = U[:, srf_index, :, :]
+print 'Done with U'
+
+V = V[:, srf_index, :, :]
+print 'Done with V'
+
+print 'Done getting wind, temperature, and precip variables into environment'
+
+# Create surface wind mag
+windMag = np.sqrt(U**2 + V**2)
 
 
+# Get a more friendly time dimension that is useful for precentile
+# maximum values
+Time     = cnm.getSelf(scenario, "date")
+dateTime = cnm.dateNumToDate(Time)
+nTime    = len(Time)
+nLon     = len(lon)
+nLat     = len(lat)
+
+# We need to identify the threshold value and mask for each variable. 
+# Using a single value is the simple method. Using a percentile value
+# for a given grid cell is much more complicated and still in development
+if threshType == 'usePercentile':
+
+	print 'using percentile thresholds for masking'
+
+	TMask, TLimVals = cnm.findHighValueDays(T,\
+											dateTime,\
+			                                TThresh)
+	TMask = np.array(TMask, dtype=int)
+
+	WindMask, WindLimVals = cnm.findHighValueDays(windMag,\
+											      dateTime,\
+			                                      WindThresh)
+	WindMask = np.array(WindMask, dtype=int)
+
+	PRECTMask, PrecLimVals = cnm.findHighValueDays(PRECT,\
+												   dateTime,\
+												   PRECTThresh)
+	PRECTMask = np.array(PRECTMask, dtype=int)
+
+elif threshType == 'useValue':
+
+	print 'using hard value thresholds for masking'
+
+	# Predefine the mask arrays
+	TMask     = np.zeros((len(t), len(lat), len(lon)), dtype=int)
+	WindMask  = TMask
+	PRECTMask = TMask
+
+	print 'Creating surface temperature Mask'
+	# Mask high temperature days for this date
+	TMask = np.array(T >= TThresh, dtype=int)
+
+	print 'Creating srf windMag Mask'
+	WindMask = np.array(windMag >= WindThresh, dtype=int)
+
+	print 'Create the low precip day Mask'
+	PRECTMask = np.array(PRECT <= PRECTThresh, dtype=int)
 
 
+######################################################################
+# Write all three masks with detailed description of chosen thresholds 
+######################################################################
+masksDict = {}
+masksDict['T']     = TMask
+masksDict['Wind']  = WindMask
+masksDict['PRECT'] = PRECTMask
 
+for var in masksDict.keys():
+
+	if var!='PRECT':
+		condition = 'high'+var
+
+	else:
+		condition = 'low'+var
+
+	saveString = condition +'Mask_'+str(threshDict[var])
+
+	# connect this descriptive name to the directory of the scenario and var
+	saveName = cnm.makeAQNCFile(saveString, scenario, 'daily')
+
+	ncFile = Dataset(saveName, 'w', format='NETCDF4')
+	ncFile.description = 'Mask indicating ' + condition + ' condition.'
+	ncFile.location    = 'Global'
+	ncFile.createDimension('time', nTime )
+	ncFile.createDimension('lat', nLat )
+	ncFile.createDimension('lon', nLon )
+
+	# Create variables on the dimension they live on 
+	maskVar = ncFile.createVariable(saveString, 'i', ('time','lat','lon'))
+	maskVar.units = '1=True, 0=False. ' + 'Limit used: ' + str(threshDict[var])
+
+	time_var = ncFile.createVariable('time', 'i4', ('time',))
+	time_var.units = 'days from origin'
+
+	latitude = ncFile.createVariable('lat', 'f4', ('lat',))
+	latitude.units = 'degrees north'
+	 
+	longitude = ncFile.createVariable('lon', 'f4', ('lon',))
+	longitude.units = 'degrees east'
+
+	# Write the actual data to these dimensions
+	maskVar[:]       = masksDict[var]
+	latitude[:]      = lat
+	longitude[:]     = lon
+	time_var[:]      = t
+
+	ncFile.close()
 
 
 

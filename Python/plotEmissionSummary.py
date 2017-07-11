@@ -76,8 +76,10 @@ m = Basemap(projection='merc',llcrnrlat=minLat,urcrnrlat=maxLat,\
 lons, lats = np.meshgrid(ELon, ELat)
 x, y = m(lons, lats)
 
-# Load area once final domain of emissions analysis is set
-area = cnm.loadEmissionGridAttributes(ELat, ELon)
+# Load grid cell area once final domain of emissions analysis is set
+# TODO: Look into run time warning
+area, landMask = cnm.loadEmissionGridAttributes(ELat, ELon)
+
 
 ################################################################################
 #----------------------- Load desired met event masks --------------------------
@@ -122,13 +124,42 @@ stagMask, mt, mLat, mLon  =  cnm.subsetModelEmissions(
                                               startMonth, endMonth,\
                                               minLat, maxLat, minLon, maxLon)
 
+# cyclone & blocking days coming soon (I hope)
+
+
+
+# Now we only care about the values over land. So mask out areas over water. 
+# This is important for parameters like "highWindMask", which mainly shows up
+# over the ocean, which is not particularly helpful. 
+# TODO: Figure out how to do this without using a for loop
+highWindMask = ma.core.MaskedArray(highWindMask)
+highTMask    = ma.core.MaskedArray(highTMask)
+lowPrecMask  = ma.core.MaskedArray(lowPrecMask)
+stagMask     = ma.core.MaskedArray(stagMask)
+
+for i in range(len(mt)):
+	highWindMask[i,:,:]= ma.masked_where(landMask == 0, highWindMask[i,:,:])
+	highTMask[i,:,:]   = ma.masked_where(landMask == 0, highTMask[i,:,:])
+	lowPrecMask[i,:,:] = ma.masked_where(landMask == 0, lowPrecMask[i,:,:])
+	stagMask[i,:,:]    = ma.masked_where(landMask == 0, stagMask[i,:,:])
+
 ################################################################################
 # Count the number of events at each grid cell for each type 
 ################################################################################
-nHighWindGrid = np.sum(highWindMask, axis=0)
-nHighTGrid    = np.sum(highTMask,    axis=0)
-nLowPrecGrid  = np.sum(lowPrecMask,  axis=0)
-nStagMaskGrid = np.sum(stagMask,     axis=0)
+year = []
+for i in range(len(mt)):
+	year.append(mt[i].year)
+
+uniqueYears = np.unique(year)
+nYears = len(uniqueYears)
+daysPerSummer = np.sum(mt < date(uniqueYears[1],1,1))
+n = daysPerSummer * nYears * 1.
+
+# Sum across time dimension TODO: and make % June-September
+nHighWindGrid = np.sum(highWindMask, axis=0) / n
+nHighTGrid    = np.sum(highTMask,    axis=0) / n
+nLowPrecGrid  = np.sum(lowPrecMask,  axis=0) / n
+nStagMaskGrid = np.sum(stagMask,     axis=0) / n
 
 # Count total occurance
 nHighWind = np.sum(highWindMask)
@@ -137,46 +168,154 @@ nLowPrec  = np.sum(lowPrecMask)
 nStagMask = np.sum(stagMask)
 
 ################################################################################
-# Map the occurance of each type 
+# Map the occurance of each type of met event 
 ################################################################################
 
-fig = plt.figure(figsize=(10,10))
+fig = plt.figure(figsize=(8,10))
 
 ax = fig.add_subplot(2,2,1)
 
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, ma.masked_where(nHighWindGrid == 0, nHighWindGrid) )
-plt.colorbar(c)
+c = m.pcolor(x, y, nHighWindGrid, cmap="Reds", vmin=0., vmax=.1 )
+cbar = m.colorbar(c, location='bottom', pad="1%", extend='max', ticks=[0, 0.05, .1])
+cbar.set_label('proportion of days')
 plt.title('Days Wind > 9 m/s')
 
 ax = fig.add_subplot(2,2,2)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, ma.masked_where(nHighTGrid == 0, nHighTGrid) )
-plt.colorbar(c)
+c = m.pcolor(x, y, nHighTGrid, cmap="Purples", vmin=0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
 plt.title('Days T > 25 C')
 
 ax = fig.add_subplot(2,2,3)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, ma.masked_where(nLowPrecGrid == 0, nLowPrecGrid) )
-plt.colorbar(c)
+c = m.pcolor(x, y, nLowPrecGrid, cmap="Purples", vmin=0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
 plt.title('Days with precip < 0.01 inches')
 
 ax = fig.add_subplot(2,2,4)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, ma.masked_where(nStagMaskGrid == 0, nStagMaskGrid) )
-plt.colorbar(c)
+c = m.pcolor(x, y, nStagMaskGrid, cmap="Purples", vmin = 0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
 plt.title('Stagnation Days')
 
 plt.savefig('../Figures/metEventMaskCounts_' + AScenario + '.png')
+plt.close()
 
+################################################################################
+# Now we want to make the exact same plot, only we want to mask ot the locations
+# where emissions are low. We want to look at met events where emissions for 
+# fires are high. Once those locations are known. Show exact same plot again
+# only where emissions are high 
+################################################################################
+ETotal = np.sum(E, axis=0) * area # kg/grid
+
+#ENew = np.zeros(E.shape)
+#ENew = ma.core.MaskedArray(ENew)
+#for i in range(len(mt)):
+#	ENew[i, :, :] = (E[i,:,:] * area)
+#
+#ENewTotal = np.sum(ENew, axis=0)
+
+
+fig = plt.figure(figsize=(8,8))
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, ETotal, cmap="OrRd")
+cbar = m.colorbar(c, location='bottom',pad="1%")
+cbar.set_label('BC + OC kg')
+plt.title('Total Emissions, June-Sept 2000-2010', fontsize=24)
+plt.savefig('../Figures/decadeEmissions_'+ AScenario + '.png')
+
+# Pick a value that boxes must exceed if they are going to be considering
+# TODO: Consider whether it would be more meaningful to look at the
+# TODO: boxes that account for 50% of the emissions, will be fewer. 
+cutoff    = np.percentile(ETotal, 75)
+highEMask = ETotal > cutoff
+ETotalSum = np.sum(ETotal)
+
+# Estimate proportion of total emissions these account for after masking out
+# the low emission amounts 
+highETotal = ma.masked_where(highEMask==False, ETotal)
+highEmittersSum = np.sum(highETotal)
+percentTotalERetained = highEmittersSum / ETotalSum * 100. 
+print 'Percent of domain emissions retained with chosen mask: ' + str(percentTotalERetained)
+
+
+fig = plt.figure(figsize=(8,8))
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, highETotal, cmap="OrRd")
+cbar = m.colorbar(c, location='bottom',pad="1%")
+cbar.set_label('BC + OC kg')
+plt.title('Total Emissions, June-Sept 2000-2010', fontsize=24)
+plt.savefig('../Figures/decadeHighEmitters_'+ AScenario + '.png')
+
+# Mask the met event totals by this high emission mask 
+nHighWindGrid = ma.masked_where(highEMask==False, nHighWindGrid)
+nHighTGrid    = ma.masked_where(highEMask==False, nHighTGrid)
+nLowPrecGrid  = ma.masked_where(highEMask==False, nLowPrecGrid)
+nStagMaskGrid = ma.masked_where(highEMask==False, nStagMaskGrid)
+
+# Now do it with the emissions in time, we do not ever want to look at the 
+# locations where the values are this low 
+for i in range(len(mt)):
+	E[i,:,:] = ma.masked_where(highEMask==False, E[i,:,:])
+
+# Plot the met even counter again now that they are masked 
+fig = plt.figure(figsize=(8,10))
+
+ax = fig.add_subplot(2,2,1)
+
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, nHighWindGrid, cmap="Reds", vmin=0., vmax=.1 )
+cbar = m.colorbar(c, location='bottom', pad="1%", extend='max', ticks=[0, 0.05, .1])
+cbar.set_label('proportion of days')
+plt.title('Days Wind > 9 m/s')
+
+ax = fig.add_subplot(2,2,2)
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, nHighTGrid, cmap="Purples", vmin=0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
+plt.title('Days T > 25 C')
+
+ax = fig.add_subplot(2,2,3)
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, nLowPrecGrid, cmap="Purples", vmin=0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
+plt.title('Days with precip < 0.01 inches')
+
+ax = fig.add_subplot(2,2,4)
+m.drawcoastlines(linewidth=1)
+m.drawstates(linewidth=1)
+m.drawcountries(linewidth=1)
+c = m.pcolor(x, y, nStagMaskGrid, cmap="Purples", vmin = 0, vmax=1 )
+cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
+cbar.set_label('proportion of days')
+plt.title('Stagnation Days')
+
+plt.savefig('../Figures/metEventMaskCountsHighE_' + AScenario + '.png')
 
 ################################################################################
 # Make masked arrays for each emission day type. DO NOT show where mask == 0
@@ -197,15 +336,125 @@ E         = ma.masked_where(E == 0, E)
 ################################################################################
 # TODO: Map total emissions for each met event type 
 ################################################################################
-# cnm.makeTotalEmissions
 
-
-# Flatten all of these values, trailing _ indicates flattened to 1D
+# Flatten all of these values, trailing _ indicates flattened to 1D, removes 
+# masked values 
 highWindE_ = ma.compressed(highWindE)
 HighTE_    = ma.compressed(HighTE)
 LowPrecE_  = ma.compressed(LowPrecE)
 stagE_     = ma.compressed(stagE)
 E_         = ma.compressed(E)
+
+# First make a multihist of these met events. 
+bins = np.linspace(0, E_.max(), 100)
+x = np.cumsum(np.diff(bins))
+
+# Count the amount in each emission bin for each type of met event
+E_heights         = plt.hist(E_, bins, label='E | No meteorology event', alpha=0.2)[0]
+HighTE_heights    = plt.hist(HighTE_, bins, label='E | high T', alpha=0.2)[0]
+highWindE_heights = plt.hist(highWindE_, bins, label = 'E | high wind', alpha=0.2)[0]
+LowPrecE_heights  = plt.hist(LowPrecE_, bins, label = 'E | low precip', alpha=0.2)[0]
+stagE_heights     = plt.hist(stagE_, bins, label = 'E | stagnation', alpha=0.2)[0]
+
+
+# Create data structure to plot nice side by side by histograms
+fig = plt.figure(figsize=(10,10))
+lw=2
+ax= fig.add_subplot(1,1,1)
+plt.subfigure(1,1)
+plt.plot(x, E_heights, label='No meteorology event', linewidth=lw)
+plt.plot(x, HighTE_heights, label='E | high T', linewidth=lw)
+plt.plot(x, highWindE_heights, label='E | high wind', linewidth=lw)
+plt.plot(x, LowPrecE_heights, label='E | low precip', linewidth=lw)
+plt.plot(x, stagE_heights, label='E | stagnation', linewidth=lw)
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.xaxis.set_ticks_position('bottom')
+ax.yaxis.set_ticks_position('left')
+plt.xlim([0, 0.00004])
+plt.xlabel('Kg m$^{-2}$', fontsize=24)
+plt.ylabel('Total grid boxe days with given emission', fontsize=24)
+
+plt.legend(loc='upperright')
+
+plt.savefig('../Figures/lineHistogram_'+AScenario+'.pdf')
+
+
+
+
+
+# Now normalize the occurance of these events and plot the lines
+# of the heights of the histogram. _n stands for normalized.
+def normalizeE(heights):
+	heights_n = heights / np.sum(heights)
+	return heights_n
+
+E_heights_n         = normalizeE(E_heights)
+HighTE_heights_n    = normalizeE(HighTE_heights)
+highWindE_heights_n = normalizeE(highWindE_heights)
+LowPrecE_heights_n  = normalizeE(LowPrecE_heights)
+stagE_heights_n     = normalizeE(stagE_heights) 
+
+
+
+
+fig = plt.figure(figsize=(8,6))
+
+plt.plot(x, E_heights_n, label='E | No meteorology event', linewidth=3)
+plt.plot(x, HighTE_heights_n, label='E | high T', linewidth=3)
+plt.plot(x, highWindE_heights_n, label = 'E | high wind', linewidth=3)
+plt.plot(x, LowPrecE_heights_n, label = 'E | low precip', linewidth=3)
+plt.plot(x, stagE_heights_n, label = 'E | stagnation', linewidth=3)
+#plt.yscale('log', nonposy='clip')
+plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+plt.xlim([0, x[30]])
+
+plt.xlabel('Emissions (kg m$^{-2}$ day$^{-1}$)', fontsize=18)
+plt.ylabel('Proportion of event days', fontsize=18)
+plt.legend(loc='upper right')
+plt.legend(frameon=False)
+
+plt.savefig('../Figures/EmissionProbabilityGivenMet.pdf')
+
+plt.close()
+
+
+FACTOR = 1e14
+
+# Make kernal density estimates for these arrays of values. 
+mu = np.mean(E_)
+sigma = np.std(E_)
+Xn =  (E_ - mu) / sigma
+
+# Try normalizing a second one with this
+
+Xn = E_ * FACTOR
+
+from sklearn.neighbors.kde import KernelDensity
+X = Xn[:, np.newaxis]
+kde = KernelDensity(kernel='tophat', bandwidth=0.1).fit(X)
+
+# Make a range of values to predict density on
+xRange = np.linspace(Xn.min(), Xn.max(), 100)[:, np.newaxis]
+log_dens = kde.score_samples(xRange)
+
+dens = np.exp(log_dens)
+
+plt.plot(xRange, dens)
+
+
+xRangeBack = xRange * sigma + mu
+
+plt.plot(xRangeBack, dens)
+plt.xlabel('No event emissions (kg/m$^{2}$/day)')
+plt.ylabel('Density Estimate')
+
+
+# Try a poor mans estimate
+#height = plt.hist([highWindE_, HighTE_], 
+#				  bins=np.linspace(E_.min(), E_.max(),1e6)))
+
 
 medianValues = [np.percentile(E_, 50), 
 				np.percentile(highWindE_, 50),

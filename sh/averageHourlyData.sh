@@ -1,5 +1,5 @@
 #!/bin/sh
-#PBS -N averageSLP
+#PBS -N 2100RCP45
 #PBS -l nodes=1:ppn=1
 ### Specify queue if necessary
 #PBS -q batch
@@ -11,7 +11,7 @@ cd /home/sbrey/projects/PMFutures/Python
 # Set the python Path so that it can use Anaconda distribution
 export PATH="/home/sbrey/anaconda2/bin:$PATH"
 
-# Passed arguments: hourlyVAR, scenario, year
-python averageHourlyData.py PSL 2000Base 2000
+# Passed arguments: hourlyVAR, scenario
+python averageHourlyData.py PSL 2100RCP85
 
 exit 0

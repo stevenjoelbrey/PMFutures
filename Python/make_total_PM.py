@@ -29,32 +29,32 @@ import time as timer
 
 startTime = timer.time()
 
-# species| Formula                       | emitted_by_fires
-# CB1    | C, hydrophpbic black carbon
-# CB2    | C, hydrophilic black carbon
-# DST01  | AlSiO5
-# DST02  | AlSiO5
-# DST03  | AlSiO5
-# DST04  | AlSiO5
-# NH4    | 
-# NH4NO3 | 
-# OC1    | C, hydrophobic organic carbon
-# OC2    | C, hydrophilic organic carbon 
-# SOA    | C12
-# SO4    |
-# SSLT01 | NaCl
-# SSLT02 | NaCl
-# SSLT03 | NaCl
-# SSLT04 | NaCl
+# species| Formula                       | emitted_by_fire_module
+# CB1    | C, hydrophpbic black carbon   | y, as BC
+# CB2    | C, hydrophilic black carbon   | y, as BC
+# DST01  | AlSiO5                        | n
+# DST02  | AlSiO5                        | n
+# DST03  | AlSiO5						 | n
+# DST04  | AlSiO5                        | n
+# NH4    |         						 | n	
+# NH4NO3 |                               | n
+# OC1    | C, hydrophobic organic carbon | y, as OC
+# OC2    | C, hydrophilic organic carbon | y, as OC
+# SOA    | C12                           | n
+# SO4    |                               | n
+# SSLT01 | NaCl                          | n
+# SSLT02 | NaCl                          | n
+# SSLT03 | NaCl                          | n
+# SSLT04 | NaCl                          | n
 
 # To calculate PM2.5,
-#	BC = CB1 + CB2
-#	SOA = SOAB + SOAI + SOAM + SOAX + SOAT
-#	FineSSLT = SSLT01 + SSLT02
-#	FineDST = DST01 + DST02
-#	Organic aerosol (OA) = OC1 + OC2 + SOA
+#		BC = CB1 + CB2
+#		SOA = SOAB + SOAI + SOAM + SOAX + SOAT
+#		FineSSLT = SSLT01 + SSLT02
+#		FineDST = DST01 + DST02
+#		Organic aerosol (OA) = OC1 + OC2 + SOA
 	
-#	PM25 = BC + 1.2*OA + SO4 + NH3NO4 + FineSSLT + FineDST
+#		PM25 = BC + 1.2*OA + SO4 + NH3NO4 + FineSSLT + FineDST
 
 
 def getSelf(scenario, species):
@@ -100,11 +100,12 @@ SO4_SRF = getSelf(scenario, 'SO4_SRF')
 NH4NO3_SRF = getSelf(scenario, 'NH4NO3_SRF')
 
 # All needed nc connections are made. Now do the math for total PM2.5
-t = getSelf(scenario, 'date')
+t   = getSelf(scenario, 'date')
 n_t = len(t)
 
 # Make an array to store the PM2.5
-PM25 = np.zeros(SO4_SRF.shape)
+PM25     = np.zeros(SO4_SRF.shape)
+FirePM25 = np.zeros(SO4_SRF.shape)
 
 for i in range(n_t): #n_t
 
@@ -128,20 +129,23 @@ for i in range(n_t): #n_t
 	# Calculate PM2.5 in units of kg/kg (all of these arrays are kg/kg)
 	PM25[i,:,:] = BC + 1.2 * OA + SO4 + NH4NO3 + FineSSLT + FineDST
 
+	# Calculate PM2.5 emitted directly by fires
+	FirePM25[i,:,:] = BC + OC1_SRF[i,:,:] + OC2_SRF[i,:,:]
+	
 
-print 'Working on converting PM25 kg/kg to ug/m3'
+#print 'Working on converting PM25 kg/kg to ug/m3'
 # Now I want PM25 in units of ug/m3 using the idea gas law for dry air
-T  = getSelf(scenario, 'T')
-PS = getSelf(scenario, 'PS')
+#T  = getSelf(scenario, 'T')
+#PS = getSelf(scenario, 'PS')
 
-R = 287.04 # [J/K/kg ]
-Rho = PS[:] / (R * T[:,25,:,:])
+#R = 287.04 # [J/K/kg ]
+#Rho = PS[:] / (R * T[:,25,:,:])
 
 # Mass conversion variables
-gramsPerKg  = 1000.
-ugPerGram   = 1e6
+#gramsPerKg  = 1000.
+#ugPerGram   = 1e6
 
-PM25_ugPerm3 = (PM25 * Rho) * (gramsPerKg * ugPerGram)
+#PM25_ugPerm3 = (PM25 * Rho) * (gramsPerKg * ugPerGram)
 
 
 # Use PS top get spatial dimensions of data 
@@ -153,18 +157,13 @@ time   = nc.variables['time'][:]
 nc.close()
 
 ###############################################################################
-# Write PM25  as daily netCDF data
+# Write total PM25 as daily netCDF data
 ###############################################################################	
 # TODO: write cesm function that is designed to save a single netcdf variable
 # TODO: this can be used in a lot of different places already.
-print 'Working on writing the NETCDF output.'
+print 'Working on writing the total PM NETCDF output.'
 
-
-def saveArrayToNC(species, ):
-	
-###############################################################################	
 saveName = cnm.makeAQNCFile('PM25', scenario, 'daily')
-
 ncFile = Dataset(saveName, 'w', format='NETCDF4')
 ncFile.description = 'Total surface layer PM2.5 as defined in README_CESM'
 ncFile.location = 'Global'
@@ -174,8 +173,8 @@ ncFile.createDimension('lon', len(lon) )
 
 # Create variables on the dimension they live on 
 PMVar = ncFile.createVariable('PM25', 'f4', ('time','lat','lon'))
-PMVar.units = 'ug/m3'
-PMVar.description = 'Ideal gas law for dry air used to calculate air density and concentration'
+PMVar.units = 'kg/kg'
+PMVar.description = 'kg of emitted species per kg of air in surface layer. P=Rho*R*T to get dry air concentration estimate.'
 
 time_var = ncFile.createVariable('time', 'i4', ('time',))
 time_var.units = 'days from origin'
@@ -187,12 +186,50 @@ longitude = ncFile.createVariable('lon', 'f4', ('lon',))
 longitude.units = 'degrees east'
 
 # Write the actual data to these dimensions
-PMVar[:]         = PM25_ugPerm3
+PMVar[:]         = PM25
 latitude[:]      = lat
 longitude[:]     = lon
 time_var[:]      = time
 
 ncFile.close()
+
+###############################################################################
+# Write total PM25 as daily netCDF data
+###############################################################################	
+# TODO: write cesm function that is designed to save a single netcdf variable
+# TODO: this can be used in a lot of different places already.
+print 'Working on writing the fire emitted PM NETCDF output.'
+
+saveName = cnm.makeAQNCFile('FirePM25', scenario, 'daily')
+ncFile = Dataset(saveName, 'w', format='NETCDF4')
+ncFile.description = 'Fire emitted PM2.5 in surface layer'
+ncFile.location = 'Global'
+ncFile.createDimension('time', n_t )
+ncFile.createDimension('lat', len(lat) )
+ncFile.createDimension('lon', len(lon) )
+
+# Create variables on the dimension they live on 
+PMVar = ncFile.createVariable('FirePM25', 'f4', ('time','lat','lon'))
+PMVar.units = 'kg/kg'
+PMVar.description = 'kg of fire emitted PM per kg of air in surface layer. P=Rho*R*T to get dry air concentration estimate.'
+
+time_var = ncFile.createVariable('time', 'i4', ('time',))
+time_var.units = 'days from origin'
+
+latitude = ncFile.createVariable('lat', 'f4', ('lat',))
+latitude.units = 'degrees north'
+ 
+longitude = ncFile.createVariable('lon', 'f4', ('lon',))
+longitude.units = 'degrees east'
+
+# Write the actual data to these dimensions
+PMVar[:]         = FirePM25
+latitude[:]      = lat
+longitude[:]     = lon
+time_var[:]      = time
+
+ncFile.close()
+
 
 writingComplete = timer.time()
 dt = (writingComplete - startTime) / 60. 
