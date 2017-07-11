@@ -25,14 +25,15 @@ import numpy.ma as ma
 from datetime import date
 import matplotlib.ticker as tkr
 import datetime
+import os.path # os.path.join('/my/root/directory', 'in', 'here')
 
 ###############################################################################
 # -----------------Air Quality File functions ---------------------------------
 ###############################################################################
 
-#scenario = '2000Firev1'
-#NCVariable = 'Z3'
-
+scenario = '2000Firev1'
+NCVariable = 'Z3'
+dataDirBase="/pierce-scratch/mariavm" # TODO: set universal python var
 
 # TODO: Make these functions into a class
 
@@ -56,6 +57,8 @@ def KtoC(T):
 	C = T - 273.15
 	return C
 
+# TODO: Make the following once, then save the file as a nc date array for each decade
+# TODO: where relevant. 
 def dateNumToDate(dateNum):
 	"""This function takes dates of the form YYYYMMDD and turns them into python
 	date objects.
@@ -94,42 +97,38 @@ def getSelf(scenario, species):
 	return ncVar
 
 
-def makeAQNCFile(NCVariable="T", scenario="2000Base", tStep="daily"):
+def makeAQNCFile(dataDirBase="/pierce-scratch/mariavm",\
+                 NCVariable="T",\
+                 scenario="2000Firev1",\
+                 tStep="daily"):
+
 	"""Function for getting path of desired AirQuality variable nc file path.
 		Parameters:
-			NCVariable: Any variable saved to AirQualityData/ directory
-			scenario:   2000Base | 2050RCP45 | 2050RCP85 | 2100RCP45 | 
-					    2100RCP85
+			NCVariable: Any variable saved dataDir directory
+			scenario:   see /pierce-scratch/mariavm
 			tStep:      The time scale of the variable of interest. 
 				        "daily" | "hourly"	
+			fireModelv: Sometimes (without warning) the fire module is updated
+                                    we are now on v 01 "fires_01"
 
 		return: A string that is the path of the file to load
 	"""
-
-	scenDec = scenario[0:4]
-	scenarioEmissions = scenario[4:len(scenario)]	
-	scenDate = {}
-	scenDate['2000tail']   = '200001-201012'
-	scenDate['2000center'] = '2000'
-	scenDate['2050tail']   = '204001-205012'
-	scenDate['2050center'] = '2050'
-	scenDate['2100tail']   = '209001-209912'
-	scenDate['2100center'] = '2100'	
-
-	rcp = {}
-	rcp['2000Base']  = ''
-	rcp['2050RCP45'] = 'rcp45_'
-	rcp['2050RCP85'] = 'rcp85_'
-	rcp['2100RCP45'] = 'rcp45_'
-	rcp['2100RCP85'] = 'rcp85_'
 	
-	# Data will always live in the same place on Yellowstone, static. 
-	dataDirBase = '/fischer-scratch/sbrey/outputFromYellowstone/'
-	fileHead    = 'cesm122_fmozsoa_f09f09_' 
-	fileMid     =  scenDate[scenDec+'center']+'_'+rcp[scenario]+'fires_00.'+ NCVariable
-	fileTail    = '.' + tStep + '.' + scenDate[scenDec+'tail'] + '.nc'
-	ncFile      = dataDirBase + "AirQualityData/" + scenario + '/' + fileHead + fileMid +\
-                  fileTail
+	# Find the ".", this will show where the end of file beginning ends
+	scenarioPath = os.path.join(dataDirBase, scenario)
+	firstFile = os.listdir(scenarioPath)[0]
+	periodIndex = firstFile.index(".")
+	fileHeaders = firstFile[0:periodIndex]
+
+	# find out decade string
+	dashIndex = firstFile.index("-")
+	firstIndex = dashIndex - 6
+	lastIndex = dashIndex + 7		
+	decade = firstFile[firstIndex:lastIndex]
+	
+        # pierce together file names
+	fileName = fileHeaders + "." + NCVariable + "." + tStep + "." + decade + ".nc" 
+	ncFile = os.path.join(scenarioPath, fileName)
 
 	return ncFile
  
