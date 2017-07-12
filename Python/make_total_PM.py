@@ -15,12 +15,14 @@ print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
-	print 'Using arguments passed via command line.'
+
 	scenario    = sys.argv[1]
+	print 'Using arguments passed via command line.'
+	print sys.argv
 
 else:
-	print 'Using default '
 	scenario    = '2000Firev1'
+	print 'Using default: ' + scenario
 
 import os
 import numpy as np
@@ -112,32 +114,29 @@ n_t = len(t)
 PM25     = np.zeros(SO4_SRF.shape)
 FirePM25 = np.zeros(SO4_SRF.shape)
 
-for i in range(n_t): 
+# Start putting the massive data arrays into the work space
+SO4 = SO4_SRF[:]
 
-	#print 'Percent Complete:' + str(i/float(n_t) * 100.)
+BC  = CB1_SRF[:] + CB2_SRF[:]
 
-	SO4 = SO4_SRF[i,:,:]
+OC = OC1_SRF[:] + OC2_SRF[:] 
 
-	BC  = CB1_SRF[i,:,:] + CB2_SRF[i,:,:]
+SOA = SOAT_SRF[:] + SOAM_SRF[:] +  SOAI_SRF[:] + SOAB_SRF[:] + SOAX_SRF[:] 
 
-	OC = OC1_SRF[i,:,:] + OC2_SRF[i,:,:] 
+NH4NO3 = NH4NO3_SRF[:]
 
-	SOA = SOAT_SRF[i,:,:] + SOAM_SRF[i,:,:] +  SOAI_SRF[i,:,:] +\
-              SOAB_SRF[i,:,:] + SOAX_SRF[i,:,:] 
+FineDST = DST01_SRF[:] + DST02_SRF[:]
 
-	NH4NO3 = NH4NO3_SRF[i,:,:]
+FineSSLT = SSLT01_SRF[:] + SSLT02_SRF[:]
 
-	FineDST = DST01_SRF[i,:,:] + DST02_SRF[i,:,:]
+# Calculate PM2.5 in units of kg/kg (all of these arrays are kg/kg)
+PM25 = SO4 + BC + 1.8*OC + SOA + NH4NO3 + FineDST + FineSSLT
 
-	FineSSLT = SSLT01_SRF[i,:,:] + SSLT02_SRF[i,:,:]
+# Calculate PM2.5 emitted directly by fires
+FirePM25 = BC + OC
 
-	# Calculate PM2.5 in units of kg/kg (all of these arrays are kg/kg)
-	PM25[i,:,:] = SO4 + BC + 1.8*OC + SOA + NH4NO3 + FineDST + FineSSLT
 
-	# Calculate PM2.5 emitted directly by fires
-	FirePM25[i,:,:] = BC + OC
-	
-
+# TODO: estimate the concentrations
 #print 'Working on converting PM25 kg/kg to ug/m3'
 # Now I want PM25 in units of ug/m3 using the idea gas law for dry air
 #T  = getSelf(scenario, 'T')
@@ -150,7 +149,12 @@ for i in range(n_t):
 #gramsPerKg  = 1000.
 #ugPerGram   = 1e6
 
-#PM25_ugPerm3 = (PM25 * Rho) * (gramsPerKg * ugPerGram)
+
+loopingComplete = timer.time()
+dt = (loopingComplete - startTime) / 60. 
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to loop and calculate [PM25]'
+print '----------------------------------------------------------------------'
 
 
 # Use PS top get spatial dimensions of data 
@@ -162,22 +166,22 @@ time   = nc.variables['time'][:]
 nc.close()
 
 ###############################################################################
-# Write total PM25 as daily netCDF data
+# Write total fire PM25 as daily netCDF data
 ###############################################################################	
 # TODO: write cesm function that is designed to save a single netcdf variable
 # TODO: this can be used in a lot of different places already.
-print 'Working on writing the total PM NETCDF output.'
+print 'Working on writing the total fire PM NETCDF output.'
 
-saveName = cnm.makeAQNCFile('PM25', scenario, 'daily')
+saveName = cnm.makeAQNCFile(dataDirBase, 'FirePM25', scenario, 'daily')
 ncFile = Dataset(saveName, 'w', format='NETCDF4')
-ncFile.description = 'Total surface layer PM2.5 as defined in README_CESM'
+ncFile.description = 'Total surface layer fire emitted PM2.5 as defined in README_CESM'
 ncFile.location = 'Global'
 ncFile.createDimension('time', n_t )
 ncFile.createDimension('lat', len(lat) )
 ncFile.createDimension('lon', len(lon) )
 
 # Create variables on the dimension they live on 
-PMVar = ncFile.createVariable('PM25', 'f4', ('time','lat','lon'))
+PMVar = ncFile.createVariable('FirePM25', 'f4', ('time','lat','lon'))
 PMVar.units = 'kg/kg'
 PMVar.description = 'kg of emitted species per kg of air in surface layer. P=Rho*R*T to get dry air concentration estimate.'
 
@@ -205,9 +209,9 @@ ncFile.close()
 # TODO: this can be used in a lot of different places already.
 print 'Working on writing the fire emitted PM NETCDF output.'
 
-saveName = cnm.makeAQNCFile('PM25', scenario, 'daily')
+saveName = cnm.makeAQNCFile(dataDirBase, 'PM25', scenario, 'daily')
 ncFile = Dataset(saveName, 'w', format='NETCDF4')
-ncFile.description = 'PM2.5 in surface layer'
+ncFile.description = 'PM25 in surface layer'
 ncFile.location = 'Global'
 ncFile.createDimension('time', n_t )
 ncFile.createDimension('lat', len(lat) )
@@ -228,7 +232,7 @@ longitude = ncFile.createVariable('lon', 'f4', ('lon',))
 longitude.units = 'degrees east'
 
 # Write the actual data to these dimensions
-PMVar[:]         = PM25
+PMVar[:]         = FirePM25
 latitude[:]      = lat
 longitude[:]     = lon
 time_var[:]      = time
@@ -240,5 +244,9 @@ dt = (writingComplete - startTime) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the entire script.'
 print '----------------------------------------------------------------------'
+
+
+
+
 
 
