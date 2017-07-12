@@ -136,26 +136,29 @@ PM25 = SO4 + BC + 1.8*OC + SOA + NH4NO3 + FineDST + FineSSLT
 FirePM25 = BC + OC
 
 
+additionComplete = timer.time()
+dt = (additionComplete - startTime) / 60. 
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to calculate [PM25] from very big arrays'
+print '----------------------------------------------------------------------'
+
+
 # TODO: estimate the concentrations
 #print 'Working on converting PM25 kg/kg to ug/m3'
 # Now I want PM25 in units of ug/m3 using the idea gas law for dry air
-#T  = getSelf(scenario, 'T')
-#PS = getSelf(scenario, 'PS')
+T  = getSelf(dataDirBase, scenario, 'T')
+PS = getSelf(dataDirBase, scenario, 'PS')
 
-#R = 287.04 # [J/K/kg ]
-#Rho = PS[:] / (R * T[:,25,:,:])
+R = 287.04 # [J/K/kg ]
+Rho = PS[:] / (R * T[:,25,:,:])
 
 # Mass conversion variables
-#gramsPerKg  = 1000.
-#ugPerGram   = 1e6
+gramsPerKg  = 1000.
+ugPerGram   = 1e6
 
-
-loopingComplete = timer.time()
-dt = (loopingComplete - startTime) / 60. 
-print '----------------------------------------------------------------------'
-print 'It took ' + str(dt) + ' minutes to loop and calculate [PM25]'
-print '----------------------------------------------------------------------'
-
+# Calculate mass concentration from kg/kg
+PM25_ugPerm3      = PM25 * Rho * gramsPerKg * ugPerGram
+fire_PM25_ugPerm3 = FirePM25 * Rho * gramsPerKg * ugPerGram
 
 # Use PS top get spatial dimensions of data 
 ncFile = cnm.makeAQNCFile(dataDirBase, "SO4_SRF", scenario, tStep="daily")
@@ -239,13 +242,54 @@ time_var[:]      = time
 
 ncFile.close()
 
+
+###############################################################################
+# Write total PM25_conc as daily netCDF data
+###############################################################################	
+# TODO: write cesm function that is designed to save a single netcdf variable
+# TODO: this can be used in a lot of different places already.
+print 'Working on writing the total PM25_conc NETCDF output.'
+
+saveName = cnm.makeAQNCFile(dataDirBase, 'PM25_conc', scenario, 'daily')
+ncFile = Dataset(saveName, 'w', format='NETCDF4')
+ncFile.description = 'PM25 concentration in surface layer'
+ncFile.location = 'Global'
+ncFile.createDimension('time', n_t )
+ncFile.createDimension('lat', len(lat) )
+ncFile.createDimension('lon', len(lon) )
+
+# Create variables on the dimension they live on 
+PMVar = ncFile.createVariable('PM25_conc', 'f4', ('time','lat','lon'))
+PMVar.units = 'ug/m3'
+PMVar.description = 'ug/m3 in surface layer air volume. P=Rho*R*T of surface used to get from kg/kg to mass concentration.'
+
+firePMVar = ncFile.createVariable('fire_PM25_conc', 'f4', ('time','lat','lon'))
+firePMVar.units = 'ug/m3'
+firePMVar.description = 'fire emitted PM ug/m3 in surface layer air volume. P=Rho*R*T of surface used to get from kg/kg to mass concentration.'
+
+time_var = ncFile.createVariable('time', 'i4', ('time',))
+time_var.units = 'days from origin'
+
+latitude = ncFile.createVariable('lat', 'f4', ('lat',))
+latitude.units = 'degrees north'
+ 
+longitude = ncFile.createVariable('lon', 'f4', ('lon',))
+longitude.units = 'degrees east'
+
+# Write the actual data to these dimensions
+PMVar[:]         = PM25_ugPerm3
+firePMVar[:]     = fire_PM25_ugPerm3   
+latitude[:]      = lat
+longitude[:]     = lon
+time_var[:]      = time
+
+ncFile.close()
+
 writingComplete = timer.time()
 dt = (writingComplete - startTime) / 60. 
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the entire script.'
 print '----------------------------------------------------------------------'
-
-
 
 
 
