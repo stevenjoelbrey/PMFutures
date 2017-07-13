@@ -13,7 +13,6 @@ print 'Argument List:', str(sys.argv)
 
 # TODO: Make it possible to pass absolute thresholds. 
 
-
 threshDict = {}
 
 if len(sys.argv) != 1:
@@ -75,16 +74,19 @@ import datetime
 import cesm_nc_manager as cnm
 import time as timer
 
+dataDirBase= os.path.join("/pierce-scratch","mariavm")
+
+
 startTime = timer.time()
 
 # Make temperature, wind, and precip file connections
-U = cnm.getSelf(scenario, "U")
-V = cnm.getSelf(scenario, "V")
-T = cnm.getSelf(scenario, "T")
-PRECT = cnm.getSelf(scenario, "PRECT")
+U = cnm.getSelf(findHighValueDays, scenario, "U")
+V = cnm.getSelf(findHighValueDays, scenario, "V")
+T = cnm.getSelf(findHighValueDays, scenario, "T")
+PRECT = cnm.getSelf(findHighValueDays, scenario, "PRECT")
 
 # Use T to get dimension information
-TFile  = cnm.makeAQNCFile('T', scenario, 'daily')
+TFile  = cnm.makeAQNCFile(findHighValueDays, 'T', scenario, 'daily')
 Tnc    = Dataset(TFile, 'r')
 t      = Tnc.variables['time'][:]
 lat    = Tnc.variables['lat'][:]
@@ -123,7 +125,7 @@ windMag = np.sqrt(U**2 + V**2)
 
 # Get a more friendly time dimension that is useful for precentile
 # maximum values
-Time     = cnm.getSelf(scenario, "date")
+Time     = cnm.getSelf(dataDirBase, scenario, "date")
 dateTime = cnm.dateNumToDate(Time)
 nTime    = len(Time)
 nLon     = len(lon)
@@ -137,19 +139,19 @@ if threshType == 'usePercentile':
 	print 'using percentile thresholds for masking'
 
 	TMask, TLimVals = cnm.findHighValueDays(T,\
-						dateTime,\
-			                        TThresh)
+										    dateTime,\
+			                                TThresh)
 
 	TMask = np.array(TMask, dtype=int)
 
 	WindMask, WindLimVals = cnm.findHighValueDays(windMag,\
-						      dateTime,\
-			                              WindThresh)
+						                          dateTime,\
+			                                      WindThresh)
 	WindMask = np.array(WindMask, dtype=int)
 
 	PRECTMask, PrecLimVals = cnm.findHighValueDays(PRECT,\
-						       dateTime,\
-					               PRECTThresh)
+						       					   dateTime,\
+					                               PRECTThresh)
 
 	PRECTMask = np.array(PRECTMask, dtype=int)
 
@@ -192,7 +194,7 @@ for var in masksDict.keys():
 	saveString = condition +'Mask_'+str(threshDict[var])
 
 	# connect this descriptive name to the directory of the scenario and var
-	saveName = cnm.makeAQNCFile(saveString, scenario, 'daily')
+	saveName = cnm.makeAQNCFile(dataDirBase, saveString, scenario, 'daily')
 
 	ncFile = Dataset(saveName, 'w', format='NETCDF4')
 	ncFile.description = 'Mask indicating ' + condition + ' condition.'
