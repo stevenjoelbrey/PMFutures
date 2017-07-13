@@ -52,27 +52,17 @@ import time as timer
 
 startTime = timer.time()
 
-# TODO: consider replacing these three line snipets with cnm.getSelf()
-
 # Load geostophic wind components
-ugFile = cnm.getSelf(dataDirBase, 'ug_P', scenario, 'daily')
-ug_nc  = Dataset(ugFile, 'r')
-ug     = ug_nc.variables['ug']
-
-vgFile = cnm.makeAQNCFile('vg_P', scenario, 'daily')
-vg_nc  = Dataset(vgFile, 'r')
-vg     = vg_nc.variables['vg']
+ug = cnm.getSelf(dataDirBase, scenario, "ug_P")
+vg = cnm.getSelf(dataDirBase, scenario, "vg_P")
 
 # Load model wind components
-UFile = cnm.makeAQNCFile('U', scenario, 'daily')
-U_nc  = Dataset(UFile, 'r')
-U     = U_nc.variables['U']
-
-VFile = cnm.makeAQNCFile('V', scenario, 'daily')
-V_nc  = Dataset(VFile, 'r')
-V     = V_nc.variables['V']
+U = cnm.getSelf(dataDirBase, scenario, "U")
+V = cnm.getSelf(dataDirBase, scenario, "V")
 
 # Get the geostrophic wind dimensions from vg file
+vgFile = cnm.makeAQNCFile(dataDirBase,'vg_P', scenario, 'daily')
+vg_nc  = Dataset(vgFile, 'r')
 plevel  = vg_nc.variables['plevel'][:]  
 lat     = vg_nc.variables['lat'][:]
 lon     = vg_nc.variables['lon'][:]
@@ -81,11 +71,14 @@ nTime   = len(time)
 nLat    = len(lat)
 nLon    = len(lon) 
 
+
 # Get the wind vertical dimensions from V file
+VFile = cnm.makeAQNCFile(dataDirBase,'V', scenario, 'daily')
+V_nc  = Dataset(VFile, 'r')
 windLev = V_nc.variables['lev'][:]
 
 # Open the precipitation file
-precFile = cnm.makeAQNCFile('PRECT', scenario, 'daily')
+precFile = cnm.makeAQNCFile(dataDirBase, 'PRECT', scenario, 'daily')
 prec_nc  = Dataset(precFile, 'r')
 prec     = prec_nc.variables['PRECT'] # [m/s]
 
@@ -106,6 +99,8 @@ windSrfIndex  = np.where(np.max(windLev) == windLev)[0][0]
 # Create numpy arrays to store mask of stagnation events
 stagnationMask = np.zeros(prec.shape, dtype=int)
 
+
+# TODO: Build this without the use of the for loop
 for i in range(nTime):  
 
 	print i 

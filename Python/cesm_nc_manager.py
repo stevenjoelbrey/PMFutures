@@ -41,7 +41,7 @@ def metersPerSecToMetersPerDay(prec):
 	"""Converts precip from m/s for a day to total inches of rain per
     grid cell for that day."""
 	
-    # prec needs to be converted from m/s to incher/day
+	# prec needs to be converted from m/s to incher/day
 	inchPerM = 39.3701      # [inch/m]
 	secondsPerDay = 86400.  # [s/day]
 	mPersToInPerDay = inchPerM * secondsPerDay # [(inch s) / (m day)]
@@ -135,7 +135,7 @@ def makeEmissionNCFile(dataDirBase="/pierce-scratch/mariavm",\
 
 def getSelf(dataDirBase, scenario, NCVariable):
 	"""Quick function for returning nc file connection."""
-	ncFile = cnm.makeAQNCFile(dataDirBase, NCVariable, scenario, tStep="daily")
+	ncFile = makeAQNCFile(dataDirBase, NCVariable, scenario, tStep="daily")
 	nc     = Dataset(ncFile, 'r')
 	ncVar  = nc.variables[NCVariable]
 	return ncVar 
