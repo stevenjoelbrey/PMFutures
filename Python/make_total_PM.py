@@ -77,37 +77,37 @@ SO4_SRF = getSelf(dataDirBase, scenario, 'SO4_SRF')
 
 # Get black carbon
 # BC = CB1 + CB2
-CB1_SRF = getSelf(dataDirBase, scenario, 'CB1_SRF')
-CB2_SRF = getSelf(dataDirBase, scenario, 'CB2_SRF')
+CB1_SRF = cnm.getSelf(dataDirBase, scenario, 'CB1_SRF')
+CB2_SRF = cnm.getSelf(dataDirBase, scenario, 'CB2_SRF')
 
 # Get secondary organic aerosol (SOA)
 # SOA = SOAB + SOAI + SOAM + SOAX + SOAT
-SOAB_SRF = getSelf(dataDirBase, scenario, 'SOAB_SRF')
-SOAI_SRF = getSelf(dataDirBase, scenario, 'SOAI_SRF')
-SOAM_SRF = getSelf(dataDirBase, scenario, 'SOAM_SRF')
-SOAX_SRF = getSelf(dataDirBase, scenario, 'SOAX_SRF')
-SOAT_SRF = getSelf(dataDirBase, scenario, 'SOAT_SRF')
+SOAB_SRF = cnm.getSelf(dataDirBase, scenario, 'SOAB_SRF')
+SOAI_SRF = cnm.getSelf(dataDirBase, scenario, 'SOAI_SRF')
+SOAM_SRF = cnm.getSelf(dataDirBase, scenario, 'SOAM_SRF')
+SOAX_SRF = cnm.getSelf(dataDirBase, scenario, 'SOAX_SRF')
+SOAT_SRF = cnm.getSelf(dataDirBase, scenario, 'SOAT_SRF')
 
 # Get sea salt aerosol
 # FineSSLT = SSLT01 + SSLT02
-SSLT01_SRF = getSelf(dataDirBase, scenario, 'SSLT01_SRF')
-SSLT02_SRF = getSelf(dataDirBase, scenario, 'SSLT02_SRF')
+SSLT01_SRF = cnm.getSelf(dataDirBase, scenario, 'SSLT01_SRF')
+SSLT02_SRF = cnm.getSelf(dataDirBase, scenario, 'SSLT02_SRF')
 
 # Get dust
 # FineDST = DST01 + DST02
-DST01_SRF = getSelf(dataDirBase, scenario, 'DST01_SRF')
-DST02_SRF = getSelf(dataDirBase, scenario, 'DST02_SRF')
+DST01_SRF = cnm.getSelf(dataDirBase, scenario, 'DST01_SRF')
+DST02_SRF = cnm.getSelf(dataDirBase, scenario, 'DST02_SRF')
 
 # Organic Aerosol (OA)
 # Organic aerosol (OA) = OC1+OC2
-OC1_SRF = getSelf(dataDirBase, scenario, 'OC1_SRF')
-OC2_SRF = getSelf(dataDirBase, scenario, 'OC2_SRF')
+OC1_SRF = cnm.getSelf(dataDirBase, scenario, 'OC1_SRF')
+OC2_SRF = cnm.getSelf(dataDirBase, scenario, 'OC2_SRF')
 
 # Get NH4NO3 (Ammonium nitrate)
-NH4NO3_SRF = getSelf(dataDirBase, scenario, 'NH4NO3_SRF')
+NH4NO3_SRF = cnm.getSelf(dataDirBase, scenario, 'NH4NO3_SRF')
 
 # All needed nc connections are made. Now do the math for total PM2.5
-t   = getSelf(dataDirBase, scenario, 'date')
+t   = cnm.getSelf(dataDirBase, scenario, 'date')
 n_t = len(t)
 
 # Make an array to store the PM2.5

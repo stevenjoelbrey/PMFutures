@@ -5,13 +5,13 @@
 ###############################################################################
 # This script is designed to create a mask of stagnation days as defined by 
 # Wang and Angell [1999]. The three variables read in and assessed for 
-# stagnation condition are 500mb , 1000mb (taken as SLP) geostrophic winds, and 
-# precipitation. 
+# stagnation condition are 500mb , 1000mb (later taken as SLP) geostrophic 
+# winds, and precipitation. 
 
 # Read arguments passed via the command line if there are any. Otherwise use the
 # interactive/development chioces list in else statement. 
 
-# TODO: Should I consider adding the creation of other masks that reqiore daily 
+# TODO: Should I consider adding the creation of other masks that require daily 
 # TODO: look into one file so that they are all made at the same time? 
 
 import sys
@@ -28,13 +28,16 @@ else:
 	print 'Using default '
 	# These are the defualt definitions of stagnation defined:
 	# http://www.arl.noaa.gov/documents/reports/atlas.pdf
-	scenario    = '2000Base'
+	scenario    = '2000Firev1'
 	wind1000Lim = 8.   # m/s  
 	wind500Lim  = 13.  # m/s
 	precLim     = 0.01 # inches/day
 
+# Set the directory where the data structure starts 
+dataDirBase="/pierce-scratch/mariavm"
 
 import os
+import os.path
 import numpy as np
 import sys
 from mpl_toolkits.basemap import Basemap, cm
@@ -52,7 +55,7 @@ startTime = timer.time()
 # TODO: consider replacing these three line snipets with cnm.getSelf()
 
 # Load geostophic wind components
-ugFile = cnm.makeAQNCFile('ug_P', scenario, 'daily')
+ugFile = cnm.getSelf(dataDirBase, 'ug_P', scenario, 'daily')
 ug_nc  = Dataset(ugFile, 'r')
 ug     = ug_nc.variables['ug']
 

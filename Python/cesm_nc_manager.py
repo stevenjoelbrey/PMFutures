@@ -33,9 +33,8 @@ import os.path # os.path.join('/my/root/directory', 'in', 'here')
 
 scenario = '2000Firev1'
 NCVariable = 'Z3'
-dataDirBase="/pierce-scratch/mariavm" # TODO: set universal python var
-
-# TODO: Make these functions into a class
+#global dataDirBase
+#dataDirBase="/pierce-scratch/mariavm"
 
 
 def metersPerSecToMetersPerDay(prec):
@@ -76,25 +75,6 @@ def dateNumToDate(dateNum):
 		Dates.append(date(yearInt, monthInt, dayInt))
 	Dates = np.array(Dates)
 	return(Dates)
-
-
-def getSelf(scenario, species):
-	"""Quick function for returning nc file connection.
-		Parameters:
-			scenario: scenario stringfor getting file connection. 
-			          e.g. 2000Base
-			species:  The species name for which you are returning
-					  a file connection. 
-
-		return: NC variable connection. 
-
-		
-"""
-	ncFile = makeAQNCFile(species, scenario, 'daily')
-	nc     = Dataset(ncFile, 'r')
-	ncVar  = nc.variables[species]
-
-	return ncVar
 
 
 def makeAQNCFile(dataDirBase="/pierce-scratch/mariavm",\
@@ -153,6 +133,12 @@ def makeEmissionNCFile(dataDirBase="/pierce-scratch/mariavm",\
 
 	return ncFile 
 
+def getSelf(dataDirBase, scenario, NCVariable):
+	"""Quick function for returning nc file connection."""
+	ncFile = cnm.makeAQNCFile(dataDirBase, NCVariable, scenario, tStep="daily")
+	nc     = Dataset(ncFile, 'r')
+	ncVar  = nc.variables[NCVariable]
+	return ncVar 
 
 def getEmissionSelf(dataDirBase, NCVariable, RCPScenario, decade):
 	"""This function uses makeEmissionNCFile() to get the nc file path

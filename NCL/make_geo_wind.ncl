@@ -29,8 +29,8 @@ begin ; begin main script
 ; Define variables and paths that are specific to this script. ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;variable   = "Z3" 
-;scenario = "2000Firev1" 
+variable   = "Z3" 
+scenario = "2000Firev1" 
 fmod = "_fires_01."
 
 nl       = strlen(scenario)          
@@ -278,9 +278,9 @@ filevardef(fo, "lon", typeof(lon), getvardims(lon))
 filevarattdef(fo,"lon", lon)                     ; copy lon attributes
 fo->lon    = (/lon/)
 
-filevardef(fo, "ug", typeof(u), getvardims(u))
-filevarattdef(fo,"ug", u)                         ; copy U attributes
-fo->ug      = (/u/)
+filevardef(fo, "ug_P", typeof(u), getvardims(u))
+filevarattdef(fo,"ug_P", u)                         ; copy U attributes
+fo->ug_P      = (/u/)
 
 delete(fo)
 
@@ -338,9 +338,9 @@ filevardef(fo, "lon", typeof(lon), getvardims(lon))
 filevarattdef(fo,"lon", lon)                     ; copy lon attributes
 fo->lon    = (/lon/)
 
-filevardef(fo, "vg", typeof(v), getvardims(v))
-filevarattdef(fo,"vg", v)                         ; copy V attributes
-fo->vg      = (/v/)
+filevardef(fo, "vg_P", typeof(v), getvardims(v))
+filevarattdef(fo,"vg_P", v)                         ; copy V attributes
+fo->vg_P      = (/v/)
 
 delete(fo)
 

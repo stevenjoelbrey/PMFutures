@@ -16,14 +16,15 @@ print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
+	print 'Using arguments passed via command line.'
 	hourlyVAR =  str(sys.argv[1]) # e.g. 'PSL'
 	scenario  =  str(sys.argv[2]) # e.g. '2000Base'
-	year      =  int(sys.argv[3]) # e.g. 2000 # NOTE: Not needed except for emissions
+
 else: 
-	# Development environment. Set variables
+	# Development environment. Set variables by hand here. 
 	hourlyVAR =  'PSL'
-	scenario  =  '2050RCP45'
-	year      =  2050 
+	scenario  =  '2000Base'
+
 
 import cesm_nc_manager as cnm
 import os
@@ -64,24 +65,31 @@ t         = cnm.dateNumToDate(d)
 # Close the date file. 
 date_nc.close()
 
+# Change time_nc to an int, so each int clearly represents a calendar 
+# day
+dayInt = np.array(time_nc[:], dtype=int)
+uniqueDayInts = np.unique(dayInt)
+
+
 print 'Working on the large loop averaging hourly values for each day'
-for i in np.arange(0, nDays): # nDays
+for i in uniqueDayInts: 
+#for i in range(0,10):
 
 	# We have to make a mask for each day of these hourly data.
 	# Since the units are time are days from origin, all integers
 	# are unique days at some hour (expressed by decimal). Se we 
 	# need to mask each 24 hours. [0,1), [1,2), ...
-	mask  = (time_nc[:] >= i) & (time_nc[:] < (i+1) ) 
-	index = np.where(mask ==  True)[0]
+	indexMask = np.where(dayInt == i)[0]
 
-	if len(index) != 24:
-		raise ValueError('Day index does not have 24 hours. Code Broken')
-
-	# Now that we have the index of a day, we need to take the 
-	# average value from the data for those 24 hours 
-	dayVAR            = Hourly_nc.variables[hourlyVAR][index, :, :]
-	dayMeanVAR        = np.mean(dayVAR, axis=0)
-	dailyVAR[i, :, :] = dayMeanVAR
+	if len(indexMask) != 24:
+		# This is exspected for the last day. Make sure this is last day
+		if i != uniqueDayInts[-1]:
+			raise ValueError('Day index does not have 24 hours. Code Broken')
+	else:
+		# This day index looks good. Take the daily mean fo 24 hour values. 
+		dayVAR            = Hourly_nc.variables[hourlyVAR][indexMask, :, :]
+		dayMeanVAR        = np.mean(dayVAR, axis=0)
+		dailyVAR[i, :, :] = dayMeanVAR
 
 
 meansCompleteTime = timer.time()
@@ -93,6 +101,8 @@ print '----------------------------------------------------------------------'
 # Make sure the time array matches the daily mean array in length and
 # date. This dimension needs to be described correctly. 
 t_subset = d[0:nDays]
+if len(t_subset) != dailyVAR.shape[0]:
+	raise ValueError('Labels for dates and dates averaged to no match!')
 
 ###############################################################################
 # Write the new netcdf data with the exact same formatting as the
@@ -136,25 +146,25 @@ print '----------------------------------------------------------------------'
 ncFile = Dataset(outPutSavename, 'w', format='NETCDF4')
 ncFile.description = 'Daily average of hourly data'
 ncFile.location = 'Global'
-ncFile.createDimension('ncols', nLon )
-ncFile.createDimension('nrows', nLat )
-ncFile.createDimension('time',  dailyVAR.shape[0] )
+ncFile.createDimension('time',  len(t_subset) )
+ncFile.createDimension('lat', nLat )
+ncFile.createDimension('lon', nLon )
 
 # Create variables on the dimension they live on 
-dayVAR_ = ncFile.createVariable(hourlyVAR, 'f4', ('nrows','ncols','time'))
+dayVAR_ = ncFile.createVariable(hourlyVAR, 'f4', ('time','lat','lon'))
 dayVAR_.units = Hourly_nc.variables[hourlyVAR].units
-
-latitude = ncFile.createVariable('lat', 'f4', ('nrows',))
-latitude.units = 'degrees north'
- 
-longitude = ncFile.createVariable('lon', 'f4', ('ncols',))
-longitude.units = 'degrees east'
 
 time_var = ncFile.createVariable('time', 'i4', ('time',))
 time_var.units = 'daily dates'
 
+latitude = ncFile.createVariable('lat', 'f4', ('lat',))
+latitude.units = 'degrees north'
+ 
+longitude = ncFile.createVariable('lon', 'f4', ('lon',))
+longitude.units = 'degrees east'
+
 # Write the actual data to these dimensions
-dayVAR_[:,:,:]   = dailyVAR
+dayVAR_[:]       = dailyVAR
 latitude[:]      = lat
 longitude[:]     = lon
 time_var[:]      = t_subset
@@ -174,7 +184,7 @@ print 'It took ' + str(dt) + ' minutes to run entire script.'
 print '----------------------------------------------------------------------'
 
 
- 
+# ncFile = '../Python_output/2000Base/2_cesm122_fmozsoa_f09f09_2000_fires_00.PSL.daily.200001-201012.nc'
 
 
 
