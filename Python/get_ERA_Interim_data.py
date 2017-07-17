@@ -15,7 +15,7 @@ VAR         = sys.argv[1]
 startYear   = int(sys.argv[2]) 
 endYear     = int(sys.argv[3])
 levtype     = sys.argv[4] #"sfc" # "pl"
-DataDir     = "/barnes-scratch/sbrey/era_interim_nc/"
+DataDir     = "/barnes-scratch/sbrey/era_interim_nc_6_hourly/"
 
 nYears = (endYear - startYear) + 1
 yearArray = np.arange(startYear, endYear+1)
@@ -25,25 +25,25 @@ yearArray = np.arange(startYear, endYear+1)
 server = ECMWFDataServer()
     
 # get param based on dictionary
-
-param_dict = {"P_srf":"134.128",
-	      "T_srf":"167.128",
-              "Td_srf":"168.128",
-              "U_srf":"165.128",
-              "V_srf":"166.128",
-              "Precip":"228.128",
-	      "Z":"129.128",
-	      "relative_vorticity_P":"138.128",
-	      "U_P":"131.128",
-              "V_P":"132.128",
-              "T_P":"130.128"
+# TODO: UPDATE once the better names are known
+param_dict = {"sp":"134.128",
+	      "t2m":"167.128",
+              "d2m":"168.128",
+              "u10":"165.128",
+              "v10":"166.128",
+              "tp":"228.128",
+	      "z":"129.128",
+	      "vo":"138.128",
+	      "u":"131.128",
+              "v":"132.128",
+              "t":"130.128"
               }
 
 param = param_dict[VAR]
 
 if param == "228.128":
 	print "getting precip, changing step and time"
-	step = "3"
+	step = "6"
 	time = "00:00:00/12:00:00"
 else:
 	step = "0"
@@ -66,21 +66,39 @@ for i in range(nYears):
 
 	if levtype == "sfc":
 
-		server.retrieve({
-		"class": "ei",
-		"dataset": "interim",
-		"date": date,
-		"expver": "1",
-		"grid": "0.75/0.75",
-		"levtype": "sfc",
-		"param": param,
-		"step": step,
-		"stream": "oper",
-		"time": time,
-		"type": "an",
-		"format" : "netcdf",
-		"target": target,
-		})
+		if param == "228.128":
+		# precip requires special treatment 
+			server.retrieve({
+    				"class": "ei",
+    				"dataset": "interim",
+    				"date": date,
+				"expver": "1",
+				"grid": "0.75/0.75",
+			    	"levtype": "sfc",
+			    	"param": "228.128",
+			    	"step": "6",
+			    	"stream": "oper",
+			    	"time": "00:00:00/12:00:00",
+			    	"type": "fc",
+				"format" : "netcdf",
+			    	"target": target,
+			})
+		else: 
+			server.retrieve({
+				"class": "ei",
+				"dataset": "interim",
+				"date": date,
+				"expver": "1",
+				"grid": "0.75/0.75",
+				"levtype": "sfc",
+				"param": param,
+				"step": step,
+				"stream": "oper",
+				"time": time,
+				"type": "an",
+				"format" : "netcdf",
+				"target": target,
+			})
 
 	else:
 
