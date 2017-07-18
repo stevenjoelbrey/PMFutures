@@ -20,12 +20,14 @@ print 'Argument List:', str(sys.argv)
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
 	hourlyVAR =  str(sys.argv[1]) # e.g. 'z'
+	startYear =  int(sys.argv[2])
+	endYear   =  int(sys.argv[3])
 
 else: 
-	# Development environment. Set variables by hand here. 
-	hourlyVAR =  'd2m'
+	# Development environment. Set variables by manually here. 
+	hourlyVAR =  't'
 	startYear = 1997
-	endYear   = 2016
+	endYear   = 1997
 
 
 dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
@@ -181,9 +183,12 @@ for year in years:
 	
 	# Create variables on the dimension they live on 
 	if len(dims) == 4:
+
 		ncFile.createDimension('level',  nLevel )
+
 		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
-		            'f4',('time','level','latitude','longitude'))
+		            'f4',('time','level','latitude','longitude'),
+			    fill_value=VAR._FillValue)
 
 		# While here create the level dimesion
 		level_ = ncFile.createVariable('level', 'i4', ('level',))
@@ -191,27 +196,34 @@ for year in years:
 
 	else:
 		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
-		            'f4',('time','latitude','longitude'))
+		            'f4',('time','latitude','longitude'),
+                            fill_value=VAR._FillValue)
 
 	# Assign the same units as the loaded file to the main variable
 	dailyVAR_.units = VAR.units
+	dailyVAR_.scale_factor = VAR.scale_factor
+	dailyVAR_.add_offset = VAR.add_offset
+	dailyVAR_.missing_value = VAR.missing_value
 
 	# Create time variable	
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
 	time_.units = time.units
+	time_.calendar = time.calendar
 
 	# create lat variable
-	latitude_ = ncFile.createVariable('lat', 'f4', ('latitude',))
+	latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
 	latitude_.units = lat.units
 	
 	# create longitude variable
-	longitude_ = ncFile.createVariable('lon', 'f4', ('longitude',))
+	longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
 	longitude_.units = lon.units
 
 	# Write the actual data to these dimensions
 	dailyVAR_[:]     = dailyVAR
 	latitude_[:]     = lat[:]
 	longitude_[:]    = lon[:]
+	if len(dims) == 4:
+		level_[:] = level[:]
 
 	# NOTE: In general, every 4th element, starting at 0th, since there
 	# NOTE: are 4 sets of 6 hourly data for any given date. However, tp
