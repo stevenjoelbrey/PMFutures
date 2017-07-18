@@ -8,23 +8,37 @@
 
 # TODO: Merge daily variable yearly files into a single 1997-2016 file!
 
-dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
-outputDir = "/barnes-scratch/sbrey/era_interim_nc_daily"
 
+
+###############################################################################
+# ---------------------- Set analysis variables--------------------------------
+###############################################################################
 import sys
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
-	hourlyVAR =  str(sys.argv[1]) # e.g. 'Z'
+	hourlyVAR =  str(sys.argv[1]) # e.g. 'z'
 
 else: 
 	# Development environment. Set variables by hand here. 
-	hourlyVAR =  'z'
+	hourlyVAR =  'd2m'
+	startYear = 1997
+	endYear   = 2016
+
+
+dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
+outputDir = "/barnes-scratch/sbrey/era_interim_nc_daily"
 	
 
+print '----------------------------------------------------------------------'
+print 'Working on variable: ' + hourlyVAR + ' for years: ' + str(startYear) +\
+      '-'+ str(endYear)
+print '----------------------------------------------------------------------'
 
+
+# Import the required modules
 import os
 import numpy as np
 from mpl_toolkits.basemap import Basemap, cm
@@ -40,30 +54,49 @@ import os.path
 
 # Start the timer on this code
 timeStart = timer.time()
-years     = np.arange(1997,2017)
+
+# Loop over the selected years 
+years  = np.arange(startYear, endYear+1)
+ii     = 0 # for counting total iterations	
 for year in years:
 
 	year = str(year)
-	print '----------------------------------------------------------------------'
+	print '---------------------------------------------------------------'
 	print 'Working on : ' + year
-	print '----------------------------------------------------------------------'	
+	print '---------------------------------------------------------------'	
 	
 
-	# Load 6-hourly  data
+	# Load 6-hourly data
 	HourlyFile  = os.path.join(dataDir, hourlyVAR + "_" + year + ".nc")	
 	nc          = Dataset(HourlyFile, 'r')
-	VAR         = nc.variables['z']   
+	VAR         = nc.variables[hourlyVAR]   
 	time        = nc.variables['time'] 
 	time_hour   = np.array(time[:], dtype=int)
 	lon         = nc.variables['longitude']
 	lat         = nc.variables['latitude']
-	level       = nc.variables['level']
 
-	##########################################
+	# Some variables live on (t, level, lat, lon) grids, others (t, lat, lon)
+	# Find out which one using dimension keys
+	# e.g. [u'longitude', u'latitude', u'time'] for 'sp'
+	#      [u'longitude', u'latitude', u'level', u'time'] for 'z'
+	dims = nc.dimensions.keys()
+	if len(dims) == 4:
+		level = nc.variables['level']
+
+	#######################################################################
 	# Handle date from hourly time dimensions
-	##########################################
-	t0 = datetime.datetime(year=1900, month=1, day=1, hour=0, minute=0, second=0) 
-	date0 = date(year=1900, month=1, day=1)
+	#######################################################################
+	if time.units == 'hours since 1900-01-01 00:00:0.0':
+		# For time datetime array
+		t0 = datetime.datetime(year=1900, month=1, day=1,\
+                                       hour=0, minute=0, second=0) 
+		# For simply getting dates 
+		date0 = date(year=1900, month=1, day=1)
+
+	else:
+		raise ValueError('Unknown time origin! Code will not work.')		
+
+	# Create arrays to store datetime objects
 	t = []
 	dates = []
 	for i in range(len(time_hour)):
@@ -80,28 +113,38 @@ for year in years:
 	nDays = len(unique_dates)
 	nLon  = len(lon)
 	nLat  = len(lat)
-	nLevel= len(level)
 
 
-	# Create array to store daily averaged data
-	dailyVAR = np.zeros((nDays, nLevel, nLat, nLon))
+	# Create array to store daily averaged data, based on dimensions
+	if len(dims) == 4:
+		nLevel= len(level)
+		dailyVAR  = np.zeros((nDays, nLevel, nLat, nLon))
+	else:
+		dailyVAR  = np.zeros((nDays, nLat, nLon))
+
+	# Get all values numpy array into workspace
 	VAR_array = VAR[:]
-
 
 	print 'Working on the large loop averaging 6-hourly values for each day'
 	for i in range(nDays):
-
-		print str(i/float(nDays)*100.) + " % complete"
-
+		ii = ii + 1.
+		print str(ii/(float(nDays)*len(years))*100.) + " % complete"
+		
 		# find unique day to work on
 		indexMask = np.where(dates == unique_dates[i])[0]
-		VAR_array_subset = VAR_array[indexMask, :, :, :]
-		day_time_mean = np.mean(VAR_array_subset, 0)
 
-		dailyVAR[i, :, : , :] = day_time_mean
+		if len(dims) == 4:
+
+			VAR_array_subset = VAR_array[indexMask, :, :, :]
+			day_time_mean = np.mean(VAR_array_subset, 0)
+			dailyVAR[i, :, : , :] = day_time_mean
+		else:
+
+			VAR_array_subset = VAR_array[indexMask, :, :]
+			day_time_mean = np.mean(VAR_array_subset, 0)
+			dailyVAR[i, :, : ] = day_time_mean	
 
 	
-
 	meansCompleteTime = timer.time()
 	dt = (meansCompleteTime - timeStart) / 60. 
 	print '----------------------------------------------------------------------'
@@ -133,23 +176,35 @@ for year in years:
 	ncFile.description = 'Daily average of 6 hourly data'
 	ncFile.location = 'Global'
 	ncFile.createDimension('time',  nDays )
-	ncFile.createDimension('level',  nLevel )
 	ncFile.createDimension('latitude', nLat )
 	ncFile.createDimension('longitude', nLon )
-
+	
 	# Create variables on the dimension they live on 
-	dailyVAR_ = ncFile.createVariable(hourlyVAR, 'f4',('time','level','latitude','longitude'))
+	if len(dims) == 4:
+		ncFile.createDimension('level',  nLevel )
+		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
+		            'f4',('time','level','latitude','longitude'))
+
+		# While here create the level dimesion
+		level_ = ncFile.createVariable('level', 'i4', ('level',))
+		level_.units = level.units
+
+	else:
+		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
+		            'f4',('time','latitude','longitude'))
+
+	# Assign the same units as the loaded file to the main variable
 	dailyVAR_.units = VAR.units
 
+	# Create time variable	
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
 	time_.units = time.units
 
-	level_ = ncFile.createVariable('level', 'i4', ('level',))
-	level_.units = level.units
-
+	# create lat variable
 	latitude_ = ncFile.createVariable('lat', 'f4', ('latitude',))
 	latitude_.units = lat.units
-	 
+	
+	# create longitude variable
 	longitude_ = ncFile.createVariable('lon', 'f4', ('longitude',))
 	longitude_.units = lon.units
 
@@ -157,15 +212,26 @@ for year in years:
 	dailyVAR_[:]     = dailyVAR
 	latitude_[:]     = lat[:]
 	longitude_[:]    = lon[:]
-	time_[:]         = time[0::4] # Take every 4th element, starting at 0th
 
+	# NOTE: In general, every 4th element, starting at 0th, since there
+	# NOTE: are 4 sets of 6 hourly data for any given date. However, tp
+	# NOTE: (total precip) only has two chunks of 6 hourly data per day.
+	# NOTE: so this needs to be handled seperately.
+	tstep = len(time) / nDays	
+	time_[:] = time[0::tstep] 
+	# The difference in each time_[:] element in hours must be 24 or 
+	# this is not working.
+	if np.unique(np.diff(time_[:])) != 24:
+		ValueError('Difference in hours between days not all 24! Broken.')
+
+	# The data is written, close the ncFile and move on to the next year! 
 	ncFile.close()
 
 
-	dt = (timer.time() - timeStart) / 60.
-	print '----------------------------------------------------------------------'
-	print 'It took ' + str(dt) + ' minutes to run entire script.'
-	print '----------------------------------------------------------------------'
+dt = (timer.time() - timeStart) / 60.
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to run entire script.'
+print '----------------------------------------------------------------------'
 
 
 
