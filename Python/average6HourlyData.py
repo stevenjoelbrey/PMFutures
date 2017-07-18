@@ -6,8 +6,6 @@
 # This script will be used to generate daily met fields from hourly nc files. 
 # The 6-houly data to average live in /barnes-scratch/sbrey/era_interim_nc_6_hourly
 
-# TODO: Merge daily variable yearly files into a single 1997-2016 file!
-
 
 
 ###############################################################################
@@ -25,9 +23,9 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	hourlyVAR =  't'
+	hourlyVAR =  'v10'
 	startYear = 1997
-	endYear   = 1997
+	endYear   = 2016
 
 
 dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
