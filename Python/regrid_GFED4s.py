@@ -18,41 +18,10 @@ species  = 'C' # 'C' , 'DM', 'small_fire_fraction' (These have daily fraction es
 import sys
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
-
 from mpl_toolkits import basemap
-
-
 import numpy as np
 import scipy.interpolate
-
-
-old_grid_data=np.random.rand(4,3)
-
-#old grid dim
-loni = np.array([109.94999695, 110.05000305, 110.15000153])
-depi=np.array([3.04677272, 9.45404911, 16.36396599, 23.89871025])
-
-#new grid dim
-lon=np.arange(110.,110.3,.1) #NB: 110.2 outside of convex hull of old so will produce nan
-depth=np.array([3.1,9,16,23])
-
-#create mesh
-X, Y = np.meshgrid(loni, depi)
-XI, YI = np.meshgrid(lon,depth)
-
-#interp
-new_grid=scipy.interpolate.griddata((X.flatten(),Y.flatten()),old_grid_data.flatten() ,\ 
-                                    (XI,YI),method='linear')
-
-print "this is original"
-print old_grid_data.reshape(4,3)
-print ""
-print "this is interp' by cubic"
-print new_grid
-
-print
-print "this is diff"
-print new_grid-old_grid_data.reshape(4,3)
+import time as timer
 
 # Get the era-interim (or other MET grid). They ALL live on the same grid, except
 # time
@@ -73,37 +42,98 @@ fire_lat  = fire_nc.variables['latitude'][:]
 fire_lon  = fire_nc.variables['longitude'][:] 
 fire_time = fire_nc.variables['time']
 
+print 'Working on loading the really big emissions file' 
+timeStart = timer.time()
+emissions = fire_nc.variables['C'][:]
+dt = (timer.time() - timeStart) / 60.
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to load emissions array into workspace'
+print '----------------------------------------------------------------------'
+
 # Adjust fire lon from -180:180 lon to 0:360 lon to match met
 fire_lon = fire_lon + 180.
 fire_lon_g, fire_lat_g = np.meshgrid(fire_lon, fire_lat)
 
+# flatten grids that do not change
+fire_lon_f = fire_lon_g.flatten()
+fire_lat_f = fire_lat_g.flatten()
+met_lon_f = met_lon_g.flatten()
+met_lat_f = met_lat_g.flatten()
+
+# Now make these into tuple for griddata function
+fire_points = (fire_lon_f, fire_lat_f)
+met_points = (met_lon_f, met_lat_f)
+
+nTStep = len(fire_time)
+
+fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)))
+deltaMass = np.zeros(nTStep)
+
+# For each time step, find the best match in terms of min lon lat
+# distance 
+# TODO: Only loop over non zero locations? Over subregion?
+timeStart = timer.time()
+for t in range(4):
+	print t
+	# Loop over fire lon values
+	for x in range(len(fire_lon)):
+		# to make it a point, loop over each lat for each lon
+		for y in range(len(fire_lat)):
+		
+			# Difference in regular grid arrays, units of deg
+			dx = np.abs(fire_lon[x] - met_lon)
+			dy = np.abs(fire_lat[y] - met_lat)
+	
+			# Index of best match
+			#xi = np.argmin(dx)
+			#yi = np.argmin(dy)
+			xi = np.where(dx == dx.min())[0][0]
+			yi = np.where(dy == dy.min())[0][0]
+
+			# assign the data
+			fire_new_grid[t, yi, xi] = fire_new_grid[t, yi, xi] + emissions[t, y, x]
+
+	# How much mass is lost or gained?
+	deltaMass[t] = np.sum(fire_new_grid[t, :, :]) - np.sum(emissions[t, :, :])
+
+dt = (timer.time() - timeStart) / 60.
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to run the re-grid loop'
+print '----------------------------------------------------------------------'
+
+
+# Before looping handle time matching of fire and met data
+
 # Get the first instance of fire data to regrid
-data = fire_nc.variables['C'][0,:,:]
+#nTStep = len(fire_time)
 
-######################
-#def regridOneDay():
-######################
+#fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)))
 
-old_grid = data
+#timeStart = timer.time()
+#for i in range(10):
+	
+#	print i 
 
-#old grid dim
-loni = fire_lon
-lati = fire_lat
+#	old_grid = emissions[i,:,:]
+	
+#	# NOTE: This does NOT conserve mtotal emission mass
+#	new_grid = scipy.interpolate.griddata((fire_lon_f, fire_lat_f), old_grid.flatten(),
+#	                                      (met_lon_g, met_lat_g), method='linear')
 
-#new grid dim
-lon = met_lon #NB: 110.2 outside of convex hull of old so will produce nan
-lat = met_lat
+#	fire_new_grid[i,:,:] = new_grid
 
-#create mesh
-X, Y   = np.meshgrid(loni, lati)
-XI, YI = np.meshgrid(lon, lat)
-
-#interp
-new_grid=scipy.interpolate.griddata((X.flatten(),Y.flatten()), old_grid.flatten() ,\
-                                    (XI,YI), method='linear')
-
+#dt = (timer.time() - timeStart) / 60.
+#print '----------------------------------------------------------------------'
+#print 'It took ' + str(dt) + ' minutes to run the loop'
+#print '----------------------------------------------------------------------'
+	
 
 
+
+
+# TODO: see what percent change in total grams of burning for the whole days grid
+# TODO: occur using this method. I do not want to loose mass or gain mass when
+# TODO: moving to a new grid. 
 
 
 
