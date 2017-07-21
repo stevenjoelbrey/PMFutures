@@ -10,12 +10,8 @@
 # Example using scipy 
 # http://christopherbull.com.au/python/scipy-interpolate-griddata/
 
-dataDir  = '/barnes-scratch/sbrey/'
-year     = 2003
-species  = 'C' # 'C' , 'DM', 'small_fire_fraction' (These have daily fraction est.)
 
-
-import sys
+import sys # for reading command line arguments
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
 from mpl_toolkits import basemap
@@ -23,20 +19,34 @@ import numpy as np
 import scipy.interpolate
 import time as timer
 
+
+print 'Number of arguments:', len(sys.argv), 'arguments.'
+print 'Argument List:', str(sys.argv)
+
+if len(sys.argv) != 1:
+	print 'Using arguments passed via command line.'
+	year      =  str(sys.argv[1]) # e.g. 'z'
+	species   =  str(sys.argv[2])
+
+else: 
+	# Development environment. Set variables by manually here. 
+	year     = str(2003)
+	species  = 'C' # 'C' , 'DM', 'small_fire_fraction' (These have daily fraction est.)
+
+# Consider making this directory a command line argument
+dataDir  = '/barnes-scratch/sbrey/'
+
 # Get the era-interim (or other MET grid). They ALL live on the same grid, except
 # time
 # TODO: Handle time matching in this script as well!
-metFile = dataDir + 'era_interim_nc_6_hourly/d2m_2003.nc' 
+metFile = dataDir + 'era_interim_nc_daily/d2m_'+ year + '.nc' 
 met_nc = Dataset(metFile, 'r')
 met_lat = met_nc.variables['latitude'][:]
 met_lon = met_nc.variables['longitude'][:]
 met_time= met_nc.variables['time']
 
-# Grid the coordinate arrays
-met_lon_g, met_lat_g = np.meshgrid(met_lon, met_lat)
-
-# Get emissions file
-fire_file = dataDir + 'GFED4s/GFED4.1s_C_2003_2016.nc'
+# Get emissions file (use yearly nc files)
+fire_file = dataDir + 'GFED4s/GFED4.1s_' + species + '_'+ year + '.nc'
 fire_nc   = Dataset(fire_file, 'r')
 fire_lat  = fire_nc.variables['latitude'][:] 
 fire_lon  = fire_nc.variables['longitude'][:] 
@@ -44,54 +54,55 @@ fire_time = fire_nc.variables['time']
 
 print 'Working on loading the really big emissions file' 
 timeStart = timer.time()
-emissions = fire_nc.variables['C'][:]
+
+emissions = fire_nc.variables[species][:]
+
 dt = (timer.time() - timeStart) / 60.
+
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to load emissions array into workspace'
 print '----------------------------------------------------------------------'
 
 # Adjust fire lon from -180:180 lon to 0:360 lon to match met
 fire_lon = fire_lon + 180.
-fire_lon_g, fire_lat_g = np.meshgrid(fire_lon, fire_lat)
 
-# flatten grids that do not change
-fire_lon_f = fire_lon_g.flatten()
-fire_lat_f = fire_lat_g.flatten()
-met_lon_f = met_lon_g.flatten()
-met_lat_f = met_lat_g.flatten()
-
-# Now make these into tuple for griddata function
-fire_points = (fire_lon_f, fire_lat_f)
-met_points = (met_lon_f, met_lat_f)
-
+# Get the total number of time steps
 nTStep = len(fire_time)
 
-fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)))
-deltaMass = np.zeros(nTStep)
+# NOTE: float32 specified otherwise addition leads to small errors and mass
+# NOTE: is not conserved in the regridding process.
+fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)), dtype='float')
+deltaMass = np.zeros(nTStep, dtype='float')
+
 
 # For each time step, find the best match in terms of min lon lat
 # distance 
 # TODO: Only loop over non zero locations? Over subregion?
 timeStart = timer.time()
-for t in range(4):
-	print t
+
+for t in range(3): # nTStep
+	#print str(t) + ' time step'
+	#print str(float(t)/nTStep*100.) + " % complete"
 	# Loop over fire lon values
 	for x in range(len(fire_lon)):
 		# to make it a point, loop over each lat for each lon
 		for y in range(len(fire_lat)):
-		
+	
+			# y and x represent the emissions data location we are
+			# trying to assign!
+	
 			# Difference in regular grid arrays, units of deg
 			dx = np.abs(fire_lon[x] - met_lon)
 			dy = np.abs(fire_lat[y] - met_lat)
 	
 			# Index of best match
-			#xi = np.argmin(dx)
-			#yi = np.argmin(dy)
-			xi = np.where(dx == dx.min())[0][0]
-			yi = np.where(dy == dy.min())[0][0]
+			xi = np.argmin(dx)
+			yi = np.argmin(dy)
+			#xi = np.where(dx == dx.min())[0][0]
+			#yi = np.where(dy == dy.min())[0][0]
 
 			# assign the data
-			fire_new_grid[t, yi, xi] = fire_new_grid[t, yi, xi] + emissions[t, y, x]
+			fire_new_grid[t, yi, xi] = (fire_new_grid[t, yi, xi] + emissions[t, y, x])
 
 	# How much mass is lost or gained?
 	deltaMass[t] = np.sum(fire_new_grid[t, :, :]) - np.sum(emissions[t, :, :])
@@ -102,47 +113,53 @@ print 'It took ' + str(dt) + ' minutes to run the re-grid loop'
 print '----------------------------------------------------------------------'
 
 
-# Before looping handle time matching of fire and met data
+######################################################################################
+# Write the NETCDF data. Make sure to include all relevant units for a given species! 
+######################################################################################
+print 'Working on writing the output as netCDF data'
+nLat = len(met_lat)
+nLon = len(met_lon)
+nTime = len(fire_time)
 
-# Get the first instance of fire data to regrid
-#nTStep = len(fire_time)
-
-#fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)))
-
-#timeStart = timer.time()
-#for i in range(10):
-	
-#	print i 
-
-#	old_grid = emissions[i,:,:]
-	
-#	# NOTE: This does NOT conserve mtotal emission mass
-#	new_grid = scipy.interpolate.griddata((fire_lon_f, fire_lat_f), old_grid.flatten(),
-#	                                      (met_lon_g, met_lat_g), method='linear')
-
-#	fire_new_grid[i,:,:] = new_grid
-
-#dt = (timer.time() - timeStart) / 60.
-#print '----------------------------------------------------------------------'
-#print 'It took ' + str(dt) + ' minutes to run the loop'
-#print '----------------------------------------------------------------------'
-	
+outputFile = dataDir + 'GFED4s/' + 'GFED4.1s_METGrid_' + species + '_' +\
+		str(year) + '.nc'
 
 
+ncFile = Dataset(outputFile, 'w', format='NETCDF4')
+ncFile.description = 'Daily GFED regridded to era-interim grid.'
+ncFile.location = 'Global'
+ncFile.createDimension('time',  nTime )
+ncFile.createDimension('latitude', nLat )
+ncFile.createDimension('longitude', nLon )
 
+VAR_ = ncFile.createVariable(species,\
+	            'f4',('time','latitude','longitude'))
+VAR_.units = 'g ' + species + ' per grid cell per day'
 
-# TODO: see what percent change in total grams of burning for the whole days grid
-# TODO: occur using this method. I do not want to loose mass or gain mass when
-# TODO: moving to a new grid. 
+# Create time variable	
+time_ = ncFile.createVariable('time', 'i4', ('time',))
+time_.units = fire_time.units
 
+# Keep track of the change in mass
+deltaMass_ = ncFile.createVariable('deltaMass', 'f4', ('time',))
+deltaMass_.units = 'change in grams whole grid each timestep due to regridding'
 
+# create lat variable
+latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
+latitude_.units = 'degrees north'
 
+# create longitude variable
+longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
+longitude_.units = 'degrees east'
 
+# Write the actual data to these dimensions
+VAR_[:]       = fire_new_grid[:]
+latitude_[:]  = met_lat
+longitude_[:] = met_lon
+time_[:]      = fire_time[:]
+deltaMass_[:] = deltaMass[:]
 
+ncFile.close()	
 
-
-# https://docs.scipy.org/doc/scipy/reference/generated/
-# scipy.interpolate.interp2d.html#scipy.interpolate.interp2d
-#scipy.interpolate.interp2d()
 
 
