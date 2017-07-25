@@ -23,9 +23,9 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	hourlyVAR =  'v10'
-	startYear = 1997
-	endYear   = 2016
+	hourlyVAR =  'tp'
+	startYear = 2003
+	endYear   = 2003
 
 
 dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
@@ -138,6 +138,15 @@ for year in years:
 			VAR_array_subset = VAR_array[indexMask, :, :, :]
 			day_time_mean = np.mean(VAR_array_subset, 0)
 			dailyVAR[i, :, : , :] = day_time_mean
+
+		elif (len(dims) == 3) & (hourlyVAR == 'tp'):
+
+			# Precip units of m per 12 hour window	
+			VAR_array_subset = VAR_array[indexMask, :, :]
+			day_time_total = np.sum(VAR_array_subset, axis=0)
+			dailyVAR[i, :, : ] = day_time_total		
+			print 'treating precip differently'	
+		
 		else:
 
 			VAR_array_subset = VAR_array[indexMask, :, :]

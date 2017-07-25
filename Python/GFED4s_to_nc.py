@@ -8,10 +8,11 @@
 # (or any lat lon passed) and save as a single daily nc file. 
 
 # TODO: include 'basis_regions' in nc output?
+# TODO: Save all the two dimensional attributes as thier own NETCDF file
 
 dataDir   = '/barnes-scratch/sbrey/GFED4s/'
-startYear = 2003
-endYear   = 2004
+startYear = 2016
+endYear   = 2016
 species   = 'C' # 'C' , 'DM', 'small_fire_fraction' (These have daily fraction est.)
 
 # Months to loop over
@@ -28,7 +29,6 @@ import datetime
 from datetime import date
 from datetime import timedelta
 from datetime import datetime
-
 
 def getYearlyData(dataDir, year, months, species):
 	"""This function gets all the data for a species for a given year and returns
@@ -145,12 +145,18 @@ if len(np.unique(np.diff(time))) > 1.:
 ######################################################################################
 # Write the NETCDF data. Make sure to include all relevant units for a given species! 
 ######################################################################################
+print 'Working on writing the output as netCDF data'
 nLat = lat.shape[0]
 nLon = lon.shape[1]
 nTime = len(time)
 
-outputFile = dataDir + 'GFED4.1s_' + species + '_' +\
-		str(startYear) + '_' + str(endYear) + '.nc'
+# When the start year is the same as the end year, only assign one year for file name
+if startYear == endYear:
+	outputFile = dataDir + 'GFED4.1s_' + species + '_' +\
+			str(startYear) + '.nc'
+else:
+	outputFile = dataDir + 'GFED4.1s_' + species + '_' +\
+			str(startYear) + '_' + str(endYear) + '.nc'
 
 ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 ncFile.description = 'Data downloaded converted from hdf5 format'
