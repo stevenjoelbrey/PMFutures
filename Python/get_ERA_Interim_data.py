@@ -15,7 +15,13 @@ VAR         = sys.argv[1]
 startYear   = int(sys.argv[2]) 
 endYear     = int(sys.argv[3])
 levtype     = sys.argv[4] #"sfc" # "pl"
-DataDir     = "/barnes-scratch/sbrey/era_interim_nc_6_hourly/"
+gridSpacing = "1.50/1.50" # "0.75/0.75"
+
+if gridSpacing == "0.75/0.75":
+	DataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly/"
+else:
+	DataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly_1_5/"
+
 
 nYears = (endYear - startYear) + 1
 yearArray = np.arange(startYear, endYear+1)
@@ -73,7 +79,7 @@ for i in range(nYears):
     				"dataset": "interim",
     				"date": date,
 				"expver": "1",
-				"grid": "0.75/0.75",
+				"grid": gridSpacing,
 			    	"levtype": "sfc",
 			    	"param": "228.128",
 			    	"step": "6",
@@ -89,7 +95,7 @@ for i in range(nYears):
 				"dataset": "interim",
 				"date": date,
 				"expver": "1",
-				"grid": "0.75/0.75",
+				"grid": gridSpacing,
 				"levtype": "sfc",
 				"param": param,
 				"step": step,
@@ -107,7 +113,7 @@ for i in range(nYears):
 		"dataset": "interim",
 		"date": date,
 		"expver": "1",
-		"grid": "0.75/0.75",
+		"grid": gridSpacing,
 		"levelist": "250/500/850/1000",
 		"levtype": "pl",
 		"param": param,
