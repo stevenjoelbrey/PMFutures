@@ -3,7 +3,8 @@
 ###############################################################################
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
-# This script will be used to merge yearly daily era-interim nc files 
+# This script will be used to merge yearly daily era-interim nc files or GFED4s
+# fire emissions files.
 
 
 # import required modules
@@ -12,39 +13,55 @@ import numpy as np
 import sys
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
+import cesm_nc_manager as cnm
 
-import sys
+dirRoot = '/barnes-scratch/sbrey/'
+
+
+###############################################################################
+# ------------------------- Handle Args --------------------------------------- 
+###############################################################################
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
-	ncVAR     =  str(sys.argv[1]) # e.g. 'z'
-	startYear =  int(sys.argv[2])
-	endYear   =  int(sys.argv[3])
+	ncVARType =  str(sys.argv[1])
+	ncVAR     =  str(sys.argv[2]) # e.g. 'z'
+	subsetNA  =  str(sys.argv[3])
+	startYear =  int(sys.argv[4])
+	endYear   =  int(sys.argv[5])
 
 else: 
 	# Development environment. Set variables by manually here. 
-	ncVAR     =  'tp'
-	startYear = 1997
-	endYear   = 1998
+	ncVARType = 'era_interim'       # 'era_interim' | 'GFED4s'
+	ncVAR     = 'tp'            # 'tp' | 'C'
+	subsetNA  = '_'         # "_NA_" | "_"
+	startYear = 2003
+	endYear   = 2016
 
 
-dataDir = '/barnes-scratch/sbrey/era_interim_nc_daily/'
-outDir  = '/barnes-scratch/sbrey/era_interim_nc_daily_merged/'
+# Set directory paths based on the type of data to be merged
+if ncVARType == 'era_interim':
+	dataDir = dirRoot + 'era_interim_nc_daily/'
+	outDir  = dirRoot + 'era_interim_nc_daily_merged/'
 
+elif ncVARType == 'GFED4s':
+	dataDir = dirRoot + 'GFED4s/'
+	outDir  = dirRoot + 'GFED4s/'
 
-#def mergeSurfaceData(var, startYear=1997, endYear=2016):
-#""""if x1 is (time1, lat, lon) and x2 is (time2, lat, lon) we want to create
-#    y such that y is (time1:time2, lat, lon)
-#"""
+###############################################################################
+# ------------------------Begin main script -----------------------------------
+###############################################################################
 
 years = np.arange(startYear, endYear+1)
 
 for year in years:
 
-
-	loadFile = dataDir + ncVAR + '_' + str(year) + '.nc'
+	if ncVARType == 'era_interim':
+		loadFile = dataDir + ncVAR + '_' + str(year) + '.nc'
+	else: 
+		loadFile = dataDir + 'GFED4.1s_METGrid_' + ncVAR + '_' + str(year) + '.nc'
 
 	# Use the first years data to get dimension information 
 	# and array to be appended too.
@@ -54,10 +71,13 @@ for year in years:
 
 		ncBase = Dataset(loadFile, 'r')
 		varBase = ncBase.variables[ncVAR]
-		# TODO: change to 'latitude' and 'longitude' once daily values are
-		# TODO: rerun 
+
+		# Get dimension information one time
 		latitude = ncBase.variables['latitude']
 		longitude = ncBase.variables['longitude']
+		latitudeUnits = latitude.units
+		longitudeUnits = longitude.units
+
 		tBase = ncBase.variables['time']
 
 		dims = ncBase.dimensions.keys()
@@ -87,11 +107,32 @@ if np.unique(np.diff(tBase)) != 24:
 print 'Final merged var size: ' + str(varBase.shape)
 print 'Final merged time array: ' + str(len(tBase))
 	
+
+#######################################################################	
+# Handle making the spatial subset
+#######################################################################	
+if subsetNA  == '_NA_':
+	ymin   = 10   
+	ymax   = 90.  
+	xmin   = -130. + 180.
+	xmax   = -60.  + 180.
+	varBase, latitude, longitude = cnm.mask2dims(varBase, longitude[:], latitude[:], 0,\
+							xmin, xmax, ymin, ymax)
+
+	print 'Final merged var NA size: ' + str(varBase.shape)
+
+
+
 #######################################################################	
 # Write the merged file
 #######################################################################	
-outputFile = outDir + ncVAR + '_' +\
-             str(startYear) + '_' + str(endYear) + '.nc'
+if ncVARType == 'era_interim':
+	outputFile = outDir + ncVAR + subsetNA + \
+		     str(startYear) + '_' + str(endYear) + '.nc'
+
+elif ncVARType == 'GFED4s':
+	outputFile = dataDir + 'GFED4.1s_METGrid_' + ncVAR + subsetNA + \
+			str(startYear)+ '_' + str(endYear) + '.nc'	
 
 print '----------------------------------------------------------------------'
 print 'Writing the output file. outputFile used:'
@@ -105,14 +146,17 @@ nLon = len(longitude)
 
 
 ncFile = Dataset(outputFile, 'w', format='NETCDF4')
-ncFile.description = 'Daily data created by average6HourlyData.py and merged with merge_year_nc.py'
+if ncVARType == 'era_interim':
+	ncFile.description = 'Daily data created by average6HourlyData.py and merged with merge_year_nc.py'
+elif ncVARType == 'GFED4s':
+	ncFile.description = 'Merged daily GFED4s emissions from yearly files after regridding'	
+
 ncFile.location = 'Global'
 ncFile.createDimension('time',  nDays )
 ncFile.createDimension('latitude', nLat )
 ncFile.createDimension('longitude', nLon )
 
 # Create variables on the dimension they live on 
-# TODO: preserve fill_value
 if len(dims) == 4:
 
 	ncFile.createDimension('level',  len(level) )
@@ -124,29 +168,40 @@ if len(dims) == 4:
 	level_ = ncFile.createVariable('level', 'i4', ('level',))
 	level_.units = level.units
 
-else:
+	mergedVAR_.scale_factor = ncBase.variables[ncVAR].scale_factor
+	mergedVAR_.add_offset = ncBase.variables[ncVAR].add_offset
+	mergedVAR_.missing_value = ncBase.variables[ncVAR].missing_value
+
+elif (len(dims)==3) & (ncVARType == 'era_interim'):
+
 	mergedVAR_ = ncFile.createVariable(ncVAR,\
 	            'f4',('time','latitude','longitude'),
                      fill_value=ncBase.variables[ncVAR]._FillValue)
 
+	mergedVAR_.scale_factor = ncBase.variables[ncVAR].scale_factor
+	mergedVAR_.add_offset = ncBase.variables[ncVAR].add_offset
+	mergedVAR_.missing_value = ncBase.variables[ncVAR].missing_value
+
+else:
+	mergedVAR_ = ncFile.createVariable(ncVAR,\
+	            'f4',('time','latitude','longitude'))	
+
 # Assign the same units as the loaded file to the main variable
 mergedVAR_.units = ncBase.variables[ncVAR].units
-mergedVAR_.scale_factor = ncBase.variables[ncVAR].scale_factor
-mergedVAR_.add_offset = ncBase.variables[ncVAR].add_offset
-mergedVAR_.missing_value = ncBase.variables[ncVAR].missing_value
 
 # Create time variable	
 time_ = ncFile.createVariable('time', 'i4', ('time',))
 time_.units = ncBase.variables['time'].units
-time_.calendar = ncBase.variables['time'].calendar
+if ncVARType == 'era_interim':
+	time_.calendar = ncBase.variables['time'].calendar
 
 # create lat variable
 latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
-latitude_.units = latitude.units
+latitude_.units = latitudeUnits
 
 # create longitude variable
 longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
-longitude_.units = longitude.units
+longitude_.units = longitudeUnits
 
 # Write the actual data to these dimensions
 mergedVAR_[:] = varBase[:]

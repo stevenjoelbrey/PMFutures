@@ -723,4 +723,34 @@ def makeHist(ax, s1MonthTotal, s2MonthTotal, s1Label, s2Label, maxValue, titleTe
 
     return(ax)
 
+def mask2dims(data, x, y, tDim, xmin, xmax, ymin, ymax):
+	"""Takes a data array of shape [time, lat, lon] and subsets
+           the data to the domain specified by x and y min and max arguments
+           tDim specifies the location of the time dimension. Use tDim=-1
+	   when the data array has no time dimension.
+
+	   return: subset, ynew, xnew
+	"""
+
+	xMask = np.where((x >= xmin) & (x <= xmax))
+	xnew = x[xMask]
+	xmin_i = np.min(xMask)
+	xmax_i = np.max(xMask) + 1
+
+	yMask = np.where((y >= ymin) & (y <= ymax))
+	ynew = y[yMask]
+	ymin_i = np.min(yMask)
+	ymax_i = np.max(yMask) + 1
+
+	if (tDim == 0) & (len(data.shape)==4):
+		subset = data[:, :, ymin_i:ymax_i, xmin_i:xmax_i]
+	elif (tDim==0):
+		subset = data[:, ymin_i:ymax_i, xmin_i:xmax_i]
+	elif(tDim==2):
+		subset = data[ymin_i:ymax_i, xmin_i:xmax_i, :]
+	elif(tDim==-1):
+		# No time dimension
+		subset = data[ymin_i:ymax_i, xmin_i:xmax_i]
+
+	return subset, ynew, xnew
 
