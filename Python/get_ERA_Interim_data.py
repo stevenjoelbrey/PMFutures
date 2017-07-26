@@ -15,7 +15,7 @@ VAR         = sys.argv[1]
 startYear   = int(sys.argv[2]) 
 endYear     = int(sys.argv[3])
 levtype     = sys.argv[4] #"sfc" # "pl"
-gridSpacing = "1.50/1.50" # "0.75/0.75"
+gridSpacing = "0.75/0.75" # "0.75/0.75" | "1.50/1.50"
 
 if gridSpacing == "0.75/0.75":
 	DataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly/"
@@ -42,7 +42,8 @@ param_dict = {"sp":"134.128",
 	      "vo":"138.128",
 	      "u":"131.128",
               "v":"132.128",
-              "t":"130.128"
+              "t":"130.128",
+              "wgust":"49.128"
               }
 
 param = param_dict[VAR]
