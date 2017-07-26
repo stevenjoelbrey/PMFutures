@@ -25,6 +25,18 @@ import datetime
 import matplotlib.pyplot as plt
 
 def find_blocking_days(sdFactor=1.):
+	"""
+	This function finds blocking days based on a very simple definition.
+	Blocking days are defined as days when the 500 mb geopotential height
+	is one standard deviation above the monthly mean for at least two days.
+	This function takes one argument.
+		Arguments:
+			sdFactor: Number multiplied by monthly std when setting
+					the threshold. 
+		return:
+			blocking days: An array of 1 and 0 indicating if blocking
+					exists.
+	"""
 
 	z_nc    = Dataset(dataDirBase + 'z_NA_2003_2016.nc', 'r')
 	level   = z_nc.variables['level']
