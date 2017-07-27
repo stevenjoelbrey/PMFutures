@@ -42,21 +42,7 @@ time = nc.variables['time'][:]
 C = nc.variables['C'][:]
 nc.close()
 
-# Make hourly time array into a nice datetime object 
-t0 = datetime.datetime(year=1900, month=1, day=1,\
-                       hour=0, minute=0, second=0)
-
-# Make a nice month and time array for masking 
-nTime = len(time)
-t = []
-month = []
-for i in range(nTime):
-	dt = timedelta(hours=int(time[i]))
-	t_new  = t0 + dt 
-	t.append(t_new)
-	month.append(t_new.month)
-t = np.array(t)
-month = np.array(month)
+t, month = cnm.get_era_interim_time(time)
 
 
 # Subset all by months of interest
@@ -84,7 +70,6 @@ v10 = ncGetSelf(dataDirBase, 'v10')[monthMask, :,:]
 windSpeed = np.sqrt(u10**2 + v10**2) 
 z   = ncGetSelf(dataDirBase, 'z')[monthMask,1,:,:] 
 RH   = ncGetSelf(dataDirBase, 'RH')[monthMask, :,:] 
-
 
 
 # TODO: Plot all parameters in space with abline for event thresholds
@@ -139,7 +124,7 @@ for i in range(nVar):
 
 		c = ax.scatter(xData, yData, c = C, marker=".",\
 				s=4, edgecolors='none',\
-				vmin=vmin,vmax=vmax,\
+				#vmin=vmin,vmax=vmax,\
 				alpha=0.7,\
 				norm=matplotlib.colors.LogNorm()
 	                       )
@@ -166,7 +151,6 @@ fig.subplots_adjust(right=0.80)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cbar = fig.colorbar(c, cax=cbar_ax)
 cbar.set_label('Emissions [g C day$^{-1}$]', fontsize=30)
-
 plt.savefig('../Figures/GFED_era_interim_6_9_parameter_space.png', dpi=500)
  
 
