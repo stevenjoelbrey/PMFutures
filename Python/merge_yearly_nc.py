@@ -34,9 +34,9 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	ncVARType = 'era_interim'       # 'era_interim' | 'GFED4s'
-	ncVAR     = 'tp'            # 'tp' | 'C'
-	subsetNA  = '_'         # "_NA_" | "_"
+	ncVARType = 'GFED4s'       # 'era_interim' | 'GFED4s'
+	ncVAR     = 'C'            # 'tp' | 'C'
+	subsetNA  = '_NA_'         # "_NA_" | "_"
 	startYear = 2003
 	endYear   = 2016
 
@@ -112,12 +112,12 @@ print 'Final merged time array: ' + str(len(tBase))
 # Handle making the spatial subset
 #######################################################################	
 if subsetNA  == '_NA_':
-	ymin   = 10   
-	ymax   = 90.  
-	xmin   = -130. + 180.
-	xmax   = -60.  + 180.
-	varBase, latitude, longitude = cnm.mask2dims(varBase, longitude[:], latitude[:], 0,\
-							xmin, xmax, ymin, ymax)
+	minLat     = 30.    
+	maxLat     = 50.    
+	minLon     = 234.   
+	maxLon     = 259.   
+	varBase, latitude, longitude = v(varBase, longitude[:], latitude[:], 0,\
+					xmin, xmax, ymin, ymax)
 
 	print 'Final merged var NA size: ' + str(varBase.shape)
 

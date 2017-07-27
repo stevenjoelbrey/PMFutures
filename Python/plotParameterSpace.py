@@ -16,13 +16,8 @@
 
 startMonth = 6
 endMonth   = 9
-minLat     = 30.    # 10.
-maxLat     = 50.    # 90.
-minLon     = 234.   # 190.
-maxLon     = 259.   # 320
 
 # Load resources
-import cesm_nc_manager as cnm
 import os
 import numpy as np
 import sys

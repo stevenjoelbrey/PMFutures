@@ -25,6 +25,8 @@ import numpy.ma as ma
 from datetime import date
 import matplotlib.ticker as tkr
 import datetime
+from datetime import date
+from datetime import timedelta
 import os.path # os.path.join('/my/root/directory', 'in', 'here')
 
 ###############################################################################
@@ -753,4 +755,39 @@ def mask2dims(data, x, y, tDim, xmin, xmax, ymin, ymax):
 		subset = data[ymin_i:ymax_i, xmin_i:xmax_i]
 
 	return subset, ynew, xnew
+
+
+def get_era_interim_time(time):
+	"""
+	This function takes a era_interim met file or regridded GFED file
+	and changes the time (in hours from 1900-01-01 00:00:00) to a 
+	python datetime object.
+		Arguments:
+			time: Hours (int) from 1900-01-01 00:00:00
+		return:
+			t: numpy array of datetime 
+			month: numpy array of month (int) aligned with t
+	"""
+	# Make hourly time array into a nice datetime object 
+	t0 = datetime.datetime(year=1900, month=1, day=1,\
+		               hour=0, minute=0, second=0)
+
+	# Make a nice month and time array for masking 
+	nTime = len(time)
+	t = []
+	month = []
+	year = []
+	for i in range(nTime):
+		dt = timedelta(hours=int(time[i]))
+		t_new  = t0 + dt 
+		t.append(t_new)
+		month.append(t_new.month)
+		year.append(t_new.year)
+	t = np.array(t)
+	month = np.array(month)
+	year = np.array(year)
+
+	return t, month, year
+
+
 
