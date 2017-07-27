@@ -221,6 +221,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	low_RH_mask     = np.array(RH < RHThresh, dtype=int)
 	high_T_mask     = np.array(t2m >= TThresh, dtype=int)
 	blocking_mask   = np.array(find_blocking_days(), dtype=int)
+	low_precip_mask = np.array(tp < precLim, dtype=int) 
 	
 	writingComplete = timer.time()
 	dt = (writingComplete - startTime) / 60. 
@@ -246,6 +247,11 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		stagnation_mask_ = ncFile.createVariable('stagnation_mask', 'i', ('time','latitude','longitude'))
 		stagnation_mask_.units = 'limts = surface wind >= ' + str(windSfcLim) +\
 				         ' 500 mb wind lim < ' +str(wind500Lim) + 'precip < ' + str(precLim)  	
+		# Precip
+		low_precip_mask
+		low_precip_mask_ = ncFile.createVariable('low_precip_mask', 'i', ('time','latitude','longitude'))
+		low_precip_mask_.units = 'days precip < ' + str(precLim) + ' inches/day'
+		low_precip_mask_[:] = low_precip_mask[:]
 
 		# wind
 		high_wind_mask_ = ncFile.createVariable('high_wind_mask', 'i', ('time','latitude','longitude'))
@@ -301,12 +307,11 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		# dimension values assignments
 		time_ = ncFile.createVariable('time', 'i4', ('time',))
 		time_.units = time.units
-		time_[:]         = time[:]
+		time_[:] = time[:]
 
 		latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
 		latitude_.units = latitude.units
-		latitude_[:]     = latitude[:]	
-
+		latitude_[:] = latitude[:]	
 
 		longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
 		longitude_.units = longitude.units
