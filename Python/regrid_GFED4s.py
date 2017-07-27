@@ -14,7 +14,7 @@
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
-from mpl_toolkits import basemap
+from mpl_toolkits.basemap import Basemap, cm, shiftgrid
 import numpy as np
 import scipy.interpolate
 import time as timer
@@ -25,25 +25,43 @@ print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
-	year      =  str(sys.argv[1]) # e.g. 'z'
+	year      =  str(sys.argv[1]) 
 	species   =  str(sys.argv[2])
 
 else: 
-	# Development environment. Set variables by manually here. 
+	# Development environment. Set variables manually here. 
 	year     = str(2003)
 	species  = 'C' # 'C' , 'DM', 'small_fire_fraction' (These have daily fraction est.)
 
+
 # Consider making this directory a command line argument
 dataDir  = '/barnes-scratch/sbrey/'
+sanityCheck = False
 
 # Get the era-interim (or other MET grid). They ALL live on the same grid, except
 # time
 # TODO: Handle time matching in this script as well!
-metFile = dataDir + 'era_interim_nc_daily/d2m_'+ year + '.nc' 
+metFile = dataDir + 'era_interim_nc_daily/sp_'+ year + '.nc' 
 met_nc = Dataset(metFile, 'r')
 met_lat = met_nc.variables['latitude'][:]
 met_lon = met_nc.variables['longitude'][:]
 met_time= met_nc.variables['time']
+sp_slice = met_nc.variables['sp'][180,:,:]
+
+
+if sanityCheck:
+	m = Basemap(projection='robin',lon_0=0,resolution='c')
+	lons, lats = np.meshgrid(met_lon, met_lat)
+	x,y=m(lons,lats)
+	m.drawcoastlines()
+	#m.fillcontinents(color='coral',lake_color='aqua')
+	# draw parallels and meridians.
+	#plt.pcolormesh(x,y, sp_slice)
+	c = plt.contour(x, y, sp_slice )
+	#m.drawmapboundary(fill_color='aqua')
+	plt.title("ERA-Interim Grid")
+	plt.show(block=False)
+	#plt.close()
 
 # Get emissions file (use yearly nc files)
 fire_file = dataDir + 'GFED4s/GFED4.1s_' + species + '_'+ year + '.nc'
@@ -52,19 +70,69 @@ fire_lat  = fire_nc.variables['latitude'][:]
 fire_lon  = fire_nc.variables['longitude'][:] 
 fire_time = fire_nc.variables['time']
 
+print '----------------------------------------------------------------------'
 print 'Working on loading the really big emissions file' 
+print '----------------------------------------------------------------------'
 timeStart = timer.time()
-
 emissions = fire_nc.variables[species][:]
-
 dt = (timer.time() - timeStart) / 60.
-
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to load emissions array into workspace'
 print '----------------------------------------------------------------------'
 
-# Adjust fire lon from -180:180 lon to 0:360 lon to match met
-fire_lon = fire_lon + 180.
+
+print '----------------------------------------------------------------------'
+print 'Working on shifting emissions from -180:180 grid to 0:360 grid.' 
+print '----------------------------------------------------------------------'
+regridStart = timer.time()
+
+emissions_new_grid = np.zeros(emissions.shape)
+fire_lon_new = np.zeros(fire_lon.shape)
+
+eastOfGreenwich = np.where(fire_lon >= 0)[0]
+westOfGreenwich = np.where(fire_lon < 0)[0]
+
+# Assign the eastern hemisphere
+fire_lon_new[range(len(eastOfGreenwich))] = fire_lon[eastOfGreenwich]
+emissions_new_grid[:,:,range(len(eastOfGreenwich))] = emissions[:,:,eastOfGreenwich]
+# assign the western hemisphere
+assignment = np.where(fire_lon_new==0)[0]
+fire_lon_new[assignment] = fire_lon[westOfGreenwich] + 360.
+emissions_new_grid[:,:, assignment] = emissions[:,:,westOfGreenwich]
+	
+# Replace old grids and longitude with new
+emissions = emissions_new_grid
+fire_lon = fire_lon_new
+
+
+dt = (timer.time() - regridStart) / 60.
+print '----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to regrid the emissions array'
+print '----------------------------------------------------------------------'
+
+##############
+# Sanity plot 
+##############
+if sanityCheck:
+
+	emissions_new_sum = np.sum(emissions_new_grid, axis=0)
+	emissions_ma = np.ma.masked_where(emissions_new_sum==0,emissions_new_sum, copy=True)
+	m = Basemap(projection='robin',lon_0=0,resolution='c')
+	lons, lats = np.meshgrid(fire_lon_new, fire_lat)
+	x,y=m(lons,lats)
+
+	m = Basemap(projection='robin', lon_0=0,resolution='c')
+	m.drawcoastlines()
+	#m.fillcontinents(color='coral',lake_color='aqua')
+	# draw parallels and meridians.
+	m.drawparallels(np.arange(-90.,120.,30.))
+	m.drawmeridians(np.arange(0.,360.,60.))
+	c = m.pcolor(x, y, emissions_ma)
+	#m.drawmapboundary(fill_color='aqua')
+	plt.title("GFED GRID")
+	plt.show()
+
+
 
 # Get the total number of time steps
 nTStep = len(fire_time)
@@ -73,7 +141,6 @@ nTStep = len(fire_time)
 # NOTE: is not conserved in the regridding process.
 fire_new_grid = np.zeros((nTStep, len(met_lat), len(met_lon)), dtype='float')
 deltaMass = np.zeros(nTStep, dtype='float')
-
 
 # For each time step, find the best match in terms of min lon lat
 # distance 
