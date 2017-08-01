@@ -8,6 +8,10 @@
 # stagnation condition are 500mb , 1000mb (later taken as SLP) geostrophic 
 # winds, and precipitation. 
 # TODO: UPDATE RH calculation to better estimate
+# TODO: Make a dynamic argument to choose all domain or "_NA_" domain. 
+# TODO: the current working version ony uses merged years NA domain.
+# TODO: Make block identification not terrible. 
+
 
 # Set the directory where the data structure starts 
 # data creation pipeline get_era_interim_data.py -> average6hourlyData.py, 
@@ -23,83 +27,101 @@ import time as timer
 from datetime import timedelta
 import datetime
 import matplotlib.pyplot as plt
+import cesm_nc_manager as cnm
 
 def find_blocking_days(sdFactor=1.):
 	"""
 	This function finds blocking days based on a very simple definition.
 	Blocking days are defined as days when the 500 mb geopotential height
-	is one standard deviation above the monthly mean for at least two days.
-	This function takes one argument.
+	is one standard deviation above the jDay mean (1979-2016) for at least 
+	five days. This function takes one argument.
 		Arguments:
 			sdFactor: Number multiplied by monthly std when setting
 					the threshold. 
 		return:
 			blocking days: An array of 1 and 0 indicating if blocking
-					exists.
+					exists (where equal to 1).
 	"""
 
-	z_nc    = Dataset(dataDirBase + 'z_NA_2003_2016.nc', 'r')
-	level   = z_nc.variables['level']
-	level_i = np.where(level[:] == 500)[0][0]
-	z       = z_nc.variables['z'][:,level_i,:,:]
-	#lat = z_nc.variables['latitude'][:]
-	#lon = z_nc.variables['longitude'][:]
-	#x,y=np.meshgrid(lon,lat)
+	all_Z500_dir = '/barnes-scratch/sbrey/era_interim_nc_daily/'
+	z_nc    = Dataset(all_Z500_dir + 'z_all_NA_daily.nc', 'r')
+	z       = z_nc.variables['z500']
+	lat = z_nc.variables['latitude'][:]
+	lon = z_nc.variables['longitude'][:]
+	x,y=np.meshgrid(lon,lat)
 	time = z_nc.variables['time'][:]
-	z_nc.close()
+	#z_nc.close()
 
-	# Make hourly time array into a nice datetime object 
-	t0 = datetime.datetime(year=1900, month=1, day=1,\
-                               hour=0, minute=0, second=0)
 
 	# Make a nice month and time array for masking 
-	nTime = len(time)
-	t = []
-	month = []
-	for i in range(nTime):
-		dt = timedelta(hours=int(time[i]))
-		t_new  = t0 + dt 
-		t.append(t_new)
-		month.append(t_new.month)
-	t = np.array(t)
-	month = np.array(month)
+	t, month, year = cnm.get_era_interim_time(time)
+	nTime = len(t)
 	
-	# Create month specific monthly threshold values 
-	z_thresh = np.zeros((12, z.shape[1], z.shape[2]))
-	for m in np.unique(month):
-		monthMask       = m == month
-		spatial_mean    = np.mean(z[monthMask,:,:], axis=0)
-		spatial_std     = np.std(z[monthMask,:,:], axis=0)
-		z_thresh[m-1,:,:] = spatial_mean + spatial_std * sdFactor
+	# Create Julian day specific threshold values based on that JDay
+	# mean and sd for the ~39 years of reanalysis I am working with 
+	# the z_thresh will be equal spatial same shape as z but with 
+	# Julian day time axis. 
+	jDays = np.arange(1, 367)
+	nJDays = len(jDays)
+	z_thresh = np.zeros((nJDays, z.shape[1], z.shape[2]))
 
+	# Create an array of the Julian dates associated with the time
+	# axis of the Z data
+	t_jDay = []
+	for i in range(len(t)):
+		thisJDay = t[i].timetuple().tm_yday
+		t_jDay.append(thisJDay)
+	t_jDay = np.array(t_jDay)
+
+	# Create the threshold mask
+	for i in range(nJDays):
+		dayMask         = jDays[i] == t_jDay
+		spatial_mean    = np.mean(z[dayMask,:,:], axis=0)
+		spatial_std     = np.std(z[dayMask,:,:], axis=0)
+		z_thresh[i,:,:] = spatial_mean + spatial_std * sdFactor
+
+	# Because criteria needs 5 days of information, have to start at
+	# the 5th day to look back into the past 5 days
+	# TODO: make this index for looping 2003 - 2016 only
 	
-	# Because criteria needs two days of information, have to start at
-	# the second day to look back into the past one day
-	index = np.arange(1, nTime)
-	blocking_mask = np.zeros(z.shape, dtype=bool)
+	datesForMask = np.where((t >= datetime.datetime(2003,1,1)) & 
+							(t <= datetime.datetime(2016,12,31)))[0]	
+	
+	blocking_mask = np.zeros((len(datesForMask), z.shape[1], z.shape[2]), dtype=bool)
 
-	for i in index:
-
-		# Need to know what month this day belongs to to choose
+	count = -1
+	for i in datesForMask:
+		count = count + 1
+		print 'making mask: ' + str(t[i]) 
+		# Need to know what jDay this is to choose
 		# the correct climatological threshold.
-		monthIndex = month[i] - 1
-
-		high_z_yesterday       = z[i-1, :, :] >= z_thresh[monthIndex,:,:]
-		high_z_today           = z[i, :, :] >= z_thresh[monthIndex,:,:]
-		blocking_mask[i, :, :] = high_z_yesterday & high_z_today
 		
-		#fig = plt.figure()
-		#c=plt.pcolor(x,y, blocking_mask[i, :, :])
-		#bar = plt.colorbar(c)
-		#plt.savefig('../Figures/block_test/block_test_'+str(i)+'.png')
-		#plt.close()
+		jDayIndex = np.where(t_jDay[i] == jDays)[0][0]
+		
+		# here the numbers are in reference to days in the past from 
+		# day we are tying to make a mask for
+		high_z_0 = z[i-0, :, :] >= z_thresh[jDayIndex-0,:,:]
+		high_z_1 = z[i-1, :, :] >= z_thresh[jDayIndex-1,:,:]
+		high_z_2 = z[i-2, :, :] >= z_thresh[jDayIndex-2,:,:]
+		high_z_3 = z[i-3, :, :] >= z_thresh[jDayIndex-3,:,:]
+		high_z_4 = z[i-4, :, :] >= z_thresh[jDayIndex-4,:,:]
+		
+		# Figure out where these 2D arrays are all true
+		m = high_z_0 & high_z_1 & high_z_2 & high_z_3 & high_z_4
+		#print 'unique values: ' + str(np.unique(m))
+		
+		blocking_mask[count, :, :] = np.array(m, dtype=int)
+		
+# 		fig = plt.figure()
+# 		c=plt.pcolor(x,y, blocking_mask[count, :, :])
+# 		c=plt.contour(x,y, z[i, :, :])
+# 		bar = plt.colorbar(c)
+# 		plt.title('Date: ' + str(t[i]) + ' Julain day = ' + str(jDays[jDayIndex]))
+# 		plt.savefig('../Figures/block_test/z_show_'+str(i)+'.png')
+# 		plt.close()
 
-		#fig = plt.figure()
-		#c=plt.contour(x,y, z[i, :, :], vmin=z.min(), vmax=z.max())
-		#bar = plt.colorbar(c)
-		#plt.savefig('../Figures/block_test/z_'+str(i)+'.png')
-		#plt.close()
-
+	z_nc.close()
+		
 	return blocking_mask
 
 
@@ -210,11 +232,11 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 
 	# http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
 	# TODO: Confirm this formula and estimate for RH
-	#RH = 100.*(np.exp((17.625*Td_C) / (243.04+Td_C))/np.exp((17.625*T_C)/(243.04+T_C)))
+	RH = 100.*(np.exp((17.625*Td_C) / (243.04+Td_C))/np.exp((17.625*T_C)/(243.04+T_C)))
 
 	# Accepted approximation
 	# http://journals.ametsoc.org/doi/pdf/10.1175/BAMS-86-2-225
-	RH = 100. - 5. * (T_C - Td_C)
+	#RH = 100. - 5. * (T_C - Td_C)
 
 	# Make the masks 
 	high_wind_mask  = np.array(sfc_wind >= windThresh, dtype=int)
@@ -244,9 +266,13 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		ncFile.createDimension('longitude', len(longitude[:]) )
 
 		# Create variables on the dimension they live on 
+
+		# Stagnation
 		stagnation_mask_ = ncFile.createVariable('stagnation_mask', 'i', ('time','latitude','longitude'))
 		stagnation_mask_.units = 'limts = surface wind >= ' + str(windSfcLim) +\
 				         ' 500 mb wind lim < ' +str(wind500Lim) + 'precip < ' + str(precLim)  	
+		stagnation_mask_[:] = stagnation_mask
+
 		# Precip
 		low_precip_mask
 		low_precip_mask_ = ncFile.createVariable('low_precip_mask', 'i', ('time','latitude','longitude'))
@@ -323,5 +349,6 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		print '----------------------------------------------------------------------'
 		print 'It took ' + str(dt) + ' minutes to write the data as nc files.'
 		print '----------------------------------------------------------------------'
+
 
 
