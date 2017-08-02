@@ -36,7 +36,7 @@ else:
 	# Development environment. Set variables by manually here. 
 	ncVARType = 'GFED4s'       # 'era_interim' | 'GFED4s'
 	ncVAR     = 'C'            # 'tp' | 'C'
-	subsetNA  = '_NA_'         # "_NA_" | "_"
+	subsetNA  = '_NA_'            # "_NA_" | "_"
 	startYear = 2003
 	endYear   = 2016
 
@@ -116,8 +116,9 @@ if subsetNA  == '_NA_':
 	maxLat     = 50.    
 	minLon     = 234.   
 	maxLon     = 259.   
-	varBase, latitude, longitude = v(varBase, longitude[:], latitude[:], 0,\
-					xmin, xmax, ymin, ymax)
+	varBase, latitude, longitude = cnm.mask2dims(varBase, longitude[:], latitude[:], 0,\
+							xmin=minLon, xmax=maxLon, 
+							ymin=minLat, ymax=maxLat)
 
 	print 'Final merged var NA size: ' + str(varBase.shape)
 

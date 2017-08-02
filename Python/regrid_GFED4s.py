@@ -106,9 +106,9 @@ fire_lon = fire_lon_new
 
 
 dt = (timer.time() - regridStart) / 60.
-print '----------------------------------------------------------------------'
-print 'It took ' + str(dt) + ' minutes to regrid the emissions array'
-print '----------------------------------------------------------------------'
+print '-----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to regrid (lons) of the emissions array'
+print '-----------------------------------------------------------------------'
 
 ##############
 # Sanity plot 

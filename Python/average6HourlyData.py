@@ -23,9 +23,9 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	hourlyVAR =  'tp'
-	startYear = 2003
-	endYear   = 2003
+	hourlyVAR =  'z'
+	startYear = 'all'
+	endYear   = 'all'
 
 
 dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
@@ -56,7 +56,11 @@ import os.path
 timeStart = timer.time()
 
 # Loop over the selected years 
-years  = np.arange(startYear, endYear+1)
+if startYear == 'all':
+	years = ['all']
+else:
+	years  = np.arange(startYear, endYear+1)
+
 ii     = 0 # for counting total iterations	
 for year in years:
 
@@ -68,6 +72,7 @@ for year in years:
 
 	# Load 6-hourly data
 	HourlyFile  = os.path.join(dataDir, hourlyVAR + "_" + year + ".nc")	
+	print HourlyFile
 	nc          = Dataset(HourlyFile, 'r')
 	VAR         = nc.variables[hourlyVAR]   
 	time        = nc.variables['time'] 
@@ -123,6 +128,9 @@ for year in years:
 		dailyVAR  = np.zeros((nDays, nLat, nLon))
 
 	# Get all values numpy array into workspace
+	print '---------------------------------------------------'
+	print 'Loading the large variable array into the workspace'
+	print '---------------------------------------------------'
 	VAR_array = VAR[:]
 
 	print 'Working on the large loop averaging 6-hourly values for each day'

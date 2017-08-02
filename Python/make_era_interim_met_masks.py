@@ -28,6 +28,8 @@ from datetime import timedelta
 import datetime
 import matplotlib.pyplot as plt
 import cesm_nc_manager as cnm
+from mpl_toolkits.basemap import Basemap, cm
+
 
 def find_blocking_days(sdFactor=1.):
 	"""
@@ -44,14 +46,25 @@ def find_blocking_days(sdFactor=1.):
 	"""
 
 	all_Z500_dir = '/barnes-scratch/sbrey/era_interim_nc_daily/'
-	z_nc    = Dataset(all_Z500_dir + 'z_all_NA_daily.nc', 'r')
+	#z_nc    = Dataset(all_Z500_dir + 'z_all_NA_daily.nc', 'r') 
+	z_nc    = Dataset(all_Z500_dir + 'z_all_daily.nc', 'r')
 	z       = z_nc.variables['z500']
 	lat = z_nc.variables['latitude'][:]
 	lon = z_nc.variables['longitude'][:]
-	x,y=np.meshgrid(lon,lat)
 	time = z_nc.variables['time'][:]
-	#z_nc.close()
+	
+	# For test plotting make bounds
+	minLat     = lat.min() 
+	maxLat     = lat.max()    
+	minLon     = lon.min()   
+	maxLon     = lon.max()   
+	map = Basemap(projection='robin',llcrnrlat=minLat, urcrnrlat=maxLat,\
+            llcrnrlon=minLon, urcrnrlon=maxLon,resolution='c',\
+	    	lon_0=0, lat_0=90)
 
+	# grid coords for mesh plotting of values. 
+	lons, lats = np.meshgrid(lon, lat)
+	x, y = map(lons, lats)
 
 	# Make a nice month and time array for masking 
 	t, month, year = cnm.get_era_interim_time(time)
@@ -108,18 +121,22 @@ def find_blocking_days(sdFactor=1.):
 		
 		# Figure out where these 2D arrays are all true
 		m = high_z_0 & high_z_1 & high_z_2 & high_z_3 & high_z_4
-		#print 'unique values: ' + str(np.unique(m))
+		print 'unique values: ' + str(np.unique(m))
 		
 		blocking_mask[count, :, :] = np.array(m, dtype=int)
 		
-# 		fig = plt.figure()
-# 		c=plt.pcolor(x,y, blocking_mask[count, :, :])
-# 		c=plt.contour(x,y, z[i, :, :])
-# 		bar = plt.colorbar(c)
-# 		plt.title('Date: ' + str(t[i]) + ' Julain day = ' + str(jDays[jDayIndex]))
-# 		plt.savefig('../Figures/block_test/z_show_'+str(i)+'.png')
-# 		plt.close()
+		fig = plt.figure(figsize=(8,8))
+		map.drawcoastlines()
+		map.drawstates()
+		map.drawcountries()
+		c=map.pcolor(x,y, blocking_mask[count, :, :])
+		c=map.contour(x,y, z[i, :, :])
+		bar = plt.colorbar(c)
+		plt.title('Date: ' + str(t[i]) + ' Julain day = ' + str(jDays[jDayIndex]))
+		plt.savefig('../Figures/block_test/z_show_'+str(i)+'.png')
+		plt.close()
 
+	# Finally close the very large nc file connection. 
 	z_nc.close()
 		
 	return blocking_mask

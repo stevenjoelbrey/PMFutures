@@ -11,12 +11,12 @@
 ###############################################################################
 # ---------------------- Set analysis variables--------------------------------
 ###############################################################################
+domain = "_NA_" # "_NA_" subsets domain to North America lat lon. Any other 
+				# string returns the whole world
  
-
-dataDir = "/Users/sbrey/Desktop/"
-outputDir = "/Users/sbrey/Desktop/"
+dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly/"
+outputDir = "/barnes-scratch/sbrey/era_interim_nc_daily/"
 	
-
 # Import the required modules
 import sys
 import os
@@ -42,6 +42,8 @@ time        = nc.variables['time']
 time_hour   = np.array(time[:], dtype=int)
 lon         = nc.variables['longitude']
 lat         = nc.variables['latitude']
+lonUnits    = lon.units
+latUnits    = lat.units 
 
 
 # get unique year sequence 
@@ -85,8 +87,27 @@ print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to create daily averages.'
 print '----------------------------------------------------------------------'
 
+###############################################################################
+# Handle spatially subsetting the data to be written. 
+###############################################################################
+if domain == "_NA_":
 
-outputFile = os.path.join(outputDir, 'z_all_daily.nc')
+	# These are the same _NA_ "North America" subset region used by 
+	# merge_yearly_nc.py
+
+	minLat     = 30.    
+	maxLat     = 50.    
+	minLon     = 234.   
+	maxLon     = 259.  	
+
+	dailyVAR, lat, lon = cnm.mask2dims(dailyVAR, lon[:], lat[:], tDim=0, 
+										xmin=minLon, xmax=maxLon, 
+										ymin=minLat, ymax=maxLat)
+
+	outputFile = os.path.join(outputDir, 'z_all_NA_daily.nc')
+	
+else:
+	outputFile = os.path.join(outputDir, 'z_all_daily.nc')
 
 
 print '----------------------------------------------------------------------'
@@ -101,8 +122,8 @@ ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 ncFile.description = 'Daily average of 6 hourly data'
 ncFile.location = 'Global'
 ncFile.createDimension('time',  nDays )
-ncFile.createDimension('latitude', nLat )
-ncFile.createDimension('longitude', nLon )
+ncFile.createDimension('latitude', len(lat) )
+ncFile.createDimension('longitude', len(lon) )
 
 # Create variables on the dimension they live on 
 dailyVAR_ = ncFile.createVariable('z500',\
@@ -122,11 +143,11 @@ time_.calendar = time.calendar
 
 # create lat variable
 latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
-latitude_.units = lat.units
+latitude_.units = latUnits
 
 # create longitude variable
 longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
-longitude_.units = lon.units
+longitude_.units = lonUnits
 
 # Write the actual data to these dimensions
 dailyVAR_[:]     = dailyVAR
