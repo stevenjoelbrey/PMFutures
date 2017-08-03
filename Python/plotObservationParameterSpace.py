@@ -20,6 +20,13 @@ maxLat     = #
 minLon     = #
 maxLon     = # 
 
+minLat = 50.# "_NA_" North America file default 
+maxLat = 30.
+minLon = 234.0
+maxLon = 258.75
+
+cutoffPercentile = 80.
+
 
 # TODO: spatial subset the analysis by the locations that have the highest 
 # TODO: cumulative emissions, since places with few emissions dont really
@@ -43,11 +50,20 @@ import datetime
 import matplotlib.ticker as tkr
 import cesm_nc_manager as cnm
 
-dataDirBase = "/barnes-scratch/sbrey/era_interim_nc_daily_merged/"
+# Figure out what machine this code is running on
+pwd = os.getcwd()
+mac = '/Users/sbrey/Google Drive/sharedProjects/PMFutures/Python'
+if pwd == mac:
+	dataDirBase = "/Volumes/Brey_external/"
+else:
+	dataDirBase = "/barnes-scratch/sbrey/"
 
+
+metDataDirBase = dataDirBase + "era_interim_nc_daily_merged/"
+figureDir = '../Figures/GFED_era_interm_analysis/'
 
 # Get emissions, use this to get dimensions
-ncFile  = "/barnes-scratch/sbrey/GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+ncFile  = dataDirBase + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
 nc = Dataset(ncFile, 'r')
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
@@ -57,9 +73,13 @@ nc.close()
 
 t, month, year = cnm.get_era_interim_time(time)
 
+# Create an array that saves out the month and julian day matrix
+# for creating scatter plots. 
 month_matrix = np.zeros(C.shape)
+jDay_matrix = np.zeros(C.shape)
 for i in range(len(t)):
 	month_matrix[i,:,:] = month[i]
+	jDay_matrix[i,:,:] = t[i].timetuple().tm_yday
 
 
 # Subset all by months of interest
@@ -70,6 +90,7 @@ t = t[monthMask]
 month = month[monthMask]
 year = year[monthMask]
 month_matrix = month_matrix[monthMask,:,:]
+jDay_matrix = jDay_matrix[monthMask,:,:]
 
 #####################################################
 # function for calculating the monthly mean 
@@ -105,27 +126,24 @@ def ncGetSelf(Dir, varname):
 	nc.close()
 	return VAR
 
-# TODO: consider only showing relationships for where 
-# TODO: emissions are greater than zero 
 
-t2m = ncGetSelf(dataDirBase, 't2m')[monthMask, :,:]
-tp = ncGetSelf(dataDirBase, 'tp')[monthMask, :,:] 
-u10 = ncGetSelf(dataDirBase, 'u10')[monthMask, :,:] 
-v10 = ncGetSelf(dataDirBase, 'v10')[monthMask, :,:]
+t2m = ncGetSelf(metDataDirBase, 't2m')[monthMask, :,:]
+tp = ncGetSelf(metDataDirBase, 'tp')[monthMask, :,:] 
+u10 = ncGetSelf(metDataDirBase, 'u10')[monthMask, :,:] 
+v10 = ncGetSelf(metDataDirBase, 'v10')[monthMask, :,:]
 windSpeed = np.sqrt(u10**2 + v10**2) 
-z   = ncGetSelf(dataDirBase, 'z')[monthMask,1,:,:] 
-RH   = ncGetSelf(dataDirBase, 'RH')[monthMask, :,:] # created by make_era_interim_met_masks.py
-d2m = ncGetSelf(dataDirBase, 'd2m')[monthMask, :,:]
+z   = ncGetSelf(metDataDirBase, 'z')[monthMask,1,:,:] 
+RH   = ncGetSelf(metDataDirBase, 'RH')[monthMask, :,:] # created by make_era_interim_met_masks.py
+d2m = ncGetSelf(metDataDirBase, 'd2m')[monthMask, :,:]
 # TODO: consider also using dew point strait up?
 
 # Make units America
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
 
-
-# TODO: Plot all parameters in space with abline for event thresholds
-# Make a version of all these plots that shows the points that make up 99% of total 
-# emissions
+# Want Z as geopotential height, so divide by gravity
+g = 9.81 # m/s**2
+z = z / g
 
 # place all meteorology into a dictionary for easy forloop handling 
 v = {}
@@ -143,44 +161,54 @@ vMonth['precip'] = makeMonthlyAverage(tp, month, year, mathType='sum')
 vMonth['Td'] = makeMonthlyAverage(d2m, month, year, mathType='mean')
 vMonth['Z500'] = makeMonthlyAverage(z, month, year, mathType='mean')
 C_monthly = makeMonthlyAverage(C, month, year, mathType='sum')
+month_matrix_monthly = makeMonthlyAverage(month_matrix, month, year, mathType='mean')
+
+# Create a mask that indicates where monthly emissions are greater than 0
 
 # Mask all variables (v[key]) where C == 0. We care about these relationships 
 # where there are emissions! 
+C_daily_cutoff = np.percentile(ma.compressed(C[C>0]), cutoffPercentile)
+C_monthly_cutoff = np.percentile(ma.compressed(C_monthly[C_monthly>0]), cutoffPercentile)
+
 for v_key in v.keys():
-	v[v_key] = np.ma.masked_where(C == 0, v[v_key])
- 	vMonth[v_key] = np.ma.masked_where(C_monthly == 0, vMonth[v_key])
+	v[v_key] = ma.masked_where(C < C_daily_cutoff, v[v_key])
+ 	vMonth[v_key] = ma.masked_where(C_monthly < C_monthly_cutoff, vMonth[v_key])
 
-# Now Mask C itself
-C = np.ma.masked_where(C == 0, C)
-C_monthly = np.ma.masked_where(C_monthly == 0, C_monthly)
+# Now Mask C itself for both timescales
+C = ma.masked_where(C< C_daily_cutoff, C)
+C_monthly = ma.masked_where(C_monthly < C_monthly_cutoff, C_monthly)
 
+# For the time matrices as well
+month_matrix_monthly = ma.masked_where(C_monthly < C_monthly_cutoff, month_matrix_monthly)
+jDay_matrix = ma.masked_where(C < C_daily_cutoff, jDay_matrix)
+
+# Create a dictionary of the units of the met being used 
 u = {}
 u['T'] = 'temperature [F]'
 u['windSpeed'] = 'windspeed [m s$^{-1}$]'
 u['precip'] = 'precip [in day$^{-1}$]'
 u['Td'] = "dew point [F]"
-u['Z500'] = "Z500 [m$^{2}$ s$^{-2}$]"
+u['Z500'] = "Z500 [m]"
 
 uMonth = {}
 uMonth['T'] = 'temperature [F]'
 uMonth['windSpeed'] = 'windspeed [m s$^{-1}$]'
 uMonth['precip'] = 'precip [in month$^{-1}$]'
 uMonth['Td'] = "dew point [F]"
-uMonth['Z500'] = "Z500 [m$^{2}$ s$^{-2}$]"
+uMonth['Z500'] = "Z500 [m]"
 
 # Range of emissions is the same for all variables in the space so set a common
 # colorbar range. 
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = '../Figures/GFED_era_interim_'+str(startMonth)+'_'+ str(endMonth)+\
-		'_daily_parameter_space.png'
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
+				'_daily_parameter_space.png'
 
 nVar = len(v.keys())
 frameN = 0
 
 vmin = C.min()
 vmax = C.max()
-
 
 for i in range(nVar):
 
@@ -200,29 +228,25 @@ for i in range(nVar):
 
 		ax = fig.add_subplot(5,5,frameN, frame_on=False)
 
-		c = ax.scatter(xData, yData, c = C, marker=".",\
-				s=5, edgecolors='none',\
+		c = ax.scatter(ma.compressed(xData), ma.compressed(yData), 
+				c = ma.compressed(C), marker=".", cmap='viridis_r',\
+				s=25, edgecolors='none',\
 				vmin=vmin, vmax=vmax,\
 				alpha=1,\
 				norm=matplotlib.colors.LogNorm()
-				#cmap="Reds"
-	                       )
+	            )
 	
 		ax.spines['top'].set_visible(False)
 		ax.yaxis.set_ticks_position('left')
 		ax.xaxis.set_ticks_position('bottom')
-		ax.tick_params(axis='y', labelsize=15)
-		ax.tick_params(axis='x', labelsize=15)
-
-
-		#cb = plt.colorbar(c, cmap='jet', extend='both')
-		#cb.set_label('Emissions [kg/day]')
+		ax.tick_params(axis='y', labelsize=18)
+		ax.tick_params(axis='x', labelsize=18)
 
 		plt.xlim([v[x].min(), v[x].max()])
 		plt.ylim([v[y].min(), v[y].max()])
 
-		plt.xlabel(u[x], fontsize=20)
-		plt.ylabel(u[y], fontsize=20)
+		plt.xlabel(u[x], fontsize=24)
+		plt.ylabel(u[y], fontsize=24)
 
 		print 'Figure frameN: ' + str(frameN) + ' is complete'
 
@@ -230,10 +254,10 @@ fig.tight_layout()
 fig.subplots_adjust(right=0.80)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cbar = fig.colorbar(c, cax=cbar_ax, extend="both")
-cbar.set_label('Emissions [g C day$^{-1}$]', fontsize=30)
-cbar.ax.tick_params(labelsize=24)
+cbar.set_label('Emissions [g C day$^{-1}$]', fontsize=36)
+cbar.ax.tick_params(labelsize=30)
 print 'Writing the figure to memory'
-plt.savefig(figSaveName, dpi=600)
+plt.savefig(figSaveName, dpi=50)
  
 ##################################################################
 # Same figure done monthly
@@ -241,15 +265,14 @@ plt.savefig(figSaveName, dpi=600)
 ##################################################################
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = '../Figures/GFED_era_interim_'+str(startMonth)+'_'+ str(endMonth)+\
-		'_monthly_parameter_space.png'
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
+				'_monthly_parameter_space.png'
 
 nVar = len(v.keys())
 frameN = 0
 
 vmin = C_monthly.min()
 vmax = C_monthly.max()
-
 
 for i in range(nVar):
 
@@ -269,19 +292,20 @@ for i in range(nVar):
 
 		ax = fig.add_subplot(5,5,frameN, frame_on=False)
 
-		c = ax.scatter(xData, yData, c = C_monthly, marker=".",\
-				s=6, edgecolors='none',\
+		c = ax.scatter(ma.compressed(xData), ma.compressed(yData), 
+				c = ma.compressed(C_monthly), marker=".",\
+				s=25, edgecolors='none',\
 				vmin=vmin, vmax=vmax,\
 				alpha=1,\
-				norm=matplotlib.colors.LogNorm()
-				#cmap="Reds"
-	                       )
+				norm=matplotlib.colors.LogNorm(),
+				cmap='viridis_r'
+	            )
 	
 		ax.spines['top'].set_visible(False)
 		ax.yaxis.set_ticks_position('left')
 		ax.xaxis.set_ticks_position('bottom')
-		ax.tick_params(axis='y', labelsize=15)
-		ax.tick_params(axis='x', labelsize=15)
+		ax.tick_params(axis='y', labelsize=18)
+		ax.tick_params(axis='x', labelsize=18)
 
 
 		#cb = plt.colorbar(c, cmap='jet', extend='both')
@@ -290,8 +314,8 @@ for i in range(nVar):
 		plt.xlim([vMonth[x].min(), vMonth[x].max()])
 		plt.ylim([vMonth[y].min(), vMonth[y].max()])
 
-		plt.xlabel(uMonth[x], fontsize=20)
-		plt.ylabel(uMonth[y], fontsize=20)
+		plt.xlabel(uMonth[x], fontsize=24)
+		plt.ylabel(uMonth[y], fontsize=24)
 
 		print 'Figure frameN: ' + str(frameN) + ' is complete'
 
@@ -299,10 +323,10 @@ fig.tight_layout()
 fig.subplots_adjust(right=0.80)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cbar = fig.colorbar(c, cax=cbar_ax, extend="both")
-cbar.set_label('Emissions [g C month$^{-1}$]', fontsize=30)
-cbar.ax.tick_params(labelsize=24)
+cbar.set_label('Emissions [g C month$^{-1}$]', fontsize=36)
+cbar.ax.tick_params(labelsize=30)
 print 'Writing the figure to memory'
-plt.savefig(figSaveName, dpi=600)
+plt.savefig(figSaveName, dpi=50)
 
 
 
@@ -310,21 +334,22 @@ plt.savefig(figSaveName, dpi=600)
 # TODO: next make plots of C vs met parameters, colorcoded by???
 ##################################################################
 
-
-
 for v_key in v.keys():
 
 	print v_key
 
 	fig = plt.figure(figsize=(13,10))
-	savename = '../Figures/' + 'C_vs_'+ v_key + '_' +\
-			str(startMonth) + '_' +str(endMonth)+'_daily.png'
+	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
+			   str(startMonth) + '_' +str(endMonth)+'_daily.png'
 
 	ax = plt.subplot(111)
 	xData=v[v_key]
-	c = ax.scatter(xData, C, c=month_matrix,
-		       edgecolors='none'
+	c = ax.scatter(ma.compressed(xData), ma.compressed(C), 
+					c=ma.compressed(jDay_matrix),
+		       		edgecolors='none'
 		       )
+		       
+	print 'minimum emission = ' + str(ma.compressed(C).min())
 
 	# Make axis pro
 	ax.spines['top'].set_visible(False)
@@ -334,28 +359,33 @@ for v_key in v.keys():
 	ax.tick_params(axis='y', labelsize=20)
 	ax.tick_params(axis='x', labelsize=20)
 
-
 	plt.xlabel(u[v_key], fontsize=26)
 	plt.ylabel('Emissions [g C day$^{-1}$]', fontsize=26)
 
 	cbar = fig.colorbar(c)
-	cbar.set_label('Month', fontsize=30)
+	cbar.set_label('Julian Day', fontsize=30)
 	cbar.ax.tick_params(labelsize=24)
 
-	plt.savefig(savename, dpi=600)
+	plt.savefig(savename, dpi=50)
 
 	#############################
 	# CREATE FOR MONTHLY AS WELL
 	#############################
-	fig = plt.figure(figsize=(10,10))
-	savename = '../Figures/' + 'C_vs_'+ v_key + '_' +\
-			str(startMonth) + '_' +str(endMonth)+'_monthly.png'
+	fig = plt.figure(figsize=(13,10))
+	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
+				str(startMonth) + '_' +str(endMonth)+'_monthly.png'
 
 	ax = plt.subplot(111)
 	xData=vMonth[v_key]
-	c = ax.scatter(xData, C_monthly,
-		       edgecolors='none'
+	c = ax.scatter(ma.compressed(xData), ma.compressed(C_monthly), 
+					c = ma.compressed(month_matrix_monthly),
+		       		edgecolors='none'
 		       )
+		       
+	cbar = fig.colorbar(c)
+	cbar.set_label('Month', fontsize=30)
+	cbar.ax.tick_params(labelsize=24)		       
+     
 
 	# Make axis pro
 	ax.spines['top'].set_visible(False)
@@ -369,7 +399,7 @@ for v_key in v.keys():
 	plt.xlabel(uMonth[v_key], fontsize=26)
 	plt.ylabel('Emissions [g C month$^{-1}$]', fontsize=26)
 
-	plt.savefig(savename, dpi=600)
+	plt.savefig(savename, dpi=50)
 
 
 
