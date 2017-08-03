@@ -52,22 +52,29 @@ figureDir = "../Figures/GFED_era_interm_analysis/"
 
 startMonth = 6
 endMonth   = 9
-region     = "_PNW_" # "_west_"| "_PNW_" | "CAL" | "_NorthRockies_" 
+region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
 
 
-# TODO: create a dictionary of these regions
+# TODO: create a dictionary of these regions. Move this to cesm_nc_mananger.
 if region == "_west_":
-	minLat     = latitude.min()  
-	maxLat     = latitude.max()    
-	minLon     = longitude.min()   
-	maxLon     = longitude.max()   
-	resolution = 'c'
+	minLat     = 30. 
+	maxLat     = 49.5    
+	minLon     = 234.0 
+	maxLon     = 258.75   
+	resolution = 'l'
 	
 elif region == '_PNW_':
 	minLat     = 42.
 	maxLat     = 50.  
 	minLon     = 234. 
 	maxLon     = 250. 		
+	resolution = 'h'
+	
+elif region == "_CAL_":
+	minLat     = 32.
+	maxLat     = 42.4  
+	minLon     = 234. 
+	maxLon     = 246. 		
 	resolution = 'h'
 
 # Get emissions, use this to get dimensions
@@ -86,8 +93,113 @@ time, month, year = cnm.get_era_interim_time(time)
 # Spatially subset the data 
 C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
+################################################################################
+# Show emissions time series for the domain
+################################################################################
+C_daily_total = np.sum(C,axis=(1,2))
+C_cumulative = np.cumsum(C_daily_total)
 
-# Make and apply month mask 
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+plt.plot(time, C_daily_total)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Daily Emissions", fontsize=29)
+plt.savefig(figureDir + "daily_timeSeries" +region+".png")
+plt.close()
+
+# TODO: Also plot different region contributions lines! That would be dope!
+
+################################################################################
+# show emissions monthly histogram
+################################################################################
+uniqueMonths = np.unique(month)
+monthTotal = np.zeros(12)
+for i in range(12):
+	monthMask = month == uniqueMonths[i]
+	monthTotal[i] = np.sum(C_daily_total[monthMask])
+
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+plt.bar(uniqueMonths, monthTotal)
+plt.xticks(uniqueMonths, uniqueMonths)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("Month", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Seasonality", fontsize=29)
+plt.savefig(figureDir + 'emissions_seasonality' + region + ".png")
+plt.close()
+
+
+################################################################################
+# Show total summer emissions
+################################################################################
+uniqueYears = np.unique(year)
+nYears = len(uniqueYears)
+C_summer = np.zeros(nYears)
+C_june = np.zeros(nYears)
+C_july = np.zeros(nYears)
+C_aug = np.zeros(nYears)
+C_sept = np.zeros(nYears)
+
+for i in range(nYears):
+	summerMask = (month >= 6.) & (month <= 9.) & (year == uniqueYears[i])
+	juneMask = (month == 6.) & (year == uniqueYears[i])
+	julyMask = (month == 7.) & (year == uniqueYears[i])
+	augMask  = (month == 8.) & (year == uniqueYears[i])
+	septMask  = (month == 9.) & (year == uniqueYears[i])
+	
+	C_summer[i] = np.sum(C_daily_total[summerMask])
+	C_june[i] = np.sum(C_daily_total[juneMask])
+	C_july[i] = np.sum(C_daily_total[julyMask])
+	C_aug[i] = np.sum(C_daily_total[augMask])
+	C_sept[i] = np.sum(C_daily_total[septMask])
+
+# First plot with all one color 
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+p1 = plt.bar(uniqueYears, C_summer)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s June-Sept Emissions", fontsize=29)
+plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
+plt.close()
+
+# Now stack the monthly contributions 
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+p1 = plt.bar(uniqueYears, C_june, color="blue")
+p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
+p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june+C_july), color="grey")
+p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june+C_july+C_aug), color="lightpink")
+plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
+			frameon=False, loc="best", fontsize=27)
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Summer Emissions", fontsize=29)
+plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
+plt.close()
+
+################################################################################
+# Make and apply month mask to start all summer mask analysis 
+################################################################################
+
 month_mask = (month >= startMonth) & (month <= endMonth)
 C = C[month_mask,:,:]
 time = time[month_mask]
@@ -128,6 +240,9 @@ fig.tight_layout()
 plt.savefig(figureDir + 'total_C_emissions_6_9_2003_2016' + region +'.png')
 plt.close()
 
+
+
+
 ################################################################################
 #----------------------- Load desired met event masks --------------------------
 ################################################################################
@@ -151,7 +266,6 @@ blocking_mask   = nc.variables['blocking_mask'][month_mask,:,:]
 nc.close()
 
 # Spatially subset these masks 
-stagnation_mask, ynew, xnew = cnm.mask2dims(stagnation_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 high_T_mask, ynew, xnew = cnm.mask2dims(high_T_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 low_precip_mask, ynew, xnew = cnm.mask2dims(low_precip_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 stagnation_mask, ynew, xnew = cnm.mask2dims(stagnation_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
