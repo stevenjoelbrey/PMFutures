@@ -60,9 +60,8 @@ nc.close()
 
 t, month, year = cnm.get_era_interim_time(time)
 
-
-# spatially subset C according to the chosen region 
-# C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+# Subset C (emissions) in space according to the chosen region 
+C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 
 # Create an array that saves out the month and julian day matrix
