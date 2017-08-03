@@ -137,6 +137,10 @@ d2m = ncGetSelf(metDataDirBase, 'd2m')[monthMask, :,:]
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
 
+# Want Z as geopotential height, so divide by gravity
+g = 9.81 # m/s**2
+z = z / g
+
 # place all meteorology into a dictionary for easy forloop handling 
 v = {}
 v['T'] = t2m
@@ -180,14 +184,14 @@ u['T'] = 'temperature [F]'
 u['windSpeed'] = 'windspeed [m s$^{-1}$]'
 u['precip'] = 'precip [in day$^{-1}$]'
 u['Td'] = "dew point [F]"
-u['Z500'] = "Z500 [m$^{2}$ s$^{-2}$]"
+u['Z500'] = "Z500 [m]"
 
 uMonth = {}
 uMonth['T'] = 'temperature [F]'
 uMonth['windSpeed'] = 'windspeed [m s$^{-1}$]'
 uMonth['precip'] = 'precip [in month$^{-1}$]'
 uMonth['Td'] = "dew point [F]"
-uMonth['Z500'] = "Z500 [m$^{2}$ s$^{-2}$]"
+uMonth['Z500'] = "Z500 [m]"
 
 # Range of emissions is the same for all variables in the space so set a common
 # colorbar range. 
@@ -222,7 +226,7 @@ for i in range(nVar):
 
 		c = ax.scatter(ma.compressed(xData), ma.compressed(yData), 
 				c = ma.compressed(C), marker=".", cmap='viridis_r',\
-				s=5, edgecolors='none',\
+				s=25, edgecolors='none',\
 				vmin=vmin, vmax=vmax,\
 				alpha=1,\
 				norm=matplotlib.colors.LogNorm()
@@ -231,17 +235,14 @@ for i in range(nVar):
 		ax.spines['top'].set_visible(False)
 		ax.yaxis.set_ticks_position('left')
 		ax.xaxis.set_ticks_position('bottom')
-		ax.tick_params(axis='y', labelsize=15)
-		ax.tick_params(axis='x', labelsize=15)
-
-		#cb = plt.colorbar(c, cmap='jet', extend='both')
-		#cb.set_label('Emissions [kg/day]')
+		ax.tick_params(axis='y', labelsize=18)
+		ax.tick_params(axis='x', labelsize=18)
 
 		plt.xlim([v[x].min(), v[x].max()])
 		plt.ylim([v[y].min(), v[y].max()])
 
-		plt.xlabel(u[x], fontsize=20)
-		plt.ylabel(u[y], fontsize=20)
+		plt.xlabel(u[x], fontsize=24)
+		plt.ylabel(u[y], fontsize=24)
 
 		print 'Figure frameN: ' + str(frameN) + ' is complete'
 
@@ -249,10 +250,10 @@ fig.tight_layout()
 fig.subplots_adjust(right=0.80)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cbar = fig.colorbar(c, cax=cbar_ax, extend="both")
-cbar.set_label('Emissions [g C day$^{-1}$]', fontsize=30)
-cbar.ax.tick_params(labelsize=24)
+cbar.set_label('Emissions [g C day$^{-1}$]', fontsize=36)
+cbar.ax.tick_params(labelsize=30)
 print 'Writing the figure to memory'
-plt.savefig(figSaveName, dpi=300)
+plt.savefig(figSaveName, dpi=50)
  
 ##################################################################
 # Same figure done monthly
@@ -289,7 +290,7 @@ for i in range(nVar):
 
 		c = ax.scatter(ma.compressed(xData), ma.compressed(yData), 
 				c = ma.compressed(C_monthly), marker=".",\
-				s=6, edgecolors='none',\
+				s=25, edgecolors='none',\
 				vmin=vmin, vmax=vmax,\
 				alpha=1,\
 				norm=matplotlib.colors.LogNorm(),
@@ -299,8 +300,8 @@ for i in range(nVar):
 		ax.spines['top'].set_visible(False)
 		ax.yaxis.set_ticks_position('left')
 		ax.xaxis.set_ticks_position('bottom')
-		ax.tick_params(axis='y', labelsize=15)
-		ax.tick_params(axis='x', labelsize=15)
+		ax.tick_params(axis='y', labelsize=18)
+		ax.tick_params(axis='x', labelsize=18)
 
 
 		#cb = plt.colorbar(c, cmap='jet', extend='both')
@@ -309,8 +310,8 @@ for i in range(nVar):
 		plt.xlim([vMonth[x].min(), vMonth[x].max()])
 		plt.ylim([vMonth[y].min(), vMonth[y].max()])
 
-		plt.xlabel(uMonth[x], fontsize=20)
-		plt.ylabel(uMonth[y], fontsize=20)
+		plt.xlabel(uMonth[x], fontsize=24)
+		plt.ylabel(uMonth[y], fontsize=24)
 
 		print 'Figure frameN: ' + str(frameN) + ' is complete'
 
@@ -318,10 +319,10 @@ fig.tight_layout()
 fig.subplots_adjust(right=0.80)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cbar = fig.colorbar(c, cax=cbar_ax, extend="both")
-cbar.set_label('Emissions [g C month$^{-1}$]', fontsize=30)
-cbar.ax.tick_params(labelsize=24)
+cbar.set_label('Emissions [g C month$^{-1}$]', fontsize=36)
+cbar.ax.tick_params(labelsize=30)
 print 'Writing the figure to memory'
-plt.savefig(figSaveName, dpi=600)
+plt.savefig(figSaveName, dpi=50)
 
 
 

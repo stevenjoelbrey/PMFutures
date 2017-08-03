@@ -144,7 +144,7 @@ plotMetByEmission <- function(C, metVar, metVarName, metVarUnits){
   
   # TODO: display N for each distribution 
   legend(
-    "topright",
+    "topleft",
     legend = c("no emissions", "[40,60] emission percentile", "top 5%"),
     col = c("black", "purple", "red"),
     lty=1,
@@ -159,7 +159,7 @@ plotMetByEmission <- function(C, metVar, metVarName, metVarUnits){
 }
 
 plotMetByEmission(C, t2m, "t2m", "K")
-plotMetByEmission(C, z, "c", "500 mb geopotential m**2/s**2")
+plotMetByEmission(C, z, "z", "500 mb geopotential m**2/s**2")
 plotMetByEmission(C, tp, "tp", "inches/day")
 plotMetByEmission(C, RH, "RH", "RH%")
 plotMetByEmission(C, srf_wind, "srf_wind", "surface wind speed m/s")
