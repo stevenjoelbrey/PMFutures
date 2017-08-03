@@ -10,7 +10,7 @@
 
 
 ################################################################################
-#------------------ Subset model emissions in space and time ------------------
+#------------- Arguments to Subset model emissions in space and time -----------
 ################################################################################
 
 cutoffPercentile = 80.
@@ -60,6 +60,11 @@ nc.close()
 
 t, month, year = cnm.get_era_interim_time(time)
 
+
+# spatially subset C according to the chosen region 
+# C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+
+
 # Create an array that saves out the month and julian day matrix
 # for creating scatter plots. 
 month_matrix = np.zeros(C.shape)
@@ -79,9 +84,9 @@ year = year[monthMask]
 month_matrix = month_matrix[monthMask,:,:]
 jDay_matrix = jDay_matrix[monthMask,:,:]
 
-#####################################################
+###############################################################################
 # function for calculating the monthly mean 
-#####################################################
+###############################################################################
 def makeMonthlyAverage(data, month, year, mathType='mean'):
 	"""
 	This function take data of the from (t, x, y) where t is a daily time dimension
@@ -123,6 +128,9 @@ z   = ncGetSelf(metDataDirBase, 'z')[monthMask,1,:,:]
 RH   = ncGetSelf(metDataDirBase, 'RH')[monthMask, :,:] # created by make_era_interim_met_masks.py
 d2m = ncGetSelf(metDataDirBase, 'd2m')[monthMask, :,:]
 # TODO: consider also using dew point strait up?
+
+# TODO: spatially subset these data in the same way as C above
+# C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 # Make units America
 d2m = cnm.KtoF(d2m)
@@ -188,8 +196,9 @@ uMonth['Z500'] = "Z500 [m]"
 # colorbar range. 
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
-				'_daily_parameter_space.png'
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) +\
+				'_' +str(startMonth)+'_'+ str(endMonth)+\
+				'_daily_parameter_space'+region+'.png'
 
 nVar = len(v.keys())
 frameN = 0
@@ -252,8 +261,9 @@ plt.savefig(figSaveName, dpi=50)
 ##################################################################
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
-				'_monthly_parameter_space.png'
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_'\
+				+str(startMonth)+'_'+ str(endMonth)+\
+				'_monthly_parameter_space'+region+'.png'
 
 nVar = len(v.keys())
 frameN = 0
@@ -327,7 +337,7 @@ for v_key in v.keys():
 
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
-			   str(startMonth) + '_' +str(endMonth)+'_daily.png'
+			   str(startMonth) + '_' +str(endMonth)+'_daily'+region+'.png'
 
 	ax = plt.subplot(111)
 	xData=v[v_key]
@@ -360,7 +370,7 @@ for v_key in v.keys():
 	#############################
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
-				str(startMonth) + '_' +str(endMonth)+'_monthly.png'
+				str(startMonth) + '_' +str(endMonth)+'_monthly'+region+'.png'
 
 	ax = plt.subplot(111)
 	xData=vMonth[v_key]
@@ -387,12 +397,5 @@ for v_key in v.keys():
 	plt.ylabel('Emissions [g C month$^{-1}$]', fontsize=26)
 
 	plt.savefig(savename, dpi=50)
-
-
-
-
-##################################################################
-# TODO: Calculate total emissions for a given parameter (e.g. T)
-##################################################################
 
 
