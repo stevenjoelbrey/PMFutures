@@ -13,27 +13,11 @@
 #------------------ Subset model emissions in space and time ------------------
 ################################################################################
 
+cutoffPercentile = 80.
 startMonth = 6
 endMonth   = 9
-minLat     = # "_NA_" file default  
-maxLat     = # 
-minLon     = #
-maxLon     = # 
+region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
 
-minLat = 50.# "_NA_" North America file default 
-maxLat = 30.
-minLon = 234.0
-maxLon = 258.75
-
-cutoffPercentile = 80.
-
-
-# TODO: spatial subset the analysis by the locations that have the highest 
-# TODO: cumulative emissions, since places with few emissions dont really
-# TODO: matter anyways
-
-# TODO: Make sure that we are actually only plotting the non-masked values. 
-# TODO: use ma.compressed() to be sure. 
 
 # Load resources
 import os
@@ -49,6 +33,9 @@ from datetime import timedelta
 import datetime
 import matplotlib.ticker as tkr
 import cesm_nc_manager as cnm
+
+# Get region lat lon range	
+minLat, maxLat, minLon, maxLon  = cnm.getRegionBounds(region)
 
 # Figure out what machine this code is running on
 pwd = os.getcwd()
