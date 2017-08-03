@@ -12,10 +12,13 @@
 ################################################################################
 #------------------ Subset model emissions in space and time ------------------
 ################################################################################
-# For report use western U.S. only
 
 startMonth = 6
 endMonth   = 9
+minLat     = # "_NA_" file default  
+maxLat     = # 
+minLon     = #
+maxLon     = # 
 
 
 # TODO: spatial subset the analysis by the locations that have the highest 
