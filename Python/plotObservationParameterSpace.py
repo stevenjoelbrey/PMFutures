@@ -16,11 +16,13 @@
 startMonth = 6
 endMonth   = 9
 
-minLat = 50.# "_NA_" North America file default 
+minLat = 50. # "_NA_" North America file default 
 maxLat = 30.
 minLon = 234.0
 maxLon = 258.75
 
+# Sets the spatial domain of interest. Make sure to do 0 if you are subsetting
+# the western region. 
 cutoffPercentile = 80.
 
 
@@ -68,6 +70,9 @@ C = nc.variables['C'][:]
 nc.close()
 
 t, month, year = cnm.get_era_interim_time(time)
+
+# Subset C (emissions) in space
+C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 # Create an array that saves out the month and julian day matrix
 # for creating scatter plots. 
@@ -122,7 +127,9 @@ def ncGetSelf(Dir, varname):
 	nc.close()
 	return VAR
 
-
+###############################################################################
+# Get the met data and subset in space and time
+###############################################################################
 t2m = ncGetSelf(metDataDirBase, 't2m')[monthMask, :,:]
 tp = ncGetSelf(metDataDirBase, 'tp')[monthMask, :,:] 
 u10 = ncGetSelf(metDataDirBase, 'u10')[monthMask, :,:] 
@@ -132,6 +139,18 @@ z   = ncGetSelf(metDataDirBase, 'z')[monthMask,1,:,:]
 RH   = ncGetSelf(metDataDirBase, 'RH')[monthMask, :,:] # created by make_era_interim_met_masks.py
 d2m = ncGetSelf(metDataDirBase, 'd2m')[monthMask, :,:]
 # TODO: consider also using dew point strait up?
+
+# spatially subset these data based on specified range
+t2m, ynew, xnew = cnm.mask2dims(t2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+tp, ynew, xnew = cnm.mask2dims(tp, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+windSpeed, ynew, xnew = cnm.mask2dims(windSpeed, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+z, ynew, xnew = cnm.mask2dims(z, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+RH, ynew, xnew = cnm.mask2dims(RH, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+
+# rename lon and lat to fit the new data
+latitude = ynew
+longitude = xnew
 
 # Make units America
 d2m = cnm.KtoF(d2m)
@@ -197,7 +216,9 @@ uMonth['Z500'] = "Z500 [m]"
 # colorbar range. 
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) +\
+				'_' +str(startMonth)+'_'+ str(endMonth)+ '_'+\
+				minLat + '_' +maxLat
 				'_daily_parameter_space.png'
 
 nVar = len(v.keys())
@@ -261,7 +282,9 @@ plt.savefig(figSaveName, dpi=50)
 ##################################################################
 fig = plt.figure(figsize=(30,22))
 
-figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_' +str(startMonth)+'_'+ str(endMonth)+\
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) +\
+				'_' +str(startMonth)+'_'+ str(endMonth) + '_'+\
+				minLat + '_' +maxLat
 				'_monthly_parameter_space.png'
 
 nVar = len(v.keys())
@@ -336,7 +359,9 @@ for v_key in v.keys():
 
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
-			   str(startMonth) + '_' +str(endMonth)+'_daily.png'
+			   str(startMonth) + '_' +str(endMonth) + '_'+\
+				minLat + '_' +maxLat
+			   '_daily.png'
 
 	ax = plt.subplot(111)
 	xData=v[v_key]
@@ -369,14 +394,15 @@ for v_key in v.keys():
 	#############################
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
-				str(startMonth) + '_' +str(endMonth)+'_monthly.png'
+				str(startMonth) + '_' +str(endMonth) +'_'+\
+				minLat + '_' + maxLat + '_monthly.png'
 
 	ax = plt.subplot(111)
 	xData=vMonth[v_key]
 	c = ax.scatter(ma.compressed(xData), ma.compressed(C_monthly), 
 					c = ma.compressed(month_matrix_monthly),
 		       		edgecolors='none'
-		       )
+		       		)
 		       
 	cbar = fig.colorbar(c)
 	cbar.set_label('Month', fontsize=30)
