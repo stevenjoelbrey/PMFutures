@@ -129,8 +129,13 @@ RH   = ncGetSelf(metDataDirBase, 'RH')[monthMask, :,:] # created by make_era_int
 d2m = ncGetSelf(metDataDirBase, 'd2m')[monthMask, :,:]
 # TODO: consider also using dew point strait up?
 
-# TODO: spatially subset these data in the same way as C above
-# C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+# spatially subset these data based on specified range
+t2m, ynew, xnew = cnm.mask2dims(t2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+tp, ynew, xnew = cnm.mask2dims(tp, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+windSpeed, ynew, xnew = cnm.mask2dims(windSpeed, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+z, ynew, xnew = cnm.mask2dims(z, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+RH, ynew, xnew = cnm.mask2dims(RH, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 # Make units America
 d2m = cnm.KtoF(d2m)
