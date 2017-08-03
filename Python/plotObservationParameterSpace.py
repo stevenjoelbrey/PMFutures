@@ -343,6 +343,8 @@ for v_key in v.keys():
 					c=ma.compressed(jDay_matrix),
 		       		edgecolors='none'
 		       )
+		       
+	print 'minimum emission = ' + str(ma.compressed(C).min())
 
 	# Make axis pro
 	ax.spines['top'].set_visible(False)
@@ -359,12 +361,12 @@ for v_key in v.keys():
 	cbar.set_label('Julian Day', fontsize=30)
 	cbar.ax.tick_params(labelsize=24)
 
-	plt.savefig(savename, dpi=600)
+	plt.savefig(savename, dpi=50)
 
 	#############################
 	# CREATE FOR MONTHLY AS WELL
 	#############################
-	fig = plt.figure(figsize=(10,10))
+	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
 				str(startMonth) + '_' +str(endMonth)+'_monthly.png'
 
@@ -392,7 +394,7 @@ for v_key in v.keys():
 	plt.xlabel(uMonth[v_key], fontsize=26)
 	plt.ylabel('Emissions [g C month$^{-1}$]', fontsize=26)
 
-	plt.savefig(savename, dpi=600)
+	plt.savefig(savename, dpi=50)
 
 
 
