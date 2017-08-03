@@ -40,7 +40,8 @@ import cesm_nc_manager as cnm
 # Select and load emissions species and AirQualityData Masks
 ################################################################################
 
-dataDirBase = "/barnes-scratch/sbrey/era_interim_nc_daily_merged/"
+drive = "/barnes-scratch/sbrey/"
+dataDirBase = drive + "era_interim_nc_daily_merged/"
 figureDir = "../Figures/GFED_era_interm_analysis/"
 
 ################################################################################
@@ -54,32 +55,12 @@ startMonth = 6
 endMonth   = 9
 region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
 
-
-# TODO: create a dictionary of these regions. Move this to cesm_nc_mananger.
-if region == "_west_":
-	minLat     = 30. 
-	maxLat     = 49.5    
-	minLon     = 234.0 
-	maxLon     = 258.75   
-	resolution = 'l'
-	
-elif region == '_PNW_':
-	minLat     = 42.
-	maxLat     = 50.  
-	minLon     = 234. 
-	maxLon     = 250. 		
-	resolution = 'h'
-	
-elif region == "_CAL_":
-	minLat     = 32.
-	maxLat     = 42.4  
-	minLon     = 234. 
-	maxLon     = 246. 		
-	resolution = 'h'
+# Get region lat lon range	
+minLat, maxLat, minLon, maxLon  = cnm.getRegionBounds(region)
 
 # Get emissions, use this to get dimensions
 # TODO: load global emissions, let region sorting take care of the rest. 
-ncFile  = "/barnes-scratch/sbrey/GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
 nc = Dataset(ncFile, 'r')
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
@@ -240,19 +221,12 @@ fig.tight_layout()
 plt.savefig(figureDir + 'total_C_emissions_6_9_2003_2016' + region +'.png')
 plt.close()
 
-
-
-
 ################################################################################
 #----------------------- Load desired met event masks --------------------------
 ################################################################################
 
-maskFile = '/barnes-scratch/sbrey/era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
+maskFile = drive + 'era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
 nc = Dataset(maskFile, 'r')
-
-# TODO: change this to calling on the function that makes the mask to make a dynamic
-# TODO: exploration of the space of cutoffs.
-
 
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
