@@ -21,7 +21,7 @@
 cutoffPercentile = 80.
 startMonth = 6
 endMonth   = 9
-region     = "_PNW_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region     = "_CAL_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 
 # Load resources
@@ -402,13 +402,13 @@ def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="
 				   
 			plt.xlabel(units[c2], fontsize=16, weight='bold')
 			plt.ylabel(units["E"], fontsize=16, weight='bold')
-			titleString = 'r=' + str(r) + ', p=' + str(p)
+			titleString = 'r=' + str(r) 
 			plt.title(titleString, 
 						fontsize=15, weight='bold')
 			
 		elif plotType=="ccf": 		
 		
-			ccf = plt.xcorr(month_df.E, month_df[c2], maxlags=12, 
+			ccf = plt.xcorr(df.E, df[c2], maxlags=12, 
 							usevlines=True, color="blue") 
 			plt.plot(ccf[0], ccf[1], color="blue")
 			plt.xlabel('lag (months)', fontsize=16, weight='bold')
