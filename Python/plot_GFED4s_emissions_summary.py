@@ -9,11 +9,6 @@
 # Summaries will be met event specific so we can learn about the relationships
 # between fire emissions and synoptic meteorology.
 
-
-# TODO: Make the distribution + boxplot that you drafted with Emily. 
-
-# TODO: Make this into a python notebook for better integrated analysis.
-
 # TODO: Different lags for testing and different averaging timescales. 
 
 # TODO: Make paths dynamic 
@@ -53,129 +48,129 @@ figureDir = "../Figures/GFED_era_interm_analysis/"
 
 startMonth = 6
 endMonth   = 9
-region     = "_Rockies_" # "_west_"| "_PNW_" | "_CAL_" | "_Rockies_" 
+region     = "_CentralRockies_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 # Get region lat lon range	
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
 
 # Get emissions, use this to get dimensions
 # TODO: load global emissions, let region sorting take care of the rest. 
-ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
-nc = Dataset(ncFile, 'r')
-latitude = nc.variables['latitude'][:]
-longitude = nc.variables['longitude'][:]
-time = nc.variables['time'][:]
-C = nc.variables['C'][:]
-nc.close()
-
+# ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+# nc = Dataset(ncFile, 'r')
+# latitude = nc.variables['latitude'][:]
+# longitude = nc.variables['longitude'][:]
+# time = nc.variables['time'][:]
+# C = nc.variables['C'][:]
+# nc.close()
+# 
 # Make time into datetime arrays
-time, month, year = cnm.get_era_interim_time(time)
-
+# time, month, year = cnm.get_era_interim_time(time)
+# 
 # Spatially subset the data 
-C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
-
-################################################################################
+# C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+# 
+# ###############################################################################
 # Show emissions time series for the domain
-################################################################################
-C_daily_total = np.sum(C,axis=(1,2))
-C_cumulative = np.cumsum(C_daily_total)
-
-fig = plt.figure(figsize=(12,8))
-ax = plt.subplot(111)
-plt.plot(time, C_daily_total)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=20)
-plt.xlabel("date", fontsize=26)
-plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s Daily Emissions", fontsize=29)
-plt.savefig(figureDir + "daily_timeSeries" +region+".png")
-plt.close()
-
+# ###############################################################################
+# C_daily_total = np.sum(C,axis=(1,2))
+# C_cumulative = np.cumsum(C_daily_total)
+# 
+# fig = plt.figure(figsize=(12,8))
+# ax = plt.subplot(111)
+# plt.plot(time, C_daily_total)
+# ax.spines['top'].set_visible(False)
+# ax.spines['right'].set_visible(False)
+# ax.tick_params(axis='y', labelsize=20)
+# ax.tick_params(axis='x', labelsize=20)
+# plt.xlabel("date", fontsize=26)
+# plt.ylabel("grams carbon emitted", fontsize=26)
+# plt.title("GDED4.1s Daily Emissions", fontsize=29)
+# plt.savefig(figureDir + "daily_timeSeries" +region+".png")
+# plt.close()
+# 
 # TODO: Also plot different region contributions lines! That would be dope!
-
-################################################################################
+# 
+# ###############################################################################
 # show emissions monthly histogram
-################################################################################
-uniqueMonths = np.unique(month)
-monthTotal = np.zeros(12)
-for i in range(12):
-	monthMask = month == uniqueMonths[i]
-	monthTotal[i] = np.sum(C_daily_total[monthMask])
-
-fig = plt.figure(figsize=(12,8))
-ax = plt.subplot(111)
-plt.bar(uniqueMonths, monthTotal)
-plt.xticks(uniqueMonths, uniqueMonths)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=20)
-plt.xlabel("Month", fontsize=26)
-plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s Seasonality", fontsize=29)
-plt.savefig(figureDir + 'emissions_seasonality' + region + ".png")
-plt.close()
-
-
-################################################################################
+# ###############################################################################
+# uniqueMonths = np.unique(month)
+# monthTotal = np.zeros(12)
+# for i in range(12):
+# 	monthMask = month == uniqueMonths[i]
+# 	monthTotal[i] = np.sum(C_daily_total[monthMask])
+# 
+# fig = plt.figure(figsize=(12,8))
+# ax = plt.subplot(111)
+# plt.bar(uniqueMonths, monthTotal)
+# plt.xticks(uniqueMonths, uniqueMonths)
+# ax.spines['top'].set_visible(False)
+# ax.spines['right'].set_visible(False)
+# ax.tick_params(axis='y', labelsize=20)
+# ax.tick_params(axis='x', labelsize=20)
+# plt.xlabel("Month", fontsize=26)
+# plt.ylabel("grams carbon emitted", fontsize=26)
+# plt.title("GDED4.1s Seasonality", fontsize=29)
+# plt.savefig(figureDir + 'emissions_seasonality' + region + ".png")
+# plt.close()
+# 
+# 
+# ###############################################################################
 # Show total summer emissions
-################################################################################
-uniqueYears = np.unique(year)
-nYears = len(uniqueYears)
-C_summer = np.zeros(nYears)
-C_june = np.zeros(nYears)
-C_july = np.zeros(nYears)
-C_aug = np.zeros(nYears)
-C_sept = np.zeros(nYears)
-
-for i in range(nYears):
-	summerMask = (month >= 6.) & (month <= 9.) & (year == uniqueYears[i])
-	juneMask = (month == 6.) & (year == uniqueYears[i])
-	julyMask = (month == 7.) & (year == uniqueYears[i])
-	augMask  = (month == 8.) & (year == uniqueYears[i])
-	septMask  = (month == 9.) & (year == uniqueYears[i])
-	
-	C_summer[i] = np.sum(C_daily_total[summerMask])
-	C_june[i] = np.sum(C_daily_total[juneMask])
-	C_july[i] = np.sum(C_daily_total[julyMask])
-	C_aug[i] = np.sum(C_daily_total[augMask])
-	C_sept[i] = np.sum(C_daily_total[septMask])
-
+# ###############################################################################
+# uniqueYears = np.unique(year)
+# nYears = len(uniqueYears)
+# C_summer = np.zeros(nYears)
+# C_june = np.zeros(nYears)
+# C_july = np.zeros(nYears)
+# C_aug = np.zeros(nYears)
+# C_sept = np.zeros(nYears)
+# 
+# for i in range(nYears):
+# 	summerMask = (month >= 6.) & (month <= 9.) & (year == uniqueYears[i])
+# 	juneMask = (month == 6.) & (year == uniqueYears[i])
+# 	julyMask = (month == 7.) & (year == uniqueYears[i])
+# 	augMask  = (month == 8.) & (year == uniqueYears[i])
+# 	septMask  = (month == 9.) & (year == uniqueYears[i])
+# 	
+# 	C_summer[i] = np.sum(C_daily_total[summerMask])
+# 	C_june[i] = np.sum(C_daily_total[juneMask])
+# 	C_july[i] = np.sum(C_daily_total[julyMask])
+# 	C_aug[i] = np.sum(C_daily_total[augMask])
+# 	C_sept[i] = np.sum(C_daily_total[septMask])
+# 
 # First plot with all one color 
-fig = plt.figure(figsize=(12,8))
-ax = plt.subplot(111)
-p1 = plt.bar(uniqueYears, C_summer)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=20)
-plt.xlabel("date", fontsize=26)
-plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s June-Sept Emissions", fontsize=29)
-plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
-plt.close()
-
+# fig = plt.figure(figsize=(12,8))
+# ax = plt.subplot(111)
+# p1 = plt.bar(uniqueYears, C_summer)
+# ax.spines['top'].set_visible(False)
+# ax.spines['right'].set_visible(False)
+# ax.tick_params(axis='y', labelsize=20)
+# ax.tick_params(axis='x', labelsize=20)
+# plt.xlabel("date", fontsize=26)
+# plt.ylabel("grams carbon emitted", fontsize=26)
+# plt.title("GDED4.1s June-Sept Emissions", fontsize=29)
+# plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
+# plt.close()
+# 
 # Now stack the monthly contributions 
-fig = plt.figure(figsize=(12,8))
-ax = plt.subplot(111)
-p1 = plt.bar(uniqueYears, C_june, color="blue")
-p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
-p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june+C_july), color="grey")
-p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june+C_july+C_aug), color="lightpink")
-plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
-			frameon=False, loc="best", fontsize=27)
-
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=20)
-plt.xlabel("date", fontsize=26)
-plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s Summer Emissions", fontsize=29)
-plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
-plt.close()
+# fig = plt.figure(figsize=(12,8))
+# ax = plt.subplot(111)
+# p1 = plt.bar(uniqueYears, C_june, color="blue")
+# p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
+# p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june+C_july), color="grey")
+# p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june+C_july+C_aug), color="lightpink")
+# plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
+# 			frameon=False, loc="best", fontsize=27)
+# 
+# ax.spines['top'].set_visible(False)
+# ax.spines['right'].set_visible(False)
+# ax.tick_params(axis='y', labelsize=20)
+# ax.tick_params(axis='x', labelsize=20)
+# plt.xlabel("date", fontsize=26)
+# plt.ylabel("grams carbon emitted", fontsize=26)
+# plt.title("GDED4.1s Summer Emissions", fontsize=29)
+# plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
+# plt.close()
 
 ################################################################################
 # Make and apply month mask to start all summer mask analysis (original function

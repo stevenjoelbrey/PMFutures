@@ -789,7 +789,7 @@ def getRegionBounds(region):
 	"""This function takes a region name "_NAME_" and returns the 
 		numeric latitudew longitude domain of that region. 
 		
-		return: minLat, maxLat, minLon, maxLon 
+		return: minLat, maxLat, minLon, maxLon, resolution 
 			
 	"""
 	if region == "_west_":
@@ -813,7 +813,7 @@ def getRegionBounds(region):
 		maxLon     = 246. 		
 		resolution = 'h'
 		
-	elif region == "_Rockies_":
+	elif region == "_CentralRockies_":
 		minLat     = 35.
 		maxLat     = 43.  
 		minLon     = 250. 
