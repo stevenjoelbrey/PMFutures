@@ -53,10 +53,10 @@ figureDir = "../Figures/GFED_era_interm_analysis/"
 
 startMonth = 6
 endMonth   = 9
-region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
+region     = "_Rockies_" # "_west_"| "_PNW_" | "_CAL_" | "_Rockies_" 
 
 # Get region lat lon range	
-minLat, maxLat, minLon, maxLon  = cnm.getRegionBounds(region)
+minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
 
 # Get emissions, use this to get dimensions
 # TODO: load global emissions, let region sorting take care of the rest. 
@@ -178,7 +178,8 @@ plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
 plt.close()
 
 ################################################################################
-# Make and apply month mask to start all summer mask analysis 
+# Make and apply month mask to start all summer mask analysis (original function
+# -ality of this script). 
 ################################################################################
 
 month_mask = (month >= startMonth) & (month <= endMonth)
