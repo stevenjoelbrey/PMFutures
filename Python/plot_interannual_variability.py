@@ -21,7 +21,7 @@
 cutoffPercentile = 80.
 startMonth = 6
 endMonth   = 9
-region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
+region     = "_PNW_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 
 # Load resources
@@ -40,6 +40,8 @@ import matplotlib.ticker as tkr
 import cesm_nc_manager as cnm
 import pandas as pd
 from scipy.stats import pearsonr
+import scipy.stats as stats
+import statsmodels
 
 # Get region lat lon range	
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
@@ -292,12 +294,12 @@ units['d2m'] = "dew point (f)"
 
 
 # TODO: make it possible for emissions to lag weather in this plot 
-def plotParameterSpace(df, units, region, figureDir): 
+def plotParameterSpace(df, units, region, figureDir, string="monthly"): 
 
 	colnames = df.columns
 	fig = plt.figure(figsize=(30, 30))
 
-	figSaveName = figureDir + 'monthlyMeanCorrelations' + region + '.png'
+	figSaveName = figureDir + string + 'MeanCorrelations' + region + '.png'
 				
 	frameN = 0
 	frameRow = 0
@@ -313,8 +315,8 @@ def plotParameterSpace(df, units, region, figureDir):
 		    
 		    if frameColumn >= frameRow:
 				# Get the data to plot against each-other
-				yData = month_df[c1]
-				xData = month_df[c2] # ~predictor
+				yData = df[c1]
+				xData = df[c2] # ~predictor
 		
 				# Get the linear fit 
 				# https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.stats.linregress.html
@@ -322,7 +324,7 @@ def plotParameterSpace(df, units, region, figureDir):
 				r, p = pearsonr(xData, yData)
 				r = round(r,3)
 				p = round(p,5)
-		
+				
 				
 				ax = fig.add_subplot(7,7, frameN, frame_on=False)	
 		
@@ -330,11 +332,18 @@ def plotParameterSpace(df, units, region, figureDir):
 						   edgecolors='none',\
 						   color="k"
 						   )
+						   
+				# show linear fit if r is decent 
+				if (np.abs(r) >= 0.5):
+					lm = stats.linregress(xData, yData)		
+					yhat = lm.slope * xData + lm.intercept   
+					plt.plot(xData, yhat, linewidth=3)
+						   
 				plt.xlabel(units[c2], fontsize=18, weight='bold')
 				plt.ylabel(units[c1], fontsize=18, weight='bold')
 				titleString = 'r=' + str(r) + ', p=' + str(p)
 				plt.title(titleString, 
-							fontsize=22, weight='bold')
+							fontsize=19, weight='bold')
 		
 				ax.spines['top'].set_visible(False)
 				ax.spines['right'].set_visible(False)
@@ -349,8 +358,92 @@ def plotParameterSpace(df, units, region, figureDir):
 	fig.tight_layout()		
 	plt.savefig(figSaveName)
 	plt.close()
+	
+plotParameterSpace(month_df, units, region, figureDir, "monthly")	
+plotParameterSpace(summer_df, units, region, figureDir, "summer")	
+
+# TODO: make it possible for emissions to lag weather in this plot 
+def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="scatter"): 
+
+	colnames = df.columns
+	fig = plt.figure(figsize=(22, 4))
+
+	figSaveName = figureDir + string + 'EmissionsVsMet_' + plotType + region + '.png'
+				
+	frameN = 0
+	for c2 in colnames[3:9]:
+		
+		frameN = frameN + 1
+		
+		# Get the data to plot against each-other
+		yData = df["E"]
+		xData = df[c2] # ~predictor
+
+		# Just to the pierceson cor r for now
+		r, p = pearsonr(xData, yData)
+		r = round(r,3)
+		p = round(p,5)
+		
+		ax = fig.add_subplot(1,6, frameN, frame_on=False)			
+
+		if plotType=="scatter":
+		
+			
+			ax.scatter(xData, yData, 
+					   edgecolors='none',\
+					   color="k"
+					   )
+				   
+			# show linear fit if r is decent 
+			if (np.abs(r) >= 0.5):
+				lm = stats.linregress(xData, yData)		
+				yhat = lm.slope * xData + lm.intercept   
+				plt.plot(xData, yhat, linewidth=3)
+				   
+			plt.xlabel(units[c2], fontsize=16, weight='bold')
+			plt.ylabel(units["E"], fontsize=16, weight='bold')
+			titleString = 'r=' + str(r) + ', p=' + str(p)
+			plt.title(titleString, 
+						fontsize=15, weight='bold')
+			
+		elif plotType=="ccf": 		
+		
+			ccf = plt.xcorr(month_df.E, month_df[c2], maxlags=12, 
+							usevlines=True, color="blue") 
+			plt.plot(ccf[0], ccf[1], color="blue")
+			plt.xlabel('lag (months)', fontsize=16, weight='bold')
+			plt.ylabel('correlation', fontsize=16, weight='bold')
+			plt.title('cor(E, ' + c2 + ')', weight='bold', fontsize=20)				
+	
+		# universal style 
+		ax.spines['top'].set_visible(False)
+		ax.spines['right'].set_visible(False)
+		ax.yaxis.set_ticks_position('left')
+		ax.xaxis.set_ticks_position('bottom')
+		ax.tick_params(axis='y', labelsize=16)
+		ax.tick_params(axis='x', labelsize=16)
+			
+					
+	fig.tight_layout()		
+	plt.savefig(figSaveName)
+	plt.close()
+
+plotEmissionVsMet(month_df, units, region, figureDir, "monthly", "scatter")
+plotEmissionVsMet(summer_df, units, region, figureDir, "summer", "scatter")
+
+# Make the lagged cross correlation version of the figure
+plotEmissionVsMet(month_df, units, region, figureDir, "monthly", "ccf")
+
+
 ################################################################################
 # Now see if the inter-annual variability in the occurrence of difference events
 # predicts inter-annual variability in summer emissions. 
 ################################################################################
+# https://stackoverflow.com/questions/40578701/acf-confidence-intervals-in-r-vs-python-why-are-they-different
+#statsmodels.graphics.tsaplots.plot_acf()
+
+
+
+#matplotlib.pyplot.xkcd(scale=1, length=100, randomness=2)
+
 
