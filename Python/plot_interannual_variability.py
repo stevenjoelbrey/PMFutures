@@ -6,7 +6,7 @@
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
 # This script will be used to explore the monthly and seasonal relationships
-# between emissions and meteorology. 
+# between emissions (TODO: Burn area) and meteorology. 
 
 # currently, this script contains much of the same functionality and load 
 # statements as plotObservationParameterSpace.py and 
@@ -17,11 +17,7 @@
 ################################################################################
 #------------- Arguments to Subset model emissions in space and time -----------
 ################################################################################
-
-cutoffPercentile = 80.
-startMonth = 6
-endMonth   = 9
-region     = "_CAL_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 
 # Load resources
@@ -43,10 +39,11 @@ from scipy.stats import pearsonr
 import scipy.stats as stats
 import statsmodels
 
-# Get region lat lon range	
+# Get region lat lon range and basemap plotting resolution based on the 
+# chosen region
+# TODO: Make a SE region! 
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
 
-# Figure out what machine this code is running on
 # Figure out what machine this code is running on
 pwd = os.getcwd()
 mac = '/Users/sbrey/Google Drive/sharedProjects/PMFutures/Python'
@@ -55,9 +52,9 @@ if pwd == mac:
 else:
 	drive = "/barnes-scratch/sbrey/"
 
-
+# Set directory paths
 metDataDirBase = drive + "era_interim_nc_daily_merged/"
-figureDir = '../Figures/GFED_era_interm_analysis/'
+figureDir = '../Figures/GFED_era_interm_analysis/' # always relativ to py
 	
 # Get emissions, use this to get dimensions
 ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
@@ -77,7 +74,7 @@ C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat,
 ################################################################################
 # Show emissions time series for the domain
 ################################################################################
-C_daily_total = np.sum(C,axis=(1,2))
+C_daily_total = np.sum(C,axis=(1,2)) # sums daily value for all lon lat
 C_cumulative = np.cumsum(C_daily_total)
 
 fig = plt.figure(figsize=(12,8))
@@ -120,7 +117,7 @@ plt.close()
 
 
 ################################################################################
-# Show total summer emissions
+# Show total summer emissions by month
 ################################################################################
 uniqueYears = np.unique(year)
 nYears = len(uniqueYears)
@@ -153,7 +150,7 @@ ax.tick_params(axis='y', labelsize=20)
 ax.tick_params(axis='x', labelsize=20)
 plt.xlabel("date", fontsize=26)
 plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s June-Sept Emissions", fontsize=29)
+plt.title("GDED4.1s June-Sept Emissions, 2003-2016", fontsize=27)
 plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
 plt.close()
 
@@ -162,18 +159,18 @@ fig = plt.figure(figsize=(12,8))
 ax = plt.subplot(111)
 p1 = plt.bar(uniqueYears, C_june, color="blue")
 p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
-p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june+C_july), color="grey")
-p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june+C_july+C_aug), color="lightpink")
+p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june + C_july), color="grey")
+p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june + C_july + C_aug), color="brown")
 plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
 			frameon=False, loc="best", fontsize=27)
-
+# Style this plot like a pro
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 ax.tick_params(axis='y', labelsize=20)
 ax.tick_params(axis='x', labelsize=20)
 plt.xlabel("date", fontsize=26)
 plt.ylabel("grams carbon emitted", fontsize=26)
-plt.title("GDED4.1s Summer Emissions", fontsize=29)
+plt.title("GDED4.1s June-Sept Emissions, 2003-2016", fontsize=27)
 plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
 plt.close()
 
@@ -182,7 +179,8 @@ plt.close()
 # Transitioning to looking at monthly 
 ################################################################################
 
-# TODO: MASK LOCATIONS THAT DO NOT HAVE LOTS OF EMISSIONS
+# TODO: MASK LOCATIONS THAT DO NOT HAVE LOTS OF EMISSIONS. 
+# UPDATE: No probably not. 
 
 ################################################################################
 # Bring in meteorology and event masks
@@ -212,7 +210,7 @@ z, ynew, xnew = cnm.mask2dims(z, longitude, latitude, 0, minLon, maxLon, minLat,
 RH, ynew, xnew = cnm.mask2dims(RH, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
-# Make units America
+# Make temperature units America
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
 
@@ -220,21 +218,22 @@ t2m = cnm.KtoF(t2m)
 latitude = ynew
 longitude = xnew 
 
-# Make Monthly totals and or means for meteorology 
-# TODO: Use pandas
+################################################################################
+# Make Monthly totals and or means for meteorology. This dataframe will be used
+# for analysis for the rest of the script. 
+################################################################################
 
 # rows of dataframe
 nMonths = nYears * 12.
-# columns of dataframe
+
+# columns of dataframe, TODO: soil moisture
 colnames = ['year', 'month', 'E', 't2m', 'tp', 'windSpeed', 'z', 'RH', 'd2m']
+# Create monthly dataframe
 monthBlank = np.zeros(shape=(int(nMonths), len(colnames))) 
 month_df = pd.DataFrame(data=monthBlank, columns=colnames)
-
+# Create summer (6-9) dataframe
 summerBlank = np.zeros(shape=(nYears, len(colnames)))
-summer_df = pd.DataFrame(data=summerBlank, columns=colnames)
-
-# TODO: Consider all kinds of different lags, like spring weather and
-# TODO: summer emissions 
+summer_df   = pd.DataFrame(data=summerBlank, columns=colnames)
 
 df_i = -1 # this is a month counter
 for y in range(nYears):
@@ -242,7 +241,7 @@ for y in range(nYears):
 	# identify this years summer days to make summer average
 	summerMask = (year == uniqueYears[y]) & (month >= 6) & (month <= 9)
 	summer_df.year[y] = uniqueYears[y]
-	#summer_df.month[y] = '6-9'
+	
 	# variables requiring summing first
 	summer_df["E"][y] = np.sum(C[summerMask, :,:])
 	summer_df["tp"][y] = np.sum(tp[summerMask, :,:])
@@ -253,9 +252,10 @@ for y in range(nYears):
 	summer_df["RH"][y] = np.mean(RH[summerMask, :,:])
 	summer_df["d2m"][y] = np.mean(d2m[summerMask, :,:])
 
+	# for each year, loop through each month
 	for m in range(12):
 		df_i = df_i + 1
-		# Mask out the days of this unique year month combo 
+		# Mask out the days of this unique year month combo (e.g. jan 2003)
 		monthMask = (uniqueMonths[m] == month) & (year == uniqueYears[y])
 		month_df.year[df_i] = uniqueYears[y]
 		month_df.month[df_i]= uniqueMonths[m]
@@ -288,27 +288,25 @@ units['z'] = '500mb height (m)'
 units['RH'] = "RH%"
 units['d2m'] = "dew point (f)"
 
-################################################################################		
-# TODO: Make a lagged correlation plot! Maybe easier to do with R? 
-################################################################################
-
 
 # TODO: make it possible for emissions to lag weather in this plot 
-def plotParameterSpace(df, units, region, figureDir, string="monthly"): 
+def plotParameterSpace(df, units, region, figureDir, string): 
 
 	colnames = df.columns
+	col_i = np.where(colnames == "E")[0][0] # Start with E column
+	col_f = len(colnames) # end with the last column
+	
 	fig = plt.figure(figsize=(30, 30))
-
 	figSaveName = figureDir + string + 'MeanCorrelations' + region + '.png'
 				
 	frameN = 0
 	frameRow = 0
-	for c1 in colnames[2:9]:
+	for c1 in colnames[col_i:col_f]:
 		
 		frameRow = frameRow + 1
 		frameColumn = 0
 		
-		for c2 in colnames[2:9]:
+		for c2 in colnames[col_i:col_f]:
 		    
 		    frameN = frameN + 1
 		    frameColumn = frameColumn + 1
@@ -325,13 +323,11 @@ def plotParameterSpace(df, units, region, figureDir, string="monthly"):
 				r = round(r,3)
 				p = round(p,5)
 				
-				
 				ax = fig.add_subplot(7,7, frameN, frame_on=False)	
-		
 				ax.scatter(xData, yData, 
 						   edgecolors='none',\
-						   color="k"
-						   )
+						   color="k",
+						   s=50)
 						   
 				# show linear fit if r is decent 
 				if (np.abs(r) >= 0.5):
@@ -339,18 +335,17 @@ def plotParameterSpace(df, units, region, figureDir, string="monthly"):
 					yhat = lm.slope * xData + lm.intercept   
 					plt.plot(xData, yhat, linewidth=3)
 						   
-				plt.xlabel(units[c2], fontsize=18, weight='bold')
-				plt.ylabel(units[c1], fontsize=18, weight='bold')
-				titleString = 'r=' + str(r) + ', p=' + str(p)
-				plt.title(titleString, 
-							fontsize=19, weight='bold')
+				plt.xlabel(units[c2], fontsize=20, weight='bold')
+				plt.ylabel(units[c1], fontsize=20, weight='bold')
+				titleString = 'r=' + str(r)
+				plt.title(titleString, fontsize=20, weight='bold')
 		
 				ax.spines['top'].set_visible(False)
 				ax.spines['right'].set_visible(False)
 				ax.yaxis.set_ticks_position('left')
 				ax.xaxis.set_ticks_position('bottom')
-				ax.tick_params(axis='y', labelsize=18)
-				ax.tick_params(axis='x', labelsize=18)
+				ax.tick_params(axis='y', labelsize=20)
+				ax.tick_params(axis='x', labelsize=20)
 			
 			# TODO: plot linear model and R**2
 			# TODO: when not plotting emissions as x or y, colorcode by emissions? 
@@ -362,21 +357,38 @@ def plotParameterSpace(df, units, region, figureDir, string="monthly"):
 plotParameterSpace(month_df, units, region, figureDir, "monthly")	
 plotParameterSpace(summer_df, units, region, figureDir, "summer")	
 
+
+# def laggedPearsonCoef(x, y, maxLag=12):
+# 	"""x and y are the same length."""
+# 	
+# 	lags = np.arange(-1*maxLag, maxLag+1)
+# 	corrs = np.zeros(len(lags))
+# 	
+# 	indicies = range(len(x))
+# 	
+# 	for i in range(len(lags)):
+# 	
+# 		# shift xData by the lag
+		
+		
 # TODO: make it possible for emissions to lag weather in this plot 
-def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="scatter"): 
-
+def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
+	"""This basically just gives the top row of plotParameterSpace()"""
+	
 	colnames = df.columns
+	col_i = np.where(colnames == "E")[0][0] + 1 # Start with first column after E
+	col_f = len(colnames) # end with the last column
+    
 	fig = plt.figure(figsize=(22, 4))
-
 	figSaveName = figureDir + string + 'EmissionsVsMet_' + plotType + region + '.png'
 				
 	frameN = 0
-	for c2 in colnames[3:9]:
+	for c2 in colnames[col_i:col_f]:
 		
 		frameN = frameN + 1
 		
 		# Get the data to plot against each-other
-		yData = df["E"]
+		yData = df["E"] # This is always the y ~predicated
 		xData = df[c2] # ~predictor
 
 		# Just to the pierceson cor r for now
@@ -387,12 +399,10 @@ def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="
 		ax = fig.add_subplot(1,6, frameN, frame_on=False)			
 
 		if plotType=="scatter":
-		
-			
+			# Sometimes we want to show a scatterplot of these data 
 			ax.scatter(xData, yData, 
-					   edgecolors='none',\
-					   color="k"
-					   )
+					   edgecolors='none',
+					   color="k")
 				   
 			# show linear fit if r is decent 
 			if (np.abs(r) >= 0.5):
@@ -400,17 +410,23 @@ def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="
 				yhat = lm.slope * xData + lm.intercept   
 				plt.plot(xData, yhat, linewidth=3)
 				   
-			plt.xlabel(units[c2], fontsize=16, weight='bold')
-			plt.ylabel(units["E"], fontsize=16, weight='bold')
+			plt.xlabel(units[c2], fontsize=20, weight='bold')
+			plt.ylabel(units["E"], fontsize=20, weight='bold')
 			titleString = 'r=' + str(r) 
-			plt.title(titleString, 
-						fontsize=15, weight='bold')
+			plt.title(titleString, fontsize=20, weight='bold')
 			
 		elif plotType=="ccf": 		
+			# Sometimes we want to do a cross correlation to see what 
+			# lag provides the highest correlation pearson coef
+			ccf = plt.xcorr(df['E'], df[c2], maxlags=12, normed=True,
+							usevlines=True, color="blue")
+			lag = ccf[0]
+			cor = ccf[1]
+			j = np.where(lag==0)[0][0]
+			correlation = cor[j]			
 		
-			ccf = plt.xcorr(df.E, df[c2], maxlags=12, 
-							usevlines=True, color="blue") 
-			plt.plot(ccf[0], ccf[1], color="blue")
+			plt.plot(lag, cor, color="blue")
+			plt.ylim( (0, 0.6) )
 			plt.xlabel('lag (months)', fontsize=16, weight='bold')
 			plt.ylabel('correlation', fontsize=16, weight='bold')
 			plt.title('cor(E, ' + c2 + ')', weight='bold', fontsize=20)				
@@ -422,7 +438,6 @@ def plotEmissionVsMet(df, units, region, figureDir, string="monthly", plotType="
 		ax.xaxis.set_ticks_position('bottom')
 		ax.tick_params(axis='y', labelsize=16)
 		ax.tick_params(axis='x', labelsize=16)
-			
 					
 	fig.tight_layout()		
 	plt.savefig(figSaveName)
@@ -436,11 +451,115 @@ plotEmissionVsMet(month_df, units, region, figureDir, "monthly", "ccf")
 
 
 ################################################################################
+# We saw that total precip ~4 months before summer is well correlated with 
+# summertime emissions. Show this relationship
+################################################################################
+spring_tp = np.zeros(nYears)
+for y in range(nYears):
+	springMask = (year == uniqueYears[y]) & (month >= 4) & (month <= 9)
+	spring_tp[y] = np.sum(tp[springMask,:,:])
+
+# Add this to the dataframe 
+#summer_df["spring_tp"] = spring_tp
+figureName = figureDir + 'spring+summer_tp_vs_E'+region+'.png'
+
+fig = plt.figure(figsize=(5,5))
+ax = fig.add_subplot(1,1,1, frame_on=True)
+plt.scatter(spring_tp, summer_df.E)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+
+lm = stats.linregress(spring_tp, summer_df.E)		
+yhat = lm.slope * spring_tp + lm.intercept   
+r = round(lm.rvalue,3)
+
+plt.plot(spring_tp, yhat, linewidth=3)
+
+plt.xlabel('April-Sept Precip (in)', fontsize=15, weight='bold')
+plt.ylabel('Emissions (grams carbon)', fontsize=15, weight='bold')
+#plt.legend('r=' + str(r), loc='best', frameon=False, fontsize=15)
+plt.title(region[1:-1] + ', r=' + str(r), fontsize=16, weight='bold')
+
+fig.tight_layout()	
+
+plt.savefig(figureName)
+plt.close()
+
+
+################################################################################
 # Now see if the inter-annual variability in the occurrence of difference events
 # predicts inter-annual variability in summer emissions. 
+# TODO: look at these masks monthly too. 
 ################################################################################
-# https://stackoverflow.com/questions/40578701/acf-confidence-intervals-in-r-vs-python-why-are-they-different
-#statsmodels.graphics.tsaplots.plot_acf()
+maskFile = drive + 'era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
+nc = Dataset(maskFile, 'r')
+
+latitude = nc.variables['latitude'][:]
+longitude = nc.variables['longitude'][:]
+metMaskDict = {}
+metMaskDict['stagnation_mask'] = nc.variables['stagnation_mask'][:]
+metMaskDict['high_T_mask']     = nc.variables['high_T_mask'][:]
+metMaskDict['low_precip_mask'] = nc.variables['low_precip_mask'][:]
+metMaskDict['high_wind_mask']  = nc.variables['high_wind_mask'][:]
+metMaskDict['low_RH_mask']     = nc.variables['low_RH_mask'][:]
+metMaskDict['blocking_mask']   = nc.variables['blocking_mask'][:]
+# TODO: cyclone days coming soon
+nc.close()
+
+# Spatially subset these met masks 
+for key in metMaskDict.keys():
+	summer_df[key] = np.zeros(nYears) # Need to place these columns in here now
+	metMaskDict[key], ynew, xnew, = cnm.mask2dims(metMaskDict[key], longitude, latitude, 
+											      0, minLon, maxLon, minLat, maxLat)
+
+# Add summer totals of these identified events to summer_df
+newColumns = metMaskDict.keys()
+
+for y in range(nYears):
+
+	# identify this years summer days to make summer average
+	summerMask = (year == uniqueYears[y]) & (month >= 6) & (month <= 9)
+	
+	# Assign the new variables
+	for key in newColumns:
+		summer_df[key][y] = np.sum(metMaskDict[key][summerMask, :,:])
+
+
+
+# plot up these relationships and the summary statistics
+nMax = C.shape[1] * C.shape[2] * np.sum(summerMask) * 1. # max any mask value for a year
+
+fig = plt.figure(figsize=(15,10))
+i = 0
+for key in newColumns:
+	i = i + 1
+	ax = fig.add_subplot(2,3,i, frame_on=True)		
+	plt.scatter(summer_df[key], summer_df.E, label=key)
+	plt.xlabel(key + ' metric', fontsize=15, weight='bold')
+	plt.ylabel('Emissions (grams carbon)', fontsize=15, weight='bold')
+	
+	lm = stats.linregress(summer_df[key], summer_df.E)		
+	yhat = lm.slope * summer_df[key] + lm.intercept   
+	r = round(lm.rvalue,3)
+	ax.text(0.45, 0.9, 'r='+str(r),
+        verticalalignment='bottom', horizontalalignment='right',
+        transform=ax.transAxes,
+        color='green', fontsize=19)
+	
+	if r > 0.5:
+		plt.plot(summer_df[key], yhat, linewidth=3)
+	
+	plt.title(key, fontsize=20, weight='bold')
+	ax.spines['top'].set_visible(False)
+	ax.spines['right'].set_visible(False)
+
+fig.tight_layout()		
+plt.savefig(figureDir + "test.png")
+
+
+
+
+
 
 
 
