@@ -84,7 +84,7 @@ for i in range(nYears):
 				    "expver": "1",
 				    "grid": gridSpacing,
 			    	"levtype": "sfc",
-			    	"param": "228.128",
+			    	"param": param,
 			    	"step": "6",
 			    	"stream": "oper",
 			    	"time": "00:00:00/12:00:00",

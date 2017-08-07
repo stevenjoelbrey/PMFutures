@@ -17,7 +17,7 @@
 ################################################################################
 #------------- Arguments to Subset model emissions in space and time -----------
 ################################################################################
-region = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region = "_CentralRockies_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 
 # Load resources
@@ -554,12 +554,8 @@ for key in newColumns:
 	ax.spines['right'].set_visible(False)
 
 fig.tight_layout()		
-plt.savefig(figureDir + "test.png")
-
-
-
-
-
+plt.savefig(figureDir + 'mask_predictors'+region+'.png')
+plt.close()
 
 
 
