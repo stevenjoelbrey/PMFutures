@@ -16,6 +16,8 @@
 
 # TODO: Different lags for testing and different averaging timescales. 
 
+# TODO: Make paths dynamic 
+
 # NOTE: In this scrip E will generally stand for "emissions", m for mask,
 # NOTE: and _ will represent a flattened multidimensional array. 
 
@@ -38,21 +40,9 @@ import cesm_nc_manager as cnm
 # Select and load emissions species and AirQualityData Masks
 ################################################################################
 
-dataDirBase = "/barnes-scratch/sbrey/era_interim_nc_daily_merged/"
+drive = "/barnes-scratch/sbrey/"
+dataDirBase = drive + "era_interim_nc_daily_merged/"
 figureDir = "../Figures/GFED_era_interm_analysis/"
-
-
-# Get emissions, use this to get dimensions
-ncFile  = "/barnes-scratch/sbrey/GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
-nc = Dataset(ncFile, 'r')
-latitude = nc.variables['latitude'][:]
-longitude = nc.variables['longitude'][:]
-time = nc.variables['time'][:]
-C = nc.variables['C'][:]
-nc.close()
-
-# Make time into datetime arrays
-time, month, year = cnm.get_era_interim_time(time)
 
 ################################################################################
 #------------------ Subset model emissions in time -----------------------------
@@ -63,13 +53,134 @@ time, month, year = cnm.get_era_interim_time(time)
 
 startMonth = 6
 endMonth   = 9
-# Get bounds for creating a map region 
-minLat     = latitude.min()  # NOTE: This may be different from the bounds on the "_NA_" data
-maxLat     = latitude.max()    
-minLon     = longitude.min()   
-maxLon     = longitude.max()   
+region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
 
-# Make and apply month mask 
+# Get region lat lon range	
+minLat, maxLat, minLon, maxLon  = cnm.getRegionBounds(region)
+
+# Get emissions, use this to get dimensions
+# TODO: load global emissions, let region sorting take care of the rest. 
+ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+nc = Dataset(ncFile, 'r')
+latitude = nc.variables['latitude'][:]
+longitude = nc.variables['longitude'][:]
+time = nc.variables['time'][:]
+C = nc.variables['C'][:]
+nc.close()
+
+# Make time into datetime arrays
+time, month, year = cnm.get_era_interim_time(time)
+
+# Spatially subset the data 
+C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+
+################################################################################
+# Show emissions time series for the domain
+################################################################################
+C_daily_total = np.sum(C,axis=(1,2))
+C_cumulative = np.cumsum(C_daily_total)
+
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+plt.plot(time, C_daily_total)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Daily Emissions", fontsize=29)
+plt.savefig(figureDir + "daily_timeSeries" +region+".png")
+plt.close()
+
+# TODO: Also plot different region contributions lines! That would be dope!
+
+################################################################################
+# show emissions monthly histogram
+################################################################################
+uniqueMonths = np.unique(month)
+monthTotal = np.zeros(12)
+for i in range(12):
+	monthMask = month == uniqueMonths[i]
+	monthTotal[i] = np.sum(C_daily_total[monthMask])
+
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+plt.bar(uniqueMonths, monthTotal)
+plt.xticks(uniqueMonths, uniqueMonths)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("Month", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Seasonality", fontsize=29)
+plt.savefig(figureDir + 'emissions_seasonality' + region + ".png")
+plt.close()
+
+
+################################################################################
+# Show total summer emissions
+################################################################################
+uniqueYears = np.unique(year)
+nYears = len(uniqueYears)
+C_summer = np.zeros(nYears)
+C_june = np.zeros(nYears)
+C_july = np.zeros(nYears)
+C_aug = np.zeros(nYears)
+C_sept = np.zeros(nYears)
+
+for i in range(nYears):
+	summerMask = (month >= 6.) & (month <= 9.) & (year == uniqueYears[i])
+	juneMask = (month == 6.) & (year == uniqueYears[i])
+	julyMask = (month == 7.) & (year == uniqueYears[i])
+	augMask  = (month == 8.) & (year == uniqueYears[i])
+	septMask  = (month == 9.) & (year == uniqueYears[i])
+	
+	C_summer[i] = np.sum(C_daily_total[summerMask])
+	C_june[i] = np.sum(C_daily_total[juneMask])
+	C_july[i] = np.sum(C_daily_total[julyMask])
+	C_aug[i] = np.sum(C_daily_total[augMask])
+	C_sept[i] = np.sum(C_daily_total[septMask])
+
+# First plot with all one color 
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+p1 = plt.bar(uniqueYears, C_summer)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s June-Sept Emissions", fontsize=29)
+plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
+plt.close()
+
+# Now stack the monthly contributions 
+fig = plt.figure(figsize=(12,8))
+ax = plt.subplot(111)
+p1 = plt.bar(uniqueYears, C_june, color="blue")
+p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
+p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june+C_july), color="grey")
+p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june+C_july+C_aug), color="lightpink")
+plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
+			frameon=False, loc="best", fontsize=27)
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=20)
+plt.xlabel("date", fontsize=26)
+plt.ylabel("grams carbon emitted", fontsize=26)
+plt.title("GDED4.1s Summer Emissions", fontsize=29)
+plt.savefig(figureDir + "summer_interannual_variability_months"+region+".png")
+plt.close()
+
+################################################################################
+# Make and apply month mask to start all summer mask analysis 
+################################################################################
+
 month_mask = (month >= startMonth) & (month <= endMonth)
 C = C[month_mask,:,:]
 time = time[month_mask]
@@ -80,11 +191,11 @@ year = year[month_mask]
 # Set up a relevant map to use later
 ################################################################################
 m = Basemap(projection='merc',llcrnrlat=minLat, urcrnrlat=maxLat,\
-            llcrnrlon=minLon, urcrnrlon=maxLon,resolution='c',\
-	    lon_0=0, lat_0=-90)
+            llcrnrlon=minLon, urcrnrlon=maxLon, resolution=resolution,\
+	    	lon_0=0, lat_0=-90)
 
 # grid coords for mesh plotting of values. 
-lons, lats = np.meshgrid(longitude, latitude)
+lons, lats = np.meshgrid(xnew, ynew)
 x, y = m(lons, lats)
 
 ################################################################################
@@ -99,7 +210,7 @@ m.drawcoastlines()
 m.drawstates()
 m.drawcountries()
 #m.drawmapboundary(fill_color='aqua')
-c = m.pcolor(x, y,  C_total_ma)
+c = m.pcolor(x, y,  C_total_ma, cmap='viridis_r')
 cbar = plt.colorbar(c, pad=0.01, orientation='horizontal', extend='both',\
 			norm=matplotlib.colors.LogNorm())
 cbar.set_label('Emissions (grams carbon)', fontsize=25)
@@ -107,19 +218,15 @@ cbar.ax.tick_params(labelsize=15)
 #m.drawmapboundary(fill_color='aqua')
 plt.title("Total June-Sept Emissions 2003-2016", fontsize=25)
 fig.tight_layout()
-plt.savefig(figureDir + 'total_C_emissions_6_9_2003_2016.png')
+plt.savefig(figureDir + 'total_C_emissions_6_9_2003_2016' + region +'.png')
 plt.close()
 
 ################################################################################
 #----------------------- Load desired met event masks --------------------------
 ################################################################################
 
-maskFile = '/barnes-scratch/sbrey/era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
+maskFile = drive + 'era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
 nc = Dataset(maskFile, 'r')
-
-# TODO: change this to calling on the function that makes the mask to make a dynamic
-# TODO: exploration of the space of cutoffs.
-
 
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
@@ -131,6 +238,18 @@ low_RH_mask     = nc.variables['low_RH_mask'][month_mask,:,:]
 blocking_mask   = nc.variables['blocking_mask'][month_mask,:,:]
 # TODO: cyclone days coming soon
 nc.close()
+
+# Spatially subset these masks 
+high_T_mask, ynew, xnew = cnm.mask2dims(high_T_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+low_precip_mask, ynew, xnew = cnm.mask2dims(low_precip_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+stagnation_mask, ynew, xnew = cnm.mask2dims(stagnation_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+high_wind_mask, ynew, xnew = cnm.mask2dims(high_wind_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+low_RH_mask, ynew, xnew = cnm.mask2dims(low_RH_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+blocking_mask, ynew, xnew = cnm.mask2dims(blocking_mask, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+
+# Now that we are done with using the old bounds altogether. 
+longitude = xnew
+latitude = ynew 
 
 ################################################################################
 # Count the number of events at each grid cell for each type and make units
@@ -169,7 +288,7 @@ ax = fig.add_subplot(2,3,1)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nHighWindGrid, vmin=0., vmax=0.1 )
+c = m.pcolor(x, y, nHighWindGrid, vmin=0., vmax=0.1, cmap='viridis_r', )
 cbar = m.colorbar(c, location='bottom', pad="1%", extend='max', ticks=[0, 0.05, .1])
 cbar.set_label('proportion of days')
 plt.title('Days mean wind > 8 m/s')
@@ -178,7 +297,7 @@ ax = fig.add_subplot(2,3,2)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nHighTGrid, vmin=0, vmax=1 ) # cmap="Purples"
+c = m.pcolor(x, y, nHighTGrid, vmin=0, vmax=1, cmap='viridis_r') 
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Days T > 24 C')
@@ -187,7 +306,7 @@ ax = fig.add_subplot(2,3,3)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nLowPrecGrid, vmin=0, vmax=1 )
+c = m.pcolor(x, y, nLowPrecGrid, vmin=0, vmax=1, cmap='viridis_r')
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Days with < 0.01 inches precip')
@@ -196,7 +315,7 @@ ax = fig.add_subplot(2,3,4)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nStagnationGrid, vmin = 0, vmax=1 )
+c = m.pcolor(x, y, nStagnationGrid, vmin = 0, vmax=1, cmap='viridis_r' )
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Stagnation Days')
@@ -205,7 +324,7 @@ ax = fig.add_subplot(2,3,5)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nLowRHGrid, vmin = 0, vmax=1 )
+c = m.pcolor(x, y, nLowRHGrid, vmin = 0, vmax=1, cmap='viridis_r' )
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('RH < 25%')
@@ -222,7 +341,7 @@ plt.title('500 mb 5 day blocking event')
 
 fig.tight_layout()
 
-plt.savefig(figureDir + 'era_interim_MetMaskCounts.png')
+plt.savefig(figureDir + 'era_interim_MetMaskCounts'+region+'.png')
 plt.close()
 
 ################################################################################
@@ -244,8 +363,8 @@ plt.xlabel('Emissions (g Carbon) day$^{-1}$ grid$^{-1}$ ', fontsize=16)
 plt.ylabel('Count', fontsize=16)
 plt.tick_params(labelsize=15) 
 plt.title('distribution of daily emissions', fontsize=24)
-plt.savefig(figureDir + 'dailyEmissionsDistribution.png')
-plt.show()
+plt.savefig(figureDir + 'dailyEmissionsDistribution'+region+'.png')
+plt.show(block=False)
 plt.close()
 
 # Mask out zero values, extra care for histogram. 
@@ -255,11 +374,9 @@ C_flat_noZero = C_flat[C_flat > 0.]
 
 # make a cutoff value, we are going to choose to ignore small emission
 # events for this analysis. 
-cutoff = np.percentile(C_flat_noZero, 50)
-
+cutoff = np.percentile(C_flat_noZero, 50) # TODO: make this cutoff an argument
 allEmissions = np.sum(C_flat_noZero)
 topEmissions = np.sum(C_flat_noZero[C_flat_noZero >= cutoff])
-
 
 # Make some log scale bins for counting 
 bins = np.logspace(1, 12, 30)
@@ -274,8 +391,7 @@ plt.ylabel('Count', fontsize=20)
 plt.tick_params(labelsize=20) 
 plt.title('distribution of daily emissions', fontsize=24)
 fig.tight_layout()
-plt.savefig(figureDir + 'dailyEmissionsDistribution_noZeros.png')
-plt.show()
+plt.savefig(figureDir + 'dailyEmissionsDistribution_noZeros'+region+'.png')
 plt.close()
 
 
@@ -283,13 +399,12 @@ plt.close()
 # Figure out spatial location to retain for analysis. Also switch from C to
 # 'E' which will generically refer to emissions. 
 ###############################################################################
-
 ETotal = np.sum(C, axis=0) # g/grid integrated over all time
 E = C
 
 # Spatially, I tink it makes the most sense to ignore boxes that have no and 
 # very low emissions. 
-spatial_cutoff    = np.percentile(ETotal, 75)
+spatial_cutoff    = np.percentile(ETotal, 75) # TODO: make percentile an argument
 highEMask = ETotal > spatial_cutoff
 ETotalSum = np.sum(ETotal)
 
@@ -309,12 +424,13 @@ fig = plt.figure(figsize=(8,8))
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, highETotal)
+c = m.pcolor(x, y, highETotal, cmap='viridis_r')
 cbar = m.colorbar(c, location='bottom',pad="1%")
 cbar.set_label('carbon emitted [g]', fontsize=20)
 cbar.ax.tick_params(labelsize=18) 
 plt.title('highest emission locations, June-Sept 2003-2016', fontsize=20)
-plt.savefig(figureDir + 'GFED4s_HighEmitterTotal_6_9_2003_2016.png')
+plt.savefig(figureDir + 'GFED4s_HighEmitterTotal_6_9_2003_2016'+region+'.png')
+plt.close()
 
 ###############################################################################
 # Mask the met event totals by this high emission mask 
@@ -344,7 +460,7 @@ ax = fig.add_subplot(2,3,1)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nHighWindGrid, vmin=0., vmax=0.1 )
+c = m.pcolor(x, y, nHighWindGrid, vmin=0., vmax=0.1, cmap='viridis_r')
 cbar = m.colorbar(c, location='bottom', pad="1%", extend='max', ticks=[0, 0.05, .1])
 cbar.set_label('proportion of days')
 plt.title('Days mean wind > 8 m/s')
@@ -353,7 +469,7 @@ ax = fig.add_subplot(2,3,2)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nHighTGrid, vmin=0, vmax=1 ) # cmap="Purples"
+c = m.pcolor(x, y, nHighTGrid, vmin=0, vmax=1, cmap='viridis_r' ) 
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Days T > 24 C')
@@ -362,7 +478,7 @@ ax = fig.add_subplot(2,3,3)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nLowPrecGrid, vmin=0, vmax=1 )
+c = m.pcolor(x, y, nLowPrecGrid, vmin=0, vmax=1, cmap='viridis_r' )
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Days with < 0.01 inches precip')
@@ -371,7 +487,7 @@ ax = fig.add_subplot(2,3,4)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nStagnationGrid, vmin = 0, vmax=1 )
+c = m.pcolor(x, y, nStagnationGrid, vmin = 0, vmax=1, cmap='viridis_r' )
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('Stagnation Days')
@@ -380,7 +496,7 @@ ax = fig.add_subplot(2,3,5)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nLowRHGrid, vmin = 0, vmax=1 )
+c = m.pcolor(x, y, nLowRHGrid, vmin = 0, vmax=1, cmap='viridis_r' )
 cbar = m.colorbar(c, location='bottom',pad="1%", ticks=[0, 0.5, 1])
 cbar.set_label('proportion of days')
 plt.title('RH < 25%')
@@ -389,36 +505,15 @@ ax = fig.add_subplot(2,3,6)
 m.drawcoastlines(linewidth=1)
 m.drawstates(linewidth=1)
 m.drawcountries(linewidth=1)
-c = m.pcolor(x, y, nBlockingGrid, vmin = 0, vmax=0.1 )
+c = m.pcolor(x, y, nBlockingGrid, vmin = 0, vmax=0.1, cmap="Reds" )
 cbar = m.colorbar(c, location='bottom',pad="1%", extend='max', ticks=[0, 0.05, 0.1])
 cbar.set_label('proportion of days')
 plt.title('500 mb 5 day blocking event')
 
 fig.tight_layout()
 
-plt.savefig(figureDir + 'era_interim_MetMaskCounts_highEmitters.png')
-
-################################################################################
-# Make masked arrays for each emission day type. DO NOT show where mask == 0
-################################################################################
-#zeroMask = E_masked == 0
-
-# highWindE = ma.masked_where(high_wind_mask == 0, E_masked_spatial)
-# HighTE    = ma.masked_where(high_T_mask == 0, E_masked_spatial)
-# LowPrecE  = ma.masked_where(low_precip_mask == 0, E_masked_spatial)
-# stagE     = ma.masked_where(stagnation_mask == 0, E_masked_spatial)
-# blockE    = ma.masked_where(blocking_mask == 0, E_masked_spatial)
-# lowRHE    = ma.masked_where(low_RH_mask == 0, E_masked_spatial)
-# NOTE: This implies that E is all summer E
-
-# We also need to mask where emissions are zero, because zero is non-interesting 
-# highWindE = ma.masked_where(E_masked == 0, highWindE)
-# HighTE    = ma.masked_where(E_masked == 0, HighTE)
-# LowPrecE  = ma.masked_where(E_masked == 0, LowPrecE)
-# stagE     = ma.masked_where(E_masked == 0, stagE)
-# blockE    = ma.masked_where(E_masked == 0, blockE)
-# lowRHE    = ma.masked_where(E_masked == 0, lowRHE)
-# E_noZero  = ma.masked_where(E_masked == 0, E_masked)
+plt.savefig(figureDir + 'era_interim_MetMaskCounts_highEmitters'+region+'.png')
+plt.close()
 
 ################################################################################
 # TODO: Map total emissions for each met event type 
@@ -457,7 +552,7 @@ stagE_heights     = plt.hist(stagE_, bins, label = 'E | stagnation', alpha=0.2)[
 blockE_heights    = plt.hist(blockE_, bins, label = 'E | 500mb blocking', alpha=0.2)[0]
 lowRHE_heights    = plt.hist(lowRHE_, bins, label = 'E | low RH%', alpha=0.2)[0]
 plt.xscale('log')
-plt.show(block=False)
+#plt.show(block=False)
 plt.close()
 
 # Create data structure to plot nice side by side by histograms
@@ -487,13 +582,13 @@ plt.legend(loc='best', frameon=False, fontsize=18)
 
 fig.tight_layout()
 
-plt.savefig(figureDir + 'lineHistogram_GDFED_era_interim.png')
+plt.savefig(figureDir + 'lineHistogram_GDFED_era_interim'+region+'.png')
+plt.close()
 
 ################################################################################
 # Now normalize the occurance of these events and plot the lines
 # of the heights of the histogram. _n stands for normalized.
 ################################################################################
-
 def normalizeE(heights):
 	heights_n = heights / np.sum(heights)
 	return heights_n
@@ -525,28 +620,13 @@ ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 ax.xaxis.set_ticks_position('bottom')
 ax.yaxis.set_ticks_position('left')
-#plt.xlim([0, 0.00004])
 plt.xlabel('g day$^{-1}$ grid$^{-1}$', fontsize=26)
 plt.ylabel('Proportion of identified days', fontsize=26)
 plt.legend(loc='best', frameon=False, fontsize=18)
 
 fig.tight_layout()
 
-plt.savefig(figureDir + 'lineHistogram_normalized_GDFED_era_interim.png')
-
+plt.savefig(figureDir + 'lineHistogram_normalized_GDFED_era_interim'+region+'.png')
 plt.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

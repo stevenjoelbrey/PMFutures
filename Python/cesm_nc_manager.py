@@ -33,11 +33,6 @@ import os.path # os.path.join('/my/root/directory', 'in', 'here')
 # -----------------Air Quality File functions ---------------------------------
 ###############################################################################
 
-scenario = '2000Firev1'
-NCVariable = 'Z3'
-#global dataDirBase
-#dataDirBase="/pierce-scratch/mariavm"
-
 
 def metersPerSecToMetersPerDay(prec):
 	"""Converts precip from m/s for a day to total inches of rain per
@@ -790,4 +785,29 @@ def get_era_interim_time(time):
 	return t, month, year
 
 
-
+def getRegionBounds(region):
+	"""This function takes a region name "_NAME_" and returns the 
+		numeric latitudew longitude domain of that region. 
+	"""
+	if region == "_west_":
+		minLat     = 30. 
+		maxLat     = 49.5    
+		minLon     = 234.0 
+		maxLon     = 258.75   
+		resolution = 'l'
+	
+	elif region == '_PNW_':
+		minLat     = 42.
+		maxLat     = 50.  
+		minLon     = 234. 
+		maxLon     = 250. 		
+		resolution = 'h'
+	
+	elif region == "_CAL_":
+		minLat     = 32.
+		maxLat     = 42.4  
+		minLon     = 234. 
+		maxLon     = 246. 		
+		resolution = 'h'
+	
+	return 		minLat, maxLat, minLon, maxLon 
