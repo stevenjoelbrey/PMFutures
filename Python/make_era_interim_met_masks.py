@@ -121,20 +121,20 @@ def find_blocking_days(sdFactor=1.):
 		
 		# Figure out where these 2D arrays are all true
 		m = high_z_0 & high_z_1 & high_z_2 & high_z_3 & high_z_4
-		print 'unique values: ' + str(np.unique(m))
+# 		print 'unique values: ' + str(np.unique(m))
 		
 		blocking_mask[count, :, :] = np.array(m, dtype=int)
 		
-		fig = plt.figure(figsize=(8,8))
-		map.drawcoastlines()
-		map.drawstates()
-		map.drawcountries()
-		c=map.pcolor(x,y, blocking_mask[count, :, :])
-		c=map.contour(x,y, z[i, :, :])
-		bar = plt.colorbar(c)
-		plt.title('Date: ' + str(t[i]) + ' Julain day = ' + str(jDays[jDayIndex]))
-		plt.savefig('../Figures/block_test/z_show_'+str(i)+'.png')
-		plt.close()
+# 		fig = plt.figure(figsize=(8,8))
+# 		map.drawcoastlines()
+# 		map.drawstates()
+# 		map.drawcountries()
+# 		c=plt.pcolor(x,y, blocking_mask[count, :, :])
+# 		c=plt.contour(x,y, z[i, :, :])
+# 		bar = plt.colorbar(c)
+# 		plt.title('Date: ' + str(t[i]) + ' Julain day = ' + str(jDays[jDayIndex]))
+# 		plt.savefig('../Figures/block_test/z_show_'+str(i)+'.png')
+# 		plt.close()
 
 	# Finally close the very large nc file connection. 
 	z_nc.close()

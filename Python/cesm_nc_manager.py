@@ -788,6 +788,9 @@ def get_era_interim_time(time):
 def getRegionBounds(region):
 	"""This function takes a region name "_NAME_" and returns the 
 		numeric latitudew longitude domain of that region. 
+		
+		return: minLat, maxLat, minLon, maxLon, resolution 
+			
 	"""
 	if region == "_west_":
 		minLat     = 30. 
@@ -809,5 +812,12 @@ def getRegionBounds(region):
 		minLon     = 234. 
 		maxLon     = 246. 		
 		resolution = 'h'
+		
+	elif region == "_CentralRockies_":
+		minLat     = 35.
+		maxLat     = 43.  
+		minLon     = 250. 
+		maxLon     = 259. 		
+		resolution = 'h'
 	
-	return 		minLat, maxLat, minLon, maxLon 
+	return minLat, maxLat, minLon, maxLon, resolution 
