@@ -39,6 +39,8 @@ import pandas as pd
 from scipy.stats import pearsonr
 import scipy.stats as stats
 import statsmodels
+# for multilinear regression
+from sklearn import linear_model
 
 # Get region lat lon range and basemap plotting resolution based on the 
 # chosen region
@@ -397,7 +399,7 @@ def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 					   color="k")
 				   
 			# show linear fit if r is decent 
-			if (np.abs(r) >= 0.5):
+			if ( (np.abs(r) >= 0.5) & (string == 'summer') ):
 				lm = stats.linregress(xData, yData)		
 				yhat = lm.slope * xData + lm.intercept   
 				plt.plot(xData, yhat, linewidth=3)
@@ -478,36 +480,67 @@ plt.savefig(figureName)
 plt.close()
 
 ################################################################################
+# Estimate multilinear regression curve on summer data. 
+# https://www.datarobot.com/blog/multiple-regression-using-statsmodels/
+################################################################################
+import statsmodels.api as sm
+X = summer_df[['t2m', 'tp', 'RH', 'z']]
+#X = summer_df[['t2m', 'tp']]
+y = summer_df['E']
+
+# Fit an OLS model with intercept 
+#X = sm.add_constant(X) # NOTE: I have no idea why examples do this...
+est = sm.OLS(y, X).fit()
+
+
+fig = plt.figure()
+plt.plot(uniqueYears, summer_df.E, label='GFED4s')
+plt.scatter(uniqueYears, est.fittedvalues, label='OLS model ~ T + Precip + RH% + Z', 
+			color='k')
+plt.title('Adj R-squared = ' + str(round(est.rsquared_adj,3)), weight='bold', fontsize=24 )
+plt.ylabel('grams carbon', weight='bold', fontsize=20)
+plt.xlabel('')
+plt.legend()
+fig.tight_layout()
+plt.savefig(figureDir+'multilinear_regression_summer' + region + '.png')
+
+
+# Test using different X values into the predictive model 
+# est.predict()
+
+
+
+################################################################################
 # Make emissions to precip relationship grid box specific
 # For every day with emissions, I want to know how long it has been since it 
 # rained in that grid box
 ################################################################################
-daysSinceRain = np.zeros(C.shape)
-daysSinceRain[:] =-9999
-nLat = len(latitude)
-nLon = len(longitude)
-nTime = len(time) 
-for x in range(nLon):
-	for y in range(nLat):
-		
-		tp_ = tp[:,y,x]
-		daysSinceRain_  = 0. # reset the counter for each new grid point 
-		
-		for t in range(nTime):
-		
-			if tp_[t] > 0.001:
-				# If in here it rained, reset daily counter
-				daysSinceRain_  = 0.
-				daysSinceRain[t,y,x] = 0.
-				
-			elif tp_[t] <= 0.001:
-				# If here it has not rained, advance the daily counter 
-				daysSinceRain_ = daysSinceRain_ + 1
-				daysSinceRain[t,y,x] = daysSinceRain_
-			else
-				print 'how did you get here?'
-		
-summerMask = (month >= 6) & (month <= 9)
+# daysSinceRain = np.zeros(C.shape)
+# daysSinceRain[:] =-9999
+# nLat = len(latitude)
+# nLon = len(longitude)
+# nTime = len(time) 
+# for x in range(nLon):
+# 	for y in range(nLat):
+# 		
+# 		tp_ = tp[:,y,x]
+# 		daysSinceRain_  = 0. # reset the counter for each new grid point 
+# 		
+# 		for t in range(nTime):
+# 		
+# 			if tp_[t] > 0.001:
+# 				# If in here it rained, reset daily counter
+# 				daysSinceRain_  = 0.
+# 				daysSinceRain[t,y,x] = 0.
+# 				
+# 			elif tp_[t] <= 0.001:
+# 				# If here it has not rained, advance the daily counter 
+# 				daysSinceRain_ = daysSinceRain_ + 1
+# 				daysSinceRain[t,y,x] = daysSinceRain_
+# 			else:
+# 				print 'how did you get here?'
+# 		
+# summerMask = (month >= 6) & (month <= 9)
 #plt.scatter(daysSinceRain[summerMask,:,:], C[summerMask,:,:])
 
 ################################################################################
