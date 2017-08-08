@@ -48,7 +48,7 @@ figureDir = "../Figures/GFED_era_interm_analysis/"
 
 startMonth = 6
 endMonth   = 9
-region     = "_CAL_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region     = "_CentralRockies_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 # Get region lat lon range	
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
@@ -92,6 +92,18 @@ m = Basemap(projection='merc',llcrnrlat=minLat, urcrnrlat=maxLat,\
 # grid coords for mesh plotting of values. 
 lons, lats = np.meshgrid(xnew, ynew)
 x, y = m(lons, lats)
+
+# Save a blank region map
+fig=plt.figure(figsize=(8,8))
+m.drawcoastlines()
+m.drawstates()
+m.drawcountries()
+m.fillcontinents(color='coral',lake_color='aqua')
+m.drawmapboundary(fill_color='aqua')
+fig.tight_layout()
+plt.savefig(figureDir + region +'.png')
+plt.close()
+
 
 ################################################################################
 # Plot total emissions to sanity check the grid, also to show total emissions
