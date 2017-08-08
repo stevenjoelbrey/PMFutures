@@ -13,11 +13,12 @@
 # plot_GFED4s_emission_summary.py. These will be consolidated at a later time
 # but I am separating here to make organization more clear. 
 
+# TODO: There is something up with precip. 
 
 ################################################################################
 #------------- Arguments to Subset model emissions in space and time -----------
 ################################################################################
-region = "_CentralRockies_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
 
 
 # Load resources
@@ -213,6 +214,7 @@ d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, min
 # Make temperature units America
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
+tp = tp * 39.3701 # 39.37 inches per meter 
 
 # These are the only lat lon values moving forward
 latitude = ynew
@@ -319,9 +321,9 @@ def plotParameterSpace(df, units, region, figureDir, string):
 				# Get the linear fit 
 				# https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.stats.linregress.html
 				# Just to the pierceson cor r for now
-				r, p = pearsonr(xData, yData)
+				r = np.corrcoef(xData, yData)[0][1]
 				r = round(r,3)
-				p = round(p,5)
+				#p = round(p,5)
 				
 				ax = fig.add_subplot(7,7, frameN, frame_on=False)	
 				ax.scatter(xData, yData, 
@@ -358,17 +360,7 @@ plotParameterSpace(month_df, units, region, figureDir, "monthly")
 plotParameterSpace(summer_df, units, region, figureDir, "summer")	
 
 
-# def laggedPearsonCoef(x, y, maxLag=12):
-# 	"""x and y are the same length."""
-# 	
-# 	lags = np.arange(-1*maxLag, maxLag+1)
-# 	corrs = np.zeros(len(lags))
-# 	
-# 	indicies = range(len(x))
-# 	
-# 	for i in range(len(lags)):
-# 	
-# 		# shift xData by the lag
+
 		
 		
 # TODO: make it possible for emissions to lag weather in this plot 
@@ -392,9 +384,9 @@ def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 		xData = df[c2] # ~predictor
 
 		# Just to the pierceson cor r for now
-		r, p = pearsonr(xData, yData)
+		r = np.corrcoef(xData, yData)[0][1]
 		r = round(r,3)
-		p = round(p,5)
+		#p = round(p,5)
 		
 		ax = fig.add_subplot(1,6, frameN, frame_on=False)			
 
@@ -485,6 +477,38 @@ fig.tight_layout()
 plt.savefig(figureName)
 plt.close()
 
+################################################################################
+# Make emissions to precip relationship grid box specific
+# For every day with emissions, I want to know how long it has been since it 
+# rained in that grid box
+################################################################################
+daysSinceRain = np.zeros(C.shape)
+daysSinceRain[:] =-9999
+nLat = len(latitude)
+nLon = len(longitude)
+nTime = len(time) 
+for x in range(nLon):
+	for y in range(nLat):
+		
+		tp_ = tp[:,y,x]
+		daysSinceRain_  = 0. # reset the counter for each new grid point 
+		
+		for t in range(nTime):
+		
+			if tp_[t] > 0.001:
+				# If in here it rained, reset daily counter
+				daysSinceRain_  = 0.
+				daysSinceRain[t,y,x] = 0.
+				
+			elif tp_[t] <= 0.001:
+				# If here it has not rained, advance the daily counter 
+				daysSinceRain_ = daysSinceRain_ + 1
+				daysSinceRain[t,y,x] = daysSinceRain_
+			else
+				print 'how did you get here?'
+		
+summerMask = (month >= 6) & (month <= 9)
+#plt.scatter(daysSinceRain[summerMask,:,:], C[summerMask,:,:])
 
 ################################################################################
 # Now see if the inter-annual variability in the occurrence of difference events
@@ -560,5 +584,112 @@ plt.close()
 
 
 #matplotlib.pyplot.xkcd(scale=1, length=100, randomness=2)
+###############################################################################
+# bring on the FPA-FOD data for the same analysis 
+###############################################################################
+dataFile = "/home/sbrey/projects/PMFutures/Dataframes/fireOccurrence_t.csv"
+df = pd.read_csv(dataFile)
+
+# subset by dates of interest
+dateMask = (df.year >= 2003) & (df.year <= 2016)
+df_subset = df[dateMask]
+
+# TODO: convert latitude longitude
+lon = df_subset.LONGITUDE
+lonAdjust = lon + 360.
+
+# TODO: subset by space of interest
+lonMask = (lonAdjust >= minLon) & (lonAdjust <= maxLon)
+latMask = (df_subset.LATITUDE >= minLat) & (df_subset.LATITUDE <= maxLat)
+spatialMask =  lonMask & latMask
+
+df_subset =  df_subset[spatialMask]
+
+df = df_subset
+
+###############################################################################
+# Make summer summary dataframes
+###############################################################################
+acres_lighting = np.zeros(nYears)
+acres_other    = np.zeros(nYears)
+
+lightningMask = df.STAT_CAUSE_DESCR == 'Lightning'
+
+# Count summer total BA in acres for each time
+for y in range(nYears):
+	summerMask = (df.year == uniqueYears[y]) & (df.month >= 6) & (df.month <= 9)
+	acres_lighting[y] = np.sum(df.FIRE_SIZE[summerMask & lightningMask])
+	acres_other[y] = np.sum(df.FIRE_SIZE[summerMask & (lightningMask==False)])
+	
+acres_total = acres_lighting + acres_other
+
+# Add these totals to the ongoing summer dataframe
+summer_df['FOD_acres_lightning'] = acres_lighting
+summer_df['FOD_acres_other'] = acres_other
+summer_df['FOD_acres_total'] = acres_total
+
+
+# plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_total[0:10], label="All acres")
+# plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_lightning[0:10], label="lightning caused")
+# plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_other[0:10], label="human caused")
+# 
+# plt.legend()
+# plt.show()
+
+
+
+metCols = [u't2m', u'tp', u'windSpeed', u'z', u'RH', u'd2m']
+
+for metName in metCols:
+
+	fig = plt.figure(figsize=(6,6))
+
+	xData = summer_df[metName][0:10]
+	y_lightning = summer_df.FOD_acres_lightning[0:10]
+	y_human =  summer_df.FOD_acres_other[0:10]
+	y_all = summer_df.FOD_acres_total[0:10]
+
+
+	lm_all = stats.linregress(xData, y_all)
+	yhat_all = lm_all.slope * xData + lm_all.intercept	
+	r_all = round(lm_all.rvalue, 3) 
+
+	lm_lightning = stats.linregress(xData, y_lightning)		
+	yhat_lightning = lm_lightning.slope * xData + lm_lightning.intercept   
+	r_lightning = round(lm_lightning.rvalue,3)
+
+	lm_human = stats.linregress(xData, y_human)
+	yhat_human = lm_human.slope * xData + lm_human.intercept   
+	r_human = round(lm_human.rvalue,3)
+
+	plt.scatter(xData, y_all, label="Total reported burn area, r$^{2}$="+ str(r_all))
+	plt.scatter(xData, y_lightning, label="lightning ignition, r$^{2}$="+ str(r_lightning))
+	plt.scatter(xData, y_human, label="human ignition, r$^{2}$="+ str(r_human))
+
+	plt.legend()
+
+	plt.ylabel('Acres burned', weight='bold')
+	plt.xlabel(metName, weight='bold')
+
+	plt.plot(xData, yhat_all, color="k")
+	plt.plot(xData, yhat_lightning, color="k")
+	plt.plot(xData, yhat_human, color="k")
+
+	fig.tight_layout()		
+
+	plt.savefig(figureDir + metName + '_FPA' + region + '.png')
+	plt.close()
+
+
+
+
+#summerBlank = np.zeros(shape=(nYears, len(colnames)))
+#FOD_summer_df = pd.DataFrame(data=summerBlank, columns=colnames)
+
+
+
+
+
+
 
 
