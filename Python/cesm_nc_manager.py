@@ -820,4 +820,18 @@ def getRegionBounds(region):
 		maxLon     = 259. 		
 		resolution = 'h'
 	
+	elif region == "_SouthEast_":
+		minLat = 24.5
+		maxLat = 35.0
+		minLon = 272.
+		maxLon = 282.
+		resolution = 'h'
+		
+	elif region == "_CONUS_":
+		maxLat = 50.
+		minLat = 24.5
+		minLon = 234.
+		maxLon = 288.	
+		resolution = 'h'
+		
 	return minLat, maxLat, minLon, maxLon, resolution 

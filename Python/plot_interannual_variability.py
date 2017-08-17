@@ -399,7 +399,7 @@ def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 					   color="k")
 				   
 			# show linear fit if r is decent 
-			if ( (np.abs(r) >= 0.5) & (string == 'summer') ):
+			if np.abs(r) >= 0.4:                       #& (string == 'summer') )
 				lm = stats.linregress(xData, yData)		
 				yhat = lm.slope * xData + lm.intercept   
 				plt.plot(xData, yhat, linewidth=3)
@@ -437,7 +437,10 @@ def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 	plt.savefig(figSaveName)
 	plt.close()
 
-plotEmissionVsMet(month_df, units, region, figureDir, "monthly", "scatter")
+# Use summer months only for the monthly scatter plot
+summerMask = (month_df.month >= 6) & (month_df.month <= 9)
+
+plotEmissionVsMet(month_df[summerMask], units, region, figureDir, "monthly", "scatter")
 plotEmissionVsMet(summer_df, units, region, figureDir, "summer", "scatter")
 
 # Make the lagged cross correlation version of the figure
@@ -494,8 +497,8 @@ est = sm.OLS(y, X).fit()
 
 
 fig = plt.figure()
-plt.plot(uniqueYears, summer_df.E, label='GFED4s')
-plt.scatter(uniqueYears, est.fittedvalues, label='OLS model ~ T + Precip + RH% + Z', 
+plt.scatter(uniqueYears, summer_df.E, label='GFED4s')
+plt.plot(uniqueYears, est.fittedvalues, label='OLS model ~ T + Precip + RH% + Z', 
 			color='k')
 plt.title('Adj R-squared = ' + str(round(est.rsquared_adj,3)), weight='bold', fontsize=24 )
 plt.ylabel('grams carbon', weight='bold', fontsize=20)
