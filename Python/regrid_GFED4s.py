@@ -1,15 +1,13 @@
 #!/usr/bin/env python2
 
-
 ###############################################################################
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
 # The purpose of this script is to regrid GFED data to ecmwf era-interim grid
 # (or any lat lon passed) and save as a single daily nc file. 
 
-# Example using scipy 
+# Example using scipy (NOT USED)
 # http://christopherbull.com.au/python/scipy-interpolate-griddata/
-
 
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
@@ -179,7 +177,6 @@ print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the re-grid loop'
 print '----------------------------------------------------------------------'
 
-
 ######################################################################################
 # Write the NETCDF data. Make sure to include all relevant units for a given species! 
 ######################################################################################
@@ -188,9 +185,10 @@ nLat = len(met_lat)
 nLon = len(met_lon)
 nTime = len(fire_time)
 
+# TODO: Make this save name (and whole section) dynamic based on the passed met grid 
+# TODO: to use
 outputFile = dataDir + 'GFED4s/' + 'GFED4.1s_METGrid_' + species + '_' +\
 		str(year) + '.nc'
-
 
 ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 ncFile.description = 'Daily GFED regridded to era-interim grid.'

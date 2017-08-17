@@ -6,7 +6,10 @@
 # This script will be used to generate daily met fields from hourly nc files. 
 # The 6-houly data to average live in /barnes-scratch/sbrey/era_interim_nc_6_hourly
 
-
+# Follows ---------------------------------------- 
+# 	- get_ERA_Interim_data.py
+# Precedes
+#	- merge_yearly_nc.py
 
 ###############################################################################
 # ---------------------- Set analysis variables--------------------------------

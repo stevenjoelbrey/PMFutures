@@ -4,8 +4,13 @@
 # ------------------------- Description --------------------------------------- 
 ###############################################################################
 # This script will be used to merge yearly daily era-interim nc files or GFED4s
-# fire emissions files.
+# fire emissions files. 
 
+# Follows ---------------------------------------- 
+# 	- average6HourlyData.py
+# Precedes ---------------------------------------- 
+#	- any function that reads in multi-year nc data of the global domain or any
+#     domain subset. 
 
 # import required modules
 import os
@@ -17,6 +22,7 @@ import cesm_nc_manager as cnm
 
 dirRoot = '/barnes-scratch/sbrey/'
 
+# TODO: Make subsetNA into a region argument using cesm_nc_manager functionality. 
 
 ###############################################################################
 # ------------------------- Handle Args --------------------------------------- 
@@ -36,7 +42,7 @@ else:
 	# Development environment. Set variables by manually here. 
 	ncVARType = 'GFED4s'       # 'era_interim' | 'GFED4s'
 	ncVAR     = 'C'            # 'tp' | 'C'
-	subsetNA  = '_NA_'            # "_NA_" | "_"
+	subsetNA  = '_NA_'         # "_NA_" | "_"
 	startYear = 2003
 	endYear   = 2016
 
