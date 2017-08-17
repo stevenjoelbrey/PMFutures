@@ -18,6 +18,25 @@ startMonth = 6
 endMonth   = 9
 region     = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_NorthRockies_" 
 
+<<<<<<< HEAD
+minLat = 50. # "_NA_" North America file default 
+maxLat = 30.
+minLon = 234.0
+maxLon = 258.75
+
+# Sets the spatial domain of interest. Make sure to do 0 if you are subsetting
+# the western region. 
+cutoffPercentile = 80.
+
+
+# TODO: spatial subset the analysis by the locations that have the highest 
+# TODO: cumulative emissions, since places with few emissions dont really
+# TODO: matter anyways
+
+# TODO: Make sure that we are actually only plotting the non-masked values. 
+# TODO: use ma.compressed() to be sure. 
+=======
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 
 # Load resources
 import os
@@ -60,10 +79,16 @@ nc.close()
 
 t, month, year = cnm.get_era_interim_time(time)
 
+<<<<<<< HEAD
+# Subset C (emissions) in space
+C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
+
+=======
 # Subset C (emissions) in space according to the chosen region 
 C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 # Create an array that saves out the month and julian day matrix
 # for creating scatter plots. 
 month_matrix = np.zeros(C.shape)
@@ -117,7 +142,9 @@ def ncGetSelf(Dir, varname):
 	nc.close()
 	return VAR
 
-
+###############################################################################
+# Get the met data and subset in space and time
+###############################################################################
 t2m = ncGetSelf(metDataDirBase, 't2m')[monthMask, :,:]
 tp = ncGetSelf(metDataDirBase, 'tp')[monthMask, :,:] 
 u10 = ncGetSelf(metDataDirBase, 'u10')[monthMask, :,:] 
@@ -136,6 +163,13 @@ z, ynew, xnew = cnm.mask2dims(z, longitude, latitude, 0, minLon, maxLon, minLat,
 RH, ynew, xnew = cnm.mask2dims(RH, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
+<<<<<<< HEAD
+# rename lon and lat to fit the new data
+latitude = ynew
+longitude = xnew
+
+=======
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 # Make units America
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
@@ -201,8 +235,14 @@ uMonth['Z500'] = "Z500 [m]"
 fig = plt.figure(figsize=(30,22))
 
 figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) +\
+<<<<<<< HEAD
+				'_' +str(startMonth)+'_'+ str(endMonth)+ '_'+\
+				minLat + '_' +maxLat
+				'_daily_parameter_space.png'
+=======
 				'_' +str(startMonth)+'_'+ str(endMonth)+\
 				'_daily_parameter_space'+region+'.png'
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 
 nVar = len(v.keys())
 frameN = 0
@@ -265,9 +305,16 @@ plt.savefig(figSaveName, dpi=50)
 ##################################################################
 fig = plt.figure(figsize=(30,22))
 
+<<<<<<< HEAD
+figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) +\
+				'_' +str(startMonth)+'_'+ str(endMonth) + '_'+\
+				minLat + '_' +maxLat
+				'_monthly_parameter_space.png'
+=======
 figSaveName = figureDir + 'ParameterSpace_cuttingBelow_' + str(int(cutoffPercentile)) + '_'\
 				+str(startMonth)+'_'+ str(endMonth)+\
 				'_monthly_parameter_space'+region+'.png'
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 
 nVar = len(v.keys())
 frameN = 0
@@ -341,7 +388,13 @@ for v_key in v.keys():
 
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
+<<<<<<< HEAD
+			   str(startMonth) + '_' +str(endMonth) + '_'+\
+				minLat + '_' +maxLat
+			   '_daily.png'
+=======
 			   str(startMonth) + '_' +str(endMonth)+'_daily'+region+'.png'
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 
 	ax = plt.subplot(111)
 	xData=v[v_key]
@@ -374,14 +427,19 @@ for v_key in v.keys():
 	#############################
 	fig = plt.figure(figsize=(13,10))
 	savename = figureDir + 'C_emitted_vs_'+ v_key + '_' +\
+<<<<<<< HEAD
+				str(startMonth) + '_' +str(endMonth) +'_'+\
+				minLat + '_' + maxLat + '_monthly.png'
+=======
 				str(startMonth) + '_' +str(endMonth)+'_monthly'+region+'.png'
+>>>>>>> 08e80feeedf6a75bd8ea0da1977b26e1cd95d10b
 
 	ax = plt.subplot(111)
 	xData=vMonth[v_key]
 	c = ax.scatter(ma.compressed(xData), ma.compressed(C_monthly), 
 					c = ma.compressed(month_matrix_monthly),
 		       		edgecolors='none'
-		       )
+		       		)
 		       
 	cbar = fig.colorbar(c)
 	cbar.set_label('Month', fontsize=30)
