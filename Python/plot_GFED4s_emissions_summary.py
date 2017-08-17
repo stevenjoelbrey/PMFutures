@@ -11,11 +11,6 @@
 
 # TODO: Different lags for testing and different averaging timescales. 
 
-# TODO: Make paths dynamic 
-
-# NOTE: In this scrip E will generally stand for "emissions", m for mask,
-# NOTE: and _ will represent a flattened multidimensional array. 
-
 # Load resources
 import os
 import numpy as np
@@ -35,9 +30,9 @@ import cesm_nc_manager as cnm
 # Select and load emissions species and AirQualityData Masks
 ################################################################################
 
-drive = "/barnes-scratch/sbrey/"
+drive       = "/barnes-scratch/sbrey/"
 dataDirBase = drive + "era_interim_nc_daily_merged/"
-figureDir = "../Figures/GFED_era_interm_analysis/"
+figureDir   = "../Figures/GFED_era_interm_analysis/"
 
 ################################################################################
 #------------------ Subset model emissions in time -----------------------------
@@ -46,9 +41,10 @@ figureDir = "../Figures/GFED_era_interm_analysis/"
 # For report use western U.S. only. That is what you get when you load a file
 # that has "_NA_" in the name. 
 
-startMonth = 6
-endMonth   = 9
-region     = "_CAL_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+startMonth = 1
+endMonth   = 12
+region     = "_CONUS_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+                                # "_SouthEast_" | "_CONUS_"
 
 # Get region lat lon range	
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
@@ -56,6 +52,7 @@ minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
 # Get emissions, use this to get dimensions
 # TODO: load global emissions, let region sorting take care of the rest. 
 ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+ncFile = drive  + "GFED4s/GFED4.1s_METGrid_C_2003_2016.nc"
 nc = Dataset(ncFile, 'r')
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
@@ -93,6 +90,18 @@ m = Basemap(projection='merc',llcrnrlat=minLat, urcrnrlat=maxLat,\
 lons, lats = np.meshgrid(xnew, ynew)
 x, y = m(lons, lats)
 
+# Save a blank region map
+fig=plt.figure(figsize=(8,8))
+m.drawcoastlines()
+m.drawstates()
+m.drawcountries()
+m.fillcontinents(color='coral',lake_color='aqua')
+m.drawmapboundary(fill_color='aqua')
+fig.tight_layout()
+plt.savefig(figureDir + region +'.png')
+plt.close()
+
+
 ################################################################################
 # Plot total emissions to sanity check the grid, also to show total emissions
 # and reveal where emissions matter. 
@@ -100,7 +109,7 @@ x, y = m(lons, lats)
 C_total = np.sum(C,axis=0)
 C_total_ma = np.ma.masked_where(C_total==0, C_total)
 
-fig=plt.figure(figsize=(8,8))
+fig=plt.figure(figsize=(8,8), frameon=False)
 m.drawcoastlines()
 m.drawstates()
 m.drawcountries()
