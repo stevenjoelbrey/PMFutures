@@ -92,8 +92,11 @@ def getYearlyData(dataDir, year, months, species):
 		nDaysInMonth = len(days.keys())
 		# because keys() does not put them in order
 		dayNumber    = np.arange(1,nDaysInMonth+1) 
-		month_daily  = np.zeros((nDaysInMonth, nLat, nLon))
+		month_daily_frac  = np.zeros((nDaysInMonth, nLat, nLon))
 
+		# loop through the days the monthly emissions are distributed over
+		# keep track of daily_fraction
+	    
 		for i in range(nDaysInMonth):
 	
 			# Advance the JDay Count (after adding dt to date0, since origin jan1)
@@ -104,12 +107,26 @@ def getYearlyData(dataDir, year, months, species):
 			# Get fraction of monthly emissions that occured on THIS day
 			dayString = 'day_' + str(dayNumber[i])
 			dayFraction = days[dayString][:]	
-
+			month_daily_frac[i,:,:] = dayFraction
+			
 			# apply fraction to monthly data
 			daily_data = month_emission * dayFraction * grid_cell_area_m2
 
 			# Append the daily data to 'yearData' array
 			yearData[jDay-1, :, :] = daily_data # -1 for python 0 based index
+			
+		# At the end of looping through each months days data, make sure the 
+		# daily fraction at each location adds up to 1 or 0.  
+		month_daily_frac_sum = np.sum(month_daily_frac, axis=0)
+		# At locations not equal to zero, how different are values from 1?
+		notZero = month_daily_frac_sum != 0.
+		notZeroValues = month_daily_frac_sum[notZero]
+	   	diff = np.abs(notZeroValues - 1.)
+	   	test = diff > 1e-4
+	   	if np.sum(test) > 0:
+	   		print 'These is a monthly fraction sum equal to: ' + str(np.max(diff))
+	   		raise ValueError('Monthly Fraction array non 0 or 1 at a location.')
+	   		
 
 	# Check for leap year, if 366 day of year is still all -1 get rid of it
 	if np.unique(yearData[365,:,:])[0] == -1:
@@ -336,5 +353,4 @@ latitude_[:]  = lat[:,0]
 longitude_[:] = lon[0,:]
 time_[:]      = timeBase[:]
 
-ncFile.close()	
-	
+ncFile.close()		
