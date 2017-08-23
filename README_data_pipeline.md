@@ -74,6 +74,35 @@ and:		http://apps.ecmwf.int/datasets/data/interim-full-daily/levtype=pl/
     	  as much z data as is possible in order to create a julain day 500 mb height 
     	  climatology for the US.
   
+### FINN (Fire INventory from NCAR)
+
+The gridded version of FINN used for this work was created by the GEOS-Chem Support Team. 
+I used the HEMCO/FINN/v2015-02 version of these data. 
+
+18 Feb 2015
+GEOS-Chem Support Team
+geos-chem-support@as.harvard.edu
  
-	  
+"The Fire INventory from NCAR version 1.0 (FINNv1) provides daily, 1-km
+resolution, global estimates of the trace gas and particle emissions from
+open burning of biomass, which includes wildfire, agricultural fires, and
+prescribed burning and does not include biofuel use and trash burning"
+(Wiedinmyer et al., 2011, citation below).	  
+
+##### GEOS-Chem wiki:
+
+  http://wiki.geos-chem.org/FINN_biomass_burning_emissions
+
+##### FINN reference paper:
+
+  Wiedinmyer, C., S. K. Akagi, R .J. Yokelson, L. K. Emmons, J. A. Al-Saadi,
+  J. J. Orlando, and A. J. Soja. "The Fire INventory from NCAR (FINN): a
+  high resolution global model to estimate the emissions from open burning:",
+  __Geosci. Model Dev.__, 4, 625641, 2011.
+	 
+	 
+TODO: 
+
+	- Place on the same grid as GFED4s for easy comparisons. 
+	- Re-grid to ecmwf grid for easy comparisons. Nearest neighbor. 	 
 	 
