@@ -13,6 +13,7 @@
 # 3) re-grid final desired product, global
 # 3) figure out if you can save carbon out. 
 
+# MAKE WORK FOR DIFFERENT YEARS AND WRITE INDIVIDUAL SPECIES, THEN MERGE YEARS
 
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
@@ -109,6 +110,8 @@ TemperateForest   = nc.variables['fire_vegtype4'][:]
 Boreal            = nc.variables['fire_vegtype5'][:]
 Crops             = nc.variables['fire_vegtype9'][:]
 
+nc.close()
+
 # Add the emissions, units of kg/m2/s together for total emissions of CO2
 CO2 = SavannaGrasslands + WoodySavannah +\
       TropicalForest + TemperateForest +\
@@ -134,20 +137,20 @@ Crops             = convertUnits(Crops, grid_area)
 CO2 = convertUnits(CO2, grid_area)
 
 # Plot the total emissions as a sanity check on the grid 
-all_emissions = np.sum(CO2, axis=0)
-m = Basemap(projection='robin',lon_0=0,resolution='c')
-lons, lats = np.meshgrid(lon, lat)
-x,y=m(lons,lats)
-m.drawcoastlines()
-#m.fillcontinents(color='coral',lake_color='aqua')
+# all_emissions = np.sum(CO2, axis=0)
+# m = Basemap(projection='robin',lon_0=0,resolution='c')
+# lons, lats = np.meshgrid(lon, lat)
+# x,y=m(lons,lats)
+# m.drawcoastlines()
+# m.fillcontinents(color='coral',lake_color='aqua')
 # draw parallels and meridians.
-#plt.pcolormesh(x,y, sp_slice)
-c = plt.pcolormesh(x, y, all_emissions )
-#m.drawmapboundary(fill_color='aqua')
-plt.title("2012 FINN emissions")
-plt.show(block=False)
-
-plt.close()
+# plt.pcolormesh(x,y, sp_slice)
+# c = plt.pcolormesh(x, y, all_emissions )
+# m.drawmapboundary(fill_color='aqua')
+# plt.title("2012 FINN emissions")
+# plt.show(block=False)
+# 
+# plt.close()
 
 ##########################################################################################
 # Save with names matching GFED as closely as possible, e.g., latitude not lat for dim 
@@ -182,7 +185,7 @@ longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
 longitude_.units = 'degrees east'
 
 # Write the actual data to these dimensions
-VAR_[:]       = CO2
+CO2_[:]       = CO2
 grid_area_[:] = grid_area
 latitude_[:]  = lat
 longitude_[:] = lon
