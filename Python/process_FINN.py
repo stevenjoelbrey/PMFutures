@@ -8,13 +8,12 @@
 # format as close to GFED as possible, for easy comparisons. 
 
 # TODO: 
-# 1) Handle the different time array
-# 2) Make sure it makes sense to add the different eco regions together. 
-# 3) re-grid final desired product, global
-# 3) figure out if you can save carbon out. 
+
+# - figure out if you can save mass of carbon only 
 
 # MAKE WORK FOR DIFFERENT YEARS AND WRITE INDIVIDUAL SPECIES, THEN MERGE YEARS
 
+import os
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt
@@ -26,15 +25,39 @@ from datetime import date
 from datetime import timedelta
 from datetime import datetime
 
-# Consider making this directory a command line argument
-dataDir  = '/barnes-scratch/sbrey/FINN/'
-f = dataDir + 'FINN_daily_2012_0.25x0.25.compressed.nc'
+##########################################################################################
+# Handle if this is being run from command line or development mode & paths 
+##########################################################################################
 
-# Explore FINN data before actually re-gridding. 
+print 'Number of arguments:', len(sys.argv), 'arguments.'
+print 'Argument List:', str(sys.argv)
+
+if len(sys.argv) != 1:
+	print 'Using arguments passed via command line.'
+	year      =  str(sys.argv[1]) 
+
+else: 
+	# Development environment. Set variables manually here. 
+	year     = str(2003)
+	
+# Figure out what machine this code is running on
+pwd = os.getcwd()
+mac = '/Users/sbrey/Google Drive/sharedProjects/PMFutures/Python'
+if pwd == mac:
+	drive = "/Volumes/Brey_external/"
+else:
+	drive = "/barnes-scratch/sbrey/"
+
+# Set path to data based on where this is running 	
+dataDir  = os.path.join(drive, 'FINN/')
+
+# Select the year FINN file to process
+f = dataDir + 'FINN_daily_' + str(year) + '_0.25x0.25.compressed.nc'
+
+# Make the file connection
 nc = Dataset(f, 'r')
 
-# I want all burning as an easy to grab variable. But re-gridding all individual sounds 
-# good too. 
+# Hand variable dimensions
 time = nc.variables['time']
 lon  = nc.variables['lon'][:]
 lat  = nc.variables['lat'][:]
@@ -125,8 +148,9 @@ def convertUnits(var, grid_area):
 	
 	var = var * 1000. * 86400.0 # g/kg * seconds/day
 	
-	return var 
-
+	return var
+	 
+print 'Working on converting units...'
 SavannaGrasslands = convertUnits(SavannaGrasslands, grid_area)
 WoodySavannah     = convertUnits(WoodySavannah, grid_area)
 TropicalForest    = convertUnits(TropicalForest, grid_area)
@@ -156,8 +180,10 @@ CO2 = convertUnits(CO2, grid_area)
 # Save with names matching GFED as closely as possible, e.g., latitude not lat for dim 
 # name 
 ##########################################################################################
+print 'Working on writing converted data to nc file...'
 
-outputFile = 'FINN_CO2_2012.nc'
+fout = 'FINN_CO2_' + year + '.nc'
+outputFile = os.path.join(dataDir,  fout)
 
 ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 ncFile.description = 'Gridded FINN data created for GEOS-Chem. No Wiki.'
