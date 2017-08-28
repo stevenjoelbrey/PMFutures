@@ -31,17 +31,20 @@ sanityCheck = False
 ##########################################################################################
 # Handle if this is being run from command line or development mode & paths 
 ##########################################################################################
-
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
 	year      =  str(sys.argv[1]) 
-
+	species   =  str(sys.argv[2])
+	writeAll  =  bool(sys.argv[3])
+	
 else: 
 	# Development environment. Set variables manually here. 
-	year     = str(2005)
+	year     = str(2003)
+	species  = 'CO2' # fire_vegtype1
+	writeAll = True  # writes all the vegtypes to nc 
 	
 # Figure out what machine this code is running on
 pwd = os.getcwd()
@@ -54,7 +57,7 @@ else:
 # Set path to data based on where this is running 	
 dataDir  = os.path.join(drive, 'FINN/')
 
-for year in np.arange(2004, 2015):
+for year in np.arange(2002, 2015):
 	print 'working on : ' + str(year)
 	year = str(year)
 
@@ -176,7 +179,7 @@ for year in np.arange(2004, 2015):
 		x,y=m(lons,lats)
 		m.drawcoastlines()
 		m.fillcontinents(color='coral',lake_color='aqua')
-		draw parallels and meridians.
+		# draw parallels and meridians.
 		plt.pcolormesh(x,y, sp_slice)
 		c = plt.pcolormesh(x, y, all_emissions )
 		m.drawmapboundary(fill_color='aqua')
@@ -188,8 +191,12 @@ for year in np.arange(2004, 2015):
 	# name 
 	##########################################################################################
 	print 'Working on writing converted data to nc file...'
-
-	fout = 'FINN_CO2_' + year + '.nc'
+		
+	if writeAll:
+		fout = 'FINN_CO2_allVegTypes_' + year + '.nc'
+	else: 
+		fout = 'FINN_CO2_' + year + '.nc'
+		
 	outputFile = os.path.join(dataDir,  fout)
 
 	ncFile = Dataset(outputFile, 'w', format='NETCDF4')
@@ -199,12 +206,14 @@ for year in np.arange(2004, 2015):
 	ncFile.createDimension('latitude', nLat )
 	ncFile.createDimension('longitude', nLon )
 
-	CO2_ = ncFile.createVariable('CO2','f4',('time','latitude','longitude'))
+	VARDIMS = ('time','latitude','longitude')
+	
+	CO2_ = ncFile.createVariable('CO2','f4', VARDIMS)
 	CO2_.units = 'g C02 / grid cell / day'	            
-
+		
 	grid_area_ = ncFile.createVariable("grid_area", 'f4', ('latitude', 'longitude')) 	            
 	grid_area_.units = 'm**2'
-				
+			
 	# Create time variables	
 	time_ = ncFile.createVariable('time', 'f4', ('time',))
 	time_.units = 'hours since 1900-01-01 00:00:00'
@@ -223,13 +232,38 @@ for year in np.arange(2004, 2015):
 	latitude_[:]  = lat
 	longitude_[:] = lon
 	time_[:]      = time
+		
+	if writeAll:
+	
+		##############################################################################    
+		# When this is true all the species of FINN are written to the nc file
+		##############################################################################    
+		 
+		SavannaGrasslands_ = ncFile.createVariable('SavannaGrasslands','f4', VARDIMS)
+		SavannaGrasslands_.units = 'g C02 / grid cell / day'
+	
+		WoodySavannah_ = ncFile.createVariable('WoodySavannah','f4', VARDIMS)
+		WoodySavannah_.units = 'g C02 / grid cell / day'
+	
+		TropicalForest_ = ncFile.createVariable('TropicalForest','f4', VARDIMS)
+		TropicalForest_.units = 'g C02 / grid cell / day'
+
+		TemperateForest_ = ncFile.createVariable('TemperateForest','f4', VARDIMS)
+		TemperateForest_.units = 'g C02 / grid cell / day'
+
+		Boreal_ = ncFile.createVariable('Boreal','f4', VARDIMS)
+		Boreal_.units = 'g C02 / grid cell / day'
+
+		Crops_ = ncFile.createVariable('Crops','f4', VARDIMS)
+		Crops_.units = 'g C02 / grid cell / day'
+		
+		# individual vegetation layers save layers 
+		SavannaGrasslands_[:] = SavannaGrasslands
+		WoodySavannah_[:]     = WoodySavannah
+		TropicalForest_[:]    = TropicalForest
+		TemperateForest_[:]   = TemperateForest
+		Boreal_[:]            = Boreal
+		Crops_[:]             = Crops
 
 	ncFile.close()		
-
-##########################################################################################
-# Save the same thing only where each species is a variable! 
-##########################################################################################
-
-
-
 
