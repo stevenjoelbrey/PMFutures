@@ -151,7 +151,7 @@ deltaMass = np.zeros(nTStep, dtype='float')
 # TODO: Only loop over non zero locations? Over subregion?
 timeStart = timer.time()
 
-for t in range(nStep): # nTStep
+for t in range(nTStep): # nTStep
 	#print str(t) + ' time step'
 	#print str(float(t)/nTStep*100.) + " % complete"
 	# Loop over fire lon values
