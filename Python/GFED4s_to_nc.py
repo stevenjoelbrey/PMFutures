@@ -28,8 +28,8 @@
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 
 dataDir   = '/barnes-scratch/sbrey/GFED4s/'
-startYear = 2003 
-endYear   = 2016 # If different than startYear, they will be appended. 
+startYear = 2004 
+endYear   = 2004 # If different than startYear, they will be appended. 
 species   = 'C' # 'C' , 'DM', 'small_fire_fraction' 
                                   # (These have daily fraction est.)
 
@@ -276,9 +276,6 @@ def getMonthlyBurnArea(dataDir, year, months):
 		# Get the months emission array
 		month_area_fraction = f[speciesDir][:]
 			
-# 		Get monthly burn area by multiplying fraction burned by grid cell area	
-# 		month_area = month_area_fraction * grid_cell_area_m2
-		
 		# Assign 
 		yearData[monthCount,:,:] = month_area_fraction
 

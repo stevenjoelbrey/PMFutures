@@ -26,12 +26,12 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	hourlyVAR =  'z'
-	startYear = 'all'
-	endYear   = 'all'
+	hourlyVAR =  'tp'
+	startYear = 2003
+	endYear   = 2003
 
 
-dataDir = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
+dataDir   = "/barnes-scratch/sbrey/era_interim_nc_6_hourly"
 outputDir = "/barnes-scratch/sbrey/era_interim_nc_daily"
 	
 
@@ -152,26 +152,23 @@ for year in years:
 
 		elif (len(dims) == 3) & (hourlyVAR == 'tp'):
 
-			# Precip units of m per 12 hour window	
+			# Precip units of m per 12 hour window. Requires a sum not an average.
 			VAR_array_subset = VAR_array[indexMask, :, :]
 			day_time_total = np.sum(VAR_array_subset, axis=0)
 			dailyVAR[i, :, : ] = day_time_total		
 			print 'treating precip differently'	
 		
 		else:
-
+			# Non-precip variables of this size need an average. 
 			VAR_array_subset = VAR_array[indexMask, :, :]
 			day_time_mean = np.mean(VAR_array_subset, 0)
 			dailyVAR[i, :, : ] = day_time_mean	
 
-	
 	meansCompleteTime = timer.time()
 	dt = (meansCompleteTime - timeStart) / 60. 
 	print '----------------------------------------------------------------------'
 	print 'It took ' + str(dt) + ' minutes to create daily averages.'
 	print '----------------------------------------------------------------------'
-
-
 
 	###############################################################################
 	# Write the new netcdf data with the exact same formatting as the
