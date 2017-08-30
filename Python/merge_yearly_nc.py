@@ -7,7 +7,7 @@
 # fire emissions files. 
 
 # Follows ---------------------------------------- 
-# 	- average6HourlyData.py
+# 	- average6HourlyData.py | process_FINNY.py
 # Precedes ---------------------------------------- 
 #	- any function that reads in multi-year nc data of the global domain or any
 #     domain subset. 
@@ -22,29 +22,30 @@ import cesm_nc_manager as cnm
 
 dirRoot = '/barnes-scratch/sbrey/'
 
-# TODO: Make subsetNA into a region argument using cesm_nc_manager functionality. 
-
 ###############################################################################
 # ------------------------- Handle Args --------------------------------------- 
 ###############################################################################
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
 
+# TODO: Add met grid as a variable forth paths, for now all ecmwf
+
 if len(sys.argv) != 1:
 	print 'Using arguments passed via command line.'
 	ncVARType =  str(sys.argv[1])
 	ncVAR     =  str(sys.argv[2]) # e.g. 'z'
-	subsetNA  =  str(sys.argv[3])
+	region    =  str(sys.argv[3])
 	startYear =  int(sys.argv[4])
 	endYear   =  int(sys.argv[5])
 
+
 else: 
 	# Development environment. Set variables by manually here. 
-	ncVARType = 'GFED4s'       # 'era_interim' | 'GFED4s'
-	ncVAR     = 'C'            # 'tp' | 'C'
-	subsetNA  = '_NA_'         # "_NA_" | "_"
+	ncVARType = 'FINN'       # 'era_interim' | 'GFED4s' | 'FINN'
+	ncVAR     = 'CO2'            # 'tp' | 'C' | 'CO2'
+	region    = '_'            #  "_" = global | any region in cnm.getRegionBounds()
 	startYear = 2003
-	endYear   = 2016
+	endYear   = 2013
 
 
 # Set directory paths based on the type of data to be merged
@@ -55,6 +56,10 @@ if ncVARType == 'era_interim':
 elif ncVARType == 'GFED4s':
 	dataDir = dirRoot + 'GFED4s/'
 	outDir  = dirRoot + 'GFED4s/'
+	
+elif ncVARType == 'FINN':
+	dataDir = dirRoot + 'FINN/'	
+	outDir  = dirRoot + 'FINN/'	
 
 ###############################################################################
 # ------------------------Begin main script -----------------------------------
@@ -66,8 +71,10 @@ for year in years:
 
 	if ncVARType == 'era_interim':
 		loadFile = dataDir + ncVAR + '_' + str(year) + '.nc'
-	else: 
-		loadFile = dataDir + 'GFED4.1s_METGrid_' + ncVAR + '_' + str(year) + '.nc'
+	elif ncVARType == 'GFED4s': 
+		loadFile = dataDir + 'GFED4.1s_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
+	elif ncVARType == 'FINN':
+		loadFile = dataDir + 'FINN_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 
 	# Use the first years data to get dimension information 
 	# and array to be appended too.
@@ -117,16 +124,17 @@ print 'Final merged time array: ' + str(len(tBase))
 #######################################################################	
 # Handle making the spatial subset
 #######################################################################	
-if subsetNA  == '_NA_':
-	minLat     = 30.    
-	maxLat     = 50.    
-	minLon     = 234.   
-	maxLon     = 259.   
+if region  != '_':
+	
+	# Get the chosen region bounds
+	minLat, maxLat, minLon, maxLon, resolution = cnm.getRegionBounds(region)
+	
+	# Subset the data based on the bounds of this region. 
 	varBase, latitude, longitude = cnm.mask2dims(varBase, longitude[:], latitude[:], 0,\
-							xmin=minLon, xmax=maxLon, 
-							ymin=minLat, ymax=maxLat)
+							                     xmin=minLon, xmax=maxLon,\
+							                     ymin=minLat, ymax=maxLat)
 
-	print 'Final merged var NA size: ' + str(varBase.shape)
+	print 'Data subset to region ' + region 
 
 
 
@@ -134,12 +142,16 @@ if subsetNA  == '_NA_':
 # Write the merged file
 #######################################################################	
 if ncVARType == 'era_interim':
-	outputFile = outDir + ncVAR + subsetNA + \
+	outputFile = outDir + ncVAR + region + \
 		     str(startYear) + '_' + str(endYear) + '.nc'
 
 elif ncVARType == 'GFED4s':
-	outputFile = dataDir + 'GFED4.1s_METGrid_' + ncVAR + subsetNA + \
+	outputFile = dataDir + 'GFED4.1s_ecmwf_' + ncVAR + region + \
 			str(startYear)+ '_' + str(endYear) + '.nc'	
+			
+elif ncVARType == 'FINN':
+	outputFile = dataDir + 'FINN_ecmwf_' + ncVAR + region + \
+			str(startYear)+ '_' + str(endYear) + '.nc'		 			
 
 print '----------------------------------------------------------------------'
 print 'Writing the output file. outputFile used:'
@@ -155,8 +167,9 @@ nLon = len(longitude)
 ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 if ncVARType == 'era_interim':
 	ncFile.description = 'Daily data created by average6HourlyData.py and merged with merge_year_nc.py'
-elif ncVARType == 'GFED4s':
-	ncFile.description = 'Merged daily GFED4s emissions from yearly files after regridding'	
+else:
+	ncFile.description = 'Merged daily' + ncVARType + 'emissions from yearly files after regridding'	
+
 
 ncFile.location = 'Global'
 ncFile.createDimension('time',  nDays )

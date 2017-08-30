@@ -6,6 +6,8 @@
 # The purpose of this script is to regrid FINN or GFFED emissions data to ecmwf 
 # era-interim grid (or any lat lon passed) and save as a single daily nc file. 
 
+# TODO: Calculate and save the grid sizes m**2 to written nc files
+
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
 import matplotlib.pyplot as plt

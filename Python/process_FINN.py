@@ -7,11 +7,10 @@
 # community suitable for this projects research goals. I want to make FINN
 # format as close to GFED as possible, for easy comparisons. 
 
-# TODO: 
-
-# - figure out if you can save mass of carbon only 
-
-# MAKE WORK FOR DIFFERENT YEARS AND WRITE INDIVIDUAL SPECIES, THEN MERGE YEARS
+# Follows ---------------------------------------- 
+# 	- average6HourlyData.py
+# Precedes ---------------------------------------- 
+#	- regrid_fire_emissions.py
 
 import os
 import sys # for reading command line arguments
@@ -44,7 +43,7 @@ else:
 	# Development environment. Set variables manually here. 
 	year     = str(2003)
 	species  = 'CO2' # fire_vegtype1
-	writeAll = True  # writes all the vegtypes to nc 
+	writeAll = False  # writes all the vegtypes to nc 
 	
 # Figure out what machine this code is running on
 pwd = os.getcwd()
@@ -109,7 +108,9 @@ for year in np.arange(2002, 2015):
 	# Calculate grid cell area in meters squared use website below for math reference
 	# https://badc.nerc.ac.uk/help/coordinates/cell-surf-area.html
 	##########################################################################################
-
+	# TODO: THIS NEEDS TO BE CHECKED FOR SURE. If these boxes are too small then our 
+	# TODO: emissions will be too small  
+	# TODO: This is where you come back. This is suspect #1. 
 	nLon = len(lon)
 	nLat = len(lat)
 	grid_area = np.zeros( (nLat, nLon) )
@@ -157,9 +158,9 @@ for year in np.arange(2002, 2015):
 		for i in range(var.shape[0]):
 			var[i,:,:] = var[i,:,:] * grid_area
 	
-		var = var * 1000. * 86400.0 # g/kg * seconds/day [conversions]
+		varNew = var * 1000. * 86400.0 # g/kg * seconds/day [conversions]
 	
-		return var
+		return varNew
 	 
 	print 'Working on converting units...'
 	SavannaGrasslands = convertUnits(SavannaGrasslands, grid_area)
@@ -183,7 +184,7 @@ for year in np.arange(2002, 2015):
 		plt.pcolormesh(x,y, sp_slice)
 		c = plt.pcolormesh(x, y, all_emissions )
 		m.drawmapboundary(fill_color='aqua')
-		plt.title("2012 FINN emissions")
+		plt.title("FINN emissions")
 		plt.show(block=False)
 
 	##########################################################################################
