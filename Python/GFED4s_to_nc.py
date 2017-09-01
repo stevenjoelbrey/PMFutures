@@ -28,8 +28,8 @@
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 
 dataDir   = '/barnes-scratch/sbrey/GFED4s/'
-startYear = 2004 
-endYear   = 2004 # If different than startYear, they will be appended. 
+startYear = 2016 
+endYear   = 2016 # If different than startYear, they will be appended. 
 species   = 'C' # 'C' , 'DM', 'small_fire_fraction' 
                                   # (These have daily fraction est.)
 
