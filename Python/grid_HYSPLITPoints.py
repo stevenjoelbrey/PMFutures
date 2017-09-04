@@ -25,14 +25,14 @@ nc     = Dataset(ncFile, 'r')
 
 glat = nc.variables['latitude'][:]
 glon = nc.variables['longitude'][:]
-time = nc.variables['time']
-
 grid_area = nc.variables['grid_area'][:]
+# time = nc.variables['time']
+# 
+# # Make time useful (nc file connection required)
+# t, month, year = cnm.get_era_interim_time(time)
 
 nc.close()
 
-# Make time useful 
-t, month, year = cnm.get_era_interim_time(time)
 
 ######################################################################################
 # Load HMS data
@@ -44,28 +44,45 @@ nRow = df.shape[0]
 hlat = df.Lat
 hlon = df.Lon	
 
-# make a nice date object for masking, also handle dur
+######################################################################################
+# Process time field (make hours from origin) and DUR (make hour)
+######################################################################################
+# NOTE: make a nice date object for masking, also handle dur. 
+# NOTE: DUR is format HHMM, we need to make this into a numeric hour quantity. 
+# NOTE: Some of these values are '****', these will be ignored. 
 HMSTime = [None] * nRow
+HMSHour = np.zeros(nRow) 
+
+# Will use same origin as GFED data, unit in hours, calling universal for project
+t0_universal = datetime.datetime(year=1900, month=1, day=1, hour=0, minute=0, second=0)
+
+# Make a place to store formatted DUR values
 DUR = np.zeros(nRow)
 
+# Loop over each row processing the time and 
 for i in range(nRow):
 	
 	YYYYMMDD = str(df.YearMmDd[i])
-	year_  = int(YYYYMMDD[0:4])
+	year_  = int(YYYYMMDD[0:4]) 
 	month_ = int(YYYYMMDD[4:6])
 	day_   = int(YYYYMMDD[6:8])		
 	
 	t_ = datetime.datetime(year=year_, month=month_, day=day_,\
 						   hour=0, minute=0, second=0)
-						   
-	HMSTime[i] = t_
-	
+	HMSTime[i] = t_					  
+						  
+	# Create and store desired origin version of time array. Find out how many hows
+	# this date is from origin date.           
+	dt = t_ - t0_universal 
+	dt_hours = dt.total_seconds() / 60**2	  
+	HMSHour[i] = dt_hours		   
+
 	thisDur = df.Dur[i]
 	# If it is not nan, get the value, otherwise leave as zero
-	# TODO: 
+	# len needs to be 4 for following code to work
 	if (type(thisDur) != float) & (thisDur != "****"):
-		if len(thisDur) == 4: # len needs to be 4 for following code to work
-		
+		if (len(thisDur) == 4):
+			# Make HHMM into a numeric hourly quantity
 			HH = thisDur[0:2]
 			MM = thisDur[2:4]
 			hourFrac = float(MM)/60.
@@ -88,24 +105,24 @@ uniqueDates = np.unique(HMSTime)
 # Loop through each day. Loop through each point. Assign duration hours a home
 # based on what ecmwf grid cell center they are closest too. 
 ######################################################################################
-nDates = len(uniqueDates)
-nLat = len(glat)
-nLon = len(glon)
-
-data = np.zeros((nDates, nLat, nLon))
-
-
-for i in range(nTime):
-
-	dateMask = HMSTime == uniqueDates[i]
-	
-	_subset = df[dateMask]
-
-
-
+# nDates = len(uniqueDates)
+# nLat = len(glat)
+# nLon = len(glon)
+# 
+# data = np.zeros((nDates, nLat, nLon))
+# 
+# 
+# for i in range(nTime):
+# 
+# 	dateMask = HMSTime == uniqueDates[i]
+# 	
+# 	_subset = df[dateMask]
+# 
 
 
 
+
+# COPY NC WRITING FORMAT USED FOR GFED PROCESSING
 
 
 
