@@ -19,6 +19,11 @@ import pandas as pd
 import cesm_nc_manager as cnm
 import datetime
 
+# Regridding degrees tolerance
+TOLERANCE = 0.25/2.
+
+print 'Loading all data, setting the fields...'
+
 # Load GFED4s grid to assign data to.
 ncFile = '/barnes-scratch/sbrey/GFED4s/GFED4.1s_C_2003_2016.nc'
 nc     = Dataset(ncFile, 'r')
@@ -95,37 +100,111 @@ df['DUR'] = DUR
 # These are the unique date we are going to loop over and save out for HMS data 	
 uniqueDates = np.unique(HMSTime)
 
-# Handle strange duration quantities and put them back into df as correct numeric
-# value 
+# Skip the first date that occurs in 2003. Preserve all other dates
+uniqueDates_new = uniqueDates[1::]
+uniqueDates = uniqueDates_new
 
+# This is our new dimension for dates that will be used as the nc dimension
+nDates = len(uniqueDates)
 
-
+# We need to save out the unique hour starts for the unique dates to define the
+# time dimension for the nc data 
+uniqueHours = np.zeros(nDates)
+for i in range(nDates):
+	dt = uniqueDates[i] - t0_universal 
+	dt_hours = dt.total_seconds() / 60**2	  
+	uniqueHours[i] = dt_hours	
 
 ######################################################################################
 # Loop through each day. Loop through each point. Assign duration hours a home
 # based on what ecmwf grid cell center they are closest too. 
 ######################################################################################
-# nDates = len(uniqueDates)
-# nLat = len(glat)
-# nLon = len(glon)
-# 
-# data = np.zeros((nDates, nLat, nLon))
-# 
-# 
-# for i in range(nTime):
-# 
-# 	dateMask = HMSTime == uniqueDates[i]
-# 	
-# 	_subset = df[dateMask]
-# 
+nLat = len(glat)
+nLon = len(glon)
+
+# Place to store the new gridded HMS data 
+data = np.zeros((nDates, nLat, nLon))
+
+# Loop through the HYSPLIT points one at a time 
+for i in range(nRow): 
+
+	dur = df.DUR[i]
+
+	# Subset the data for this date
+	dateMask = uniqueDates == HMSTime[i]
+	
+	# Figure out if this is a non-zero dur value to assign, otherwise, leave data
+	# array as zero, unchanged, since adding zero does nothing 
+	if dur != 0:
+		
+		fire_lon = df.Lon[i]
+		fire_lat = df.Lat[i]
+		
+		dx = np.abs(fire_lon - glon)
+		dy = np.abs(fire_lat - glat)
+	
+		# Index of best match
+		xi = np.argmin(dx)
+		yi = np.argmin(dy)
+		
+		# Make sure the gridded index actually matches the HMS point location 
+		dx_test = glon[xi] - fire_lon
+		dy_test = glat[yi] - fire_lat
+
+		# Assign the HYSPLIT point duration to the correct location and date
+		if (dx_test <= TOLERANCE) & (dy_test <= TOLERANCE):
+			data[dateMask, yi, xi] = data[dateMask, yi, xi] + dur
+		else:
+			print 'dx mismatch = ' + str(dx_test)
+			print 'dy mismatch = ' + str(dy_test)
+			raise ValueError('HYSPLIT Point location assignment not within tolerance.')
+
+	percentComplete = np.round(float(i)/nRow*100., 5)
+	print str(percentComplete) + '% complete gridding'
 
 
 
+##########################################################################################
+# Save with names matching GFED as closely as possible, e.g., latitude not lat for dim 
+# name 
+##########################################################################################
+print 'Working on writing converted data to large nc file...'
+	
+fout = '/barnes-scratch/sbrey/HMS/HYSPLITPoints_SPDH.nc'
+	
+ncFile = Dataset(fout, 'w', format='NETCDF4')
+ncFile.description = 'Gridded HYSPLIT point duration data. See Brey et al. 2017 for details'
+ncFile.location = 'Global'
+ncFile.createDimension('time',  nDates )
+ncFile.createDimension('latitude', nLat )
+ncFile.createDimension('longitude', nLon )
 
-# COPY NC WRITING FORMAT USED FOR GFED PROCESSING
+VARDIMS = ('time','latitude','longitude')
+
+SPDH_ = ncFile.createVariable('SPDH','f4', VARDIMS)
+SPDH_.units = 'smoke production duration hours'	            
+	
+grid_area_ = ncFile.createVariable("grid_area", 'f4', ('latitude', 'longitude')) 	            
+grid_area_.units = 'm**2'
+		
+# Create time variables	
+time_ = ncFile.createVariable('time', 'f4', ('time',))
+time_.units = 'hours since 1900-01-01 00:00:00'
+
+# create lat variable
+latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
+latitude_.units = 'degrees north'
+
+# create longitude variable
+longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
+longitude_.units = 'degrees east'
+
+# Write the actual data to these dimensions
+SPDH_[:]      = data
+grid_area_[:] = grid_area
+latitude_[:]  = glat
+longitude_[:] = glon
+time_[:]      = uniqueHours
 
 
-
-
-
-
+ncFile.close()
