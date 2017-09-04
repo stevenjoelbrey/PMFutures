@@ -763,24 +763,30 @@ def get_era_interim_time(time):
 			t: numpy array of datetime 
 			month: numpy array of month (int) aligned with t
 	"""
-	# Make hourly time array into a nice datetime object 
-	t0 = datetime.datetime(year=1900, month=1, day=1,\
-		               hour=0, minute=0, second=0)
+	
+	if time.units == 'hours since 1900-01-01 00:00:00':
+		# Make hourly time array into a nice datetime object 
+		t0 = datetime.datetime(year=1900, month=1, day=1,\
+						   hour=0, minute=0, second=0)
 
-	# Make a nice month and time array for masking 
-	nTime = len(time)
-	t = []
-	month = []
-	year = []
-	for i in range(nTime):
-		dt = timedelta(hours=int(time[i]))
-		t_new  = t0 + dt 
-		t.append(t_new)
-		month.append(t_new.month)
-		year.append(t_new.year)
-	t = np.array(t)
-	month = np.array(month)
-	year = np.array(year)
+		# Make a nice month and time array for masking 
+		nTime = len(time)
+		t = []
+		month = []
+		year = []
+		for i in range(nTime):
+			dt = timedelta(hours=int(time[i]))
+			t_new  = t0 + dt 
+			t.append(t_new)
+			month.append(t_new.month)
+			year.append(t_new.year)
+		t = np.array(t)
+		month = np.array(month)
+		year = np.array(year)
+	
+	else:
+		raise ValueError('The nc time object does not have origin == 1900-01-01 00:00:00')
+		
 
 	return t, month, year
 
