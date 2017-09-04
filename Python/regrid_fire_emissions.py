@@ -15,6 +15,7 @@ from mpl_toolkits.basemap import Basemap, cm, shiftgrid
 import numpy as np
 import scipy.interpolate
 import time as timer
+import cesm_nc_manager as cnm
 
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
@@ -28,10 +29,10 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables manually here. 
-	year      = str(2003)
-	inventory = 'FINN'  # FINN | GFED4s
+	year      = str(2006)
+	inventory = 'HMS'  # FINN | GFED4s | HMS
 	METGrid   = 'ecmwf' #
-	species   = 'CO2'   # Either CO2 or a specific vegetation type or C for GFED
+	species   = 'SPDH'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
 
 
 # Consider making this directory a command line argument
@@ -69,7 +70,8 @@ if inventory == 'GDED4s':
 
 elif inventory == 'FINN':	
 	fire_file = dataDir + 'FINN/FINN_' + species + '_'+ year + '.nc'
-	
+elif inventory == 'HMS':
+	fire_file = dataDir + 'HMS/HYSPLITPoints_' + species  + '.nc'
 else:
 	print 'Unknown emissions type'
 
@@ -137,11 +139,22 @@ if sanityCheck:
 	m.drawmeridians(np.arange(0.,360.,60.))
 	c = m.pcolor(x, y, emissions_ma)
 	#m.drawmapboundary(fill_color='aqua')
-	plt.title("GFED GRID")
+	plt.title("REGRID GRID")
 	plt.show()
 
-# Get the total number of time steps
-nTStep = len(fire_time)
+fire_time_units = fire_time.units # preserve for writing nc data
+# TODO: Subset by year range when HMS, since it is not in the file name 
+if inventory == 'HMS':
+	t, month, years = cnm.get_era_interim_time(fire_time)	
+	yearMask = years == int(year)
+	
+	# apply the mask
+	fire_time = fire_time[yearMask]
+	emissions = emissions[yearMask,:,:]
+
+# How make an array that represets all dates in this year to index the yearly data
+# This is needed because HMS is missing dates
+nTStep = len(met_time)
 
 # NOTE: float32 specified otherwise addition leads to small errors and mass
 # NOTE: is not conserved in the regridding process.
@@ -155,29 +168,39 @@ timeStart = timer.time()
 
 for t in range(nTStep): # nTStep
 	#print str(t) + ' time step'
-	#print str(float(t)/nTStep*100.) + " % complete"
-	# Loop over fire lon values
-	for x in range(len(fire_lon)):
-		# to make it a point, loop over each lat for each lon
-		for y in range(len(fire_lat)):
 	
-			# y and x represent the emissions data location we are
-			# trying to assign!
+	# Where does this date for this year fall in fire_time? 
+	tMask = met_time[t] == fire_time[:]
 	
-			# Difference in regular grid arrays, units of deg
-			dx = np.abs(fire_lon[x] - met_lon)
-			dy = np.abs(fire_lat[y] - met_lat)
+	# See if the date exists, if it does not that means there is no fire emission
+	# data for this date and we can move forward with the time loop. 
+	if np.sum(tMask) > 0: 
 	
-			# Index of best match
-			xi = np.argmin(dx)
-			yi = np.argmin(dy)
+		print str(float(t)/nTStep*100.) + " % complete"
+		# Loop over fire lon values
+		for x in range(len(fire_lon)):
+			# to make it a point, loop over each lat for each lon
+			for y in range(len(fire_lat)):
+	
+				# y and x represent the emissions data location we are
+				# trying to assign!
+	
+				# Difference in regular grid arrays, units of deg
+				dx = np.abs(fire_lon[x] - met_lon)
+				dy = np.abs(fire_lat[y] - met_lat)
+	
+				# Index of best match
+				xi = np.argmin(dx)
+				yi = np.argmin(dy)
 
-			# assign the data
-			fire_new_grid[t, yi, xi] = (fire_new_grid[t, yi, xi] + emissions[t, y, x])
+				# assign the data, new grid is t referenced, emissions tMask
+				fire_new_grid[t, yi, xi] = (fire_new_grid[t, yi, xi] + emissions[tMask, y, x])
 
-	# How much mass is lost or gained?
-	deltaMass[t] = np.sum(fire_new_grid[t, :, :]) - np.sum(emissions[t, :, :])
-
+		# How much mass is lost or gained?
+		deltaMass[t] = np.sum(fire_new_grid[t, :, :]) - np.sum(emissions[tMask, :, :])
+	else:
+		print str(met_time[t]) + '  - missing in fire_emissions'
+		
 dt = (timer.time() - timeStart) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run the re-grid loop'
@@ -189,7 +212,7 @@ print '----------------------------------------------------------------------'
 print 'Working on writing the output as netCDF data'
 nLat = len(met_lat)
 nLon = len(met_lon)
-nTime = len(fire_time)
+nTime = nTStep # should match number of days in calendar year of chosen year
 
 # TODO: Make this save name (and whole section) dynamic based on the passed met grid 
 # TODO: to use
@@ -202,20 +225,29 @@ if inventory == 'GDED4s':
 elif inventory == 'FINN':	
 	outputFile = dataDir + 'FINN/' + 'FINN_' + METGrid + '_' + species + '_' +\
 		         str(year) + '.nc'
+		         
+elif inventory == 'HMS':
+	outputFile = dataDir + 'HMS/' + 'HYSPLITPoints_' + METGrid + '_' + species +'_' +\
+	             str(year) + '.nc'
 	
-	ncFile = Dataset(outputFile, 'w', format='NETCDF4')
-	ncFile.description = 'Daily ' + inventory + ' regridded to era-interim grid.'
-	ncFile.location = 'Global'
-	ncFile.createDimension('time',  nTime )
-	ncFile.createDimension('latitude', nLat )
-	ncFile.createDimension('longitude', nLon )
+		         	
+ncFile = Dataset(outputFile, 'w', format='NETCDF4')
+ncFile.description = 'Daily ' + inventory + ' regridded to era-interim grid.'
+ncFile.location = 'Global'
+ncFile.createDimension('time',  nTime )
+ncFile.createDimension('latitude', nLat )
+ncFile.createDimension('longitude', nLon )
 
-	VAR_ = ncFile.createVariable(species, 'f4',('time','latitude','longitude'))
+VAR_ = ncFile.createVariable(species, 'f4',('time','latitude','longitude'))
+
+if inventory != 'HMS':
 	VAR_.units = 'g ' + species + ' per grid cell per day'
+else:
+	VAR_.units = 'smoke production duration hours'	
 
 # Create time variable	
 time_ = ncFile.createVariable('time', 'i4', ('time',))
-time_.units = fire_time.units
+time_.units = fire_time_units
 
 # Keep track of the change in mass
 deltaMass_ = ncFile.createVariable('deltaMass', 'f4', ('time',))
@@ -233,7 +265,7 @@ longitude_.units = 'degrees east'
 VAR_[:]       = fire_new_grid[:]
 latitude_[:]  = met_lat
 longitude_[:] = met_lon
-time_[:]      = fire_time[:]
+time_[:]      = met_time[:]
 deltaMass_[:] = deltaMass[:]
 
 ncFile.close()	
