@@ -5,6 +5,7 @@
 ###############################################################################
 # The purpose of this script is to regrid FINN or GFFED emissions data to ecmwf 
 # era-interim grid (or any lat lon passed) and save as a single daily nc file. 
+# There is a good deal of special handlign of HYSPLIT Points fire data. 
 
 # TODO: Calculate and save the grid sizes m**2 to written nc files
 
@@ -29,7 +30,7 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables manually here. 
-	year      = str(2006)
+	year      = str(2013)
 	inventory = 'HMS'  # FINN | GFED4s | HMS
 	METGrid   = 'ecmwf' #
 	species   = 'SPDH'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
@@ -46,9 +47,9 @@ metFile = dataDir + 'era_interim_nc_daily/sp_'+ year + '.nc'
 met_nc = Dataset(metFile, 'r')
 met_lat = met_nc.variables['latitude'][:]
 met_lon = met_nc.variables['longitude'][:]
-met_time= met_nc.variables['time']
+met_time= met_nc.variables['time'][:]
 sp_slice = met_nc.variables['sp'][180,:,:]
-
+met_nc.close()
 
 if sanityCheck:
 	m = Basemap(projection='robin',lon_0=0,resolution='c')
@@ -81,7 +82,7 @@ fire_lon  = fire_nc.variables['longitude'][:]
 fire_time = fire_nc.variables['time']
 
 print '----------------------------------------------------------------------'
-print 'Working on loading the really big emissions file' 
+print 'Working on loading the really big emissions file for year ' + year
 print '----------------------------------------------------------------------'
 timeStart = timer.time()
 emissions = fire_nc.variables[species][:]
@@ -114,21 +115,46 @@ emissions_new_grid[:,:, assignment] = emissions[:,:,westOfGreenwich]
 emissions = emissions_new_grid
 fire_lon = fire_lon_new
 
+# preserve for writing nc data
+fire_time_units = fire_time.units 
+
+
+######################################################################################
+# Subset this grid, by the maximum and minimum bounds of fires, for HMS inventory. No
+# need to loop all over the world when there are only recorded fires in North America.
+# This dramatically improves performance when HMS fires are those being regridded. 
+######################################################################################
+if inventory == 'HMS':
+	minLat = 10.
+	maxLat = 85. 
+	minLon = 190.
+	maxLon = 325.
+
+	emissions, fire_lat, fire_lon = cnm.mask2dims(emissions, fire_lon, fire_lat,
+												  0, minLon, maxLon, minLat, maxLat)
+
+	# We need to subset the HMS data by year also. 
+	t, month, years = cnm.get_era_interim_time(fire_time)	
+	yearMask = years == int(year)
+	
+	# apply the mask
+	fire_time = fire_time[yearMask]
+	emissions = emissions[yearMask,:,:]
 
 dt = (timer.time() - regridStart) / 60.
 print '-----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to regrid (lons) of the emissions array'
 print '-----------------------------------------------------------------------'
 
-##############
-# Sanity plot 
-##############
+######################################################################################
+# Sanity plot for interactive analysis mode
+######################################################################################
 if sanityCheck:
 
-	emissions_new_sum = np.sum(emissions_new_grid, axis=0)
+	emissions_new_sum = np.sum(emissions, axis=0)
 	emissions_ma = np.ma.masked_where(emissions_new_sum==0,emissions_new_sum, copy=True)
 	m = Basemap(projection='robin',lon_0=0,resolution='c')
-	lons, lats = np.meshgrid(fire_lon_new, fire_lat)
+	lons, lats = np.meshgrid(fire_lon, fire_lat)
 	x,y=m(lons,lats)
 
 	m = Basemap(projection='robin', lon_0=0,resolution='c')
@@ -141,16 +167,6 @@ if sanityCheck:
 	#m.drawmapboundary(fill_color='aqua')
 	plt.title("REGRID GRID")
 	plt.show()
-
-fire_time_units = fire_time.units # preserve for writing nc data
-# TODO: Subset by year range when HMS, since it is not in the file name 
-if inventory == 'HMS':
-	t, month, years = cnm.get_era_interim_time(fire_time)	
-	yearMask = years == int(year)
-	
-	# apply the mask
-	fire_time = fire_time[yearMask]
-	emissions = emissions[yearMask,:,:]
 
 # How make an array that represets all dates in this year to index the yearly data
 # This is needed because HMS is missing dates
@@ -177,6 +193,7 @@ for t in range(nTStep): # nTStep
 	if np.sum(tMask) > 0: 
 	
 		print str(float(t)/nTStep*100.) + " % complete"
+		
 		# Loop over fire lon values
 		for x in range(len(fire_lon)):
 			# to make it a point, loop over each lat for each lon
