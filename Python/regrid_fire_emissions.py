@@ -30,7 +30,7 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables manually here. 
-	year      = str(2013)
+	year      = str(2015)
 	inventory = 'HMS'  # FINN | GFED4s | HMS
 	METGrid   = 'ecmwf' #
 	species   = 'SPDH'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
@@ -68,7 +68,6 @@ if sanityCheck:
 # Get emissions file (use yearly nc files)
 if inventory == 'GDED4s':
 	fire_file = dataDir + 'GFED4s/GFED4.1s_' + species + '_'+ year + '.nc'
-
 elif inventory == 'FINN':	
 	fire_file = dataDir + 'FINN/FINN_' + species + '_'+ year + '.nc'
 elif inventory == 'HMS':
@@ -76,16 +75,31 @@ elif inventory == 'HMS':
 else:
 	print 'Unknown emissions type'
 
+# Pull the time first, get an array of the years, find the indicies, then pull only
+# these from the emissions variable. For all but HMS this should load of time indicies 
+# indo the workspace. 
 fire_nc   = Dataset(fire_file, 'r')
+fire_time = fire_nc.variables['time']
 fire_lat  = fire_nc.variables['latitude'][:] 
 fire_lon  = fire_nc.variables['longitude'][:] 
-fire_time = fire_nc.variables['time']
+
+t_temp, month_temp, year_temp = cnm.get_era_interim_time(fire_time)
+timeIndex = np.where(year_temp == int(year))[0]
+
+# preserve for writing nc data
+fire_time_units = fire_time.units 
+
+# Now subset the time array to the year of interest only
+fire_time = fire_time[timeIndex]
+
+# Remove variables that are no longer needed. 
+del t_temp, month_temp, year_temp
 
 print '----------------------------------------------------------------------'
 print 'Working on loading the really big emissions file for year ' + year
 print '----------------------------------------------------------------------'
 timeStart = timer.time()
-emissions = fire_nc.variables[species][:]
+emissions = fire_nc.variables[species][timeIndex,:,:]
 dt = (timer.time() - timeStart) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to load emissions array into workspace'
@@ -115,9 +129,11 @@ emissions_new_grid[:,:, assignment] = emissions[:,:,westOfGreenwich]
 emissions = emissions_new_grid
 fire_lon = fire_lon_new
 
-# preserve for writing nc data
-fire_time_units = fire_time.units 
 
+dt = (timer.time() - regridStart) / 60.
+print '-----------------------------------------------------------------------'
+print 'It took ' + str(dt) + ' minutes to regrid (lons) of the emissions array'
+print '-----------------------------------------------------------------------'
 
 ######################################################################################
 # Subset this grid, by the maximum and minimum bounds of fires, for HMS inventory. No
@@ -133,18 +149,15 @@ if inventory == 'HMS':
 	emissions, fire_lat, fire_lon = cnm.mask2dims(emissions, fire_lon, fire_lat,
 												  0, minLon, maxLon, minLat, maxLat)
 
-	# We need to subset the HMS data by year also. 
-	t, month, years = cnm.get_era_interim_time(fire_time)	
-	yearMask = years == int(year)
-	
-	# apply the mask
-	fire_time = fire_time[yearMask]
-	emissions = emissions[yearMask,:,:]
+# 	We need to subset the HMS data by year also. 
+# 	t, month, years = cnm.get_era_interim_time(fire_time)	
+# 	yearMask = years == int(year)
+# 	
+# 	apply the mask
+# 	fire_time = fire_time[yearMask]
+# 	emissions = emissions[yearMask,:,:]
 
-dt = (timer.time() - regridStart) / 60.
-print '-----------------------------------------------------------------------'
-print 'It took ' + str(dt) + ' minutes to regrid (lons) of the emissions array'
-print '-----------------------------------------------------------------------'
+
 
 ######################################################################################
 # Sanity plot for interactive analysis mode
@@ -202,7 +215,7 @@ for t in range(nTStep): # nTStep
 				# y and x represent the emissions data location we are
 				# trying to assign!
 	
-				# Difference in regular grid arrays, units of deg
+				# Difference in regular grid arrahmsys, units of deg
 				dx = np.abs(fire_lon[x] - met_lon)
 				dy = np.abs(fire_lat[y] - met_lat)
 	
