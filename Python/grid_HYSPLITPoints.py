@@ -7,6 +7,8 @@
 # regridded to an ecmwf grid soon after but needs to be on the GFEDF4s grid
 # first for sanity checks. 
 
+# TODO: Save the gridded data for US ONLY and for ONE YEAR AT A TIME. 15 GB file
+# TODO: is way to big for proper netCDF behavior. 
 
 import sys # for reading command line arguments
 from netCDF4 import Dataset 
@@ -126,7 +128,7 @@ nLon = len(glon)
 data = np.zeros((nDates, nLat, nLon))
 
 # Loop through the HYSPLIT points one at a time 
-for i in range(nRow): 
+for i in range(nRow): # nRow
 
 	dur = df.DUR[i]
 
@@ -153,7 +155,7 @@ for i in range(nRow):
 
 		# Assign the HYSPLIT point duration to the correct location and date
 		if (dx_test <= TOLERANCE) & (dy_test <= TOLERANCE):
-			data[dateMask, yi, xi] = data[dateMask, yi, xi] + dur
+			data[dateMask, yi, xi] = (data[dateMask, yi, xi] + dur)
 		else:
 			print 'dx mismatch = ' + str(dx_test)
 			print 'dy mismatch = ' + str(dy_test)
@@ -205,6 +207,5 @@ grid_area_[:] = grid_area
 latitude_[:]  = glat
 longitude_[:] = glon
 time_[:]      = uniqueHours
-
 
 ncFile.close()
