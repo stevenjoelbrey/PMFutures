@@ -146,16 +146,9 @@ if inventory == 'HMS':
 	minLon = 190.
 	maxLon = 325.
 
-	emissions, fire_lat, fire_lon = cnm.mask2dims(emissions, fire_lon, fire_lat,
+	emissions, fire_lat, fire_lon = cnm.mask2dims(emissions, fire_lon, fire_lat,\
 												  0, minLon, maxLon, minLat, maxLat)
 
-# 	We need to subset the HMS data by year also. 
-# 	t, month, years = cnm.get_era_interim_time(fire_time)	
-# 	yearMask = years == int(year)
-# 	
-# 	apply the mask
-# 	fire_time = fire_time[yearMask]
-# 	emissions = emissions[yearMask,:,:]
 
 
 

@@ -41,11 +41,11 @@ if len(sys.argv) != 1:
 
 else: 
 	# Development environment. Set variables by manually here. 
-	ncVARType = 'FINN'       # 'era_interim' | 'GFED4s' | 'FINN'
-	ncVAR     = 'CO2'            # 'tp' | 'C' | 'CO2'
-	region    = '_'            #  "_" = global | any region in cnm.getRegionBounds()
-	startYear = 2003
-	endYear   = 2013
+	ncVARType = 'HMS'       # 'era_interim' | 'GFED4s' | 'FINN'
+	ncVAR     = 'SPDH'       # 'tp' | 'C' | 'CO2' | 'SPDH'
+	region    = '_'          #  "_" = global | any region in cnm.getRegionBounds()
+	startYear = 2006         # HMS only spans 2006 - 2015
+	endYear   = 2015
 
 
 # Set directory paths based on the type of data to be merged
@@ -61,8 +61,12 @@ elif ncVARType == 'FINN':
 	dataDir = dirRoot + 'FINN/'	
 	outDir  = dirRoot + 'FINN/'	
 
+elif ncVARType == 'HMS':
+	dataDir = dirRoot + 'HMS/'	
+	outDir  = dirRoot + 'HMS/'	
+
 ###############################################################################
-# ------------------------Begin main script -----------------------------------
+# ----------------------- Begin main script -----------------------------------
 ###############################################################################
 
 years = np.arange(startYear, endYear+1)
@@ -75,6 +79,8 @@ for year in years:
 		loadFile = dataDir + 'GFED4.1s_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 	elif ncVARType == 'FINN':
 		loadFile = dataDir + 'FINN_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
+	elif ncVARType == 'HMS':
+		loadFile = dataDir + 'HYSPLITPoints_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 
 	# Use the first years data to get dimension information 
 	# and array to be appended too.
@@ -152,6 +158,14 @@ elif ncVARType == 'GFED4s':
 elif ncVARType == 'FINN':
 	outputFile = dataDir + 'FINN_ecmwf_' + ncVAR + region + \
 			str(startYear)+ '_' + str(endYear) + '.nc'		 			
+
+elif ncVARType == 'HMS':
+	outputFile = dataDir + 'HMS_ecmwf_' + ncVAR + region + \
+			str(startYear)+ '_' + str(endYear) + '.nc'		
+
+else:
+	raise ValueError('ncVARType unknown. Please use known ncVARType.')
+
 
 print '----------------------------------------------------------------------'
 print 'Writing the output file. outputFile used:'
