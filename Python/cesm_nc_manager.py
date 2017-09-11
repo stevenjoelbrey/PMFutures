@@ -840,4 +840,8 @@ def getRegionBounds(region):
 		maxLon = 288.	
 		resolution = 'h'
 		
+	else:
+		raise ValueError('unknown region argument. Use _west_, _CONUS_, _PNW_,\
+		_CAL_, _CentralRockies_, _SouthEast_, _CONUS_')	
+		
 	return minLat, maxLat, minLon, maxLon, resolution 

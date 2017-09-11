@@ -43,7 +43,7 @@ else:
 	# Development environment. Set variables by manually here. 
 	ncVARType = 'HMS'       # 'era_interim' | 'GFED4s' | 'FINN'
 	ncVAR     = 'SPDH'       # 'tp' | 'C' | 'CO2' | 'SPDH'
-	region    = '_'          #  "_" = global | any region in cnm.getRegionBounds()
+	region    = '_west_'          #  "_" = global | any region in cnm.getRegionBounds()
 	startYear = 2006         # HMS only spans 2006 - 2015
 	endYear   = 2015
 
