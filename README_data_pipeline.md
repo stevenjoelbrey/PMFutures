@@ -38,7 +38,7 @@ Datasource README: http://www.geo.vu.nl/~gwerf/GFED/GFED4/Readme.pdf
 		  where daily emission estimate arrays are applied to the GFED4s emissions, based
 		  on  
 		  
-	- ~Python/regrid_GFED4s.py
+	- ~Python/regrid_fire_emissions.py
 		- This script takes the GFED4s nc data and regrids to ecmwf 0.75 deg grid based
 		  on nearest neighbor method. 'MEG_GRID' string is inserted to these .nc files,
 		  which also live in /scratch/GFED4s/
@@ -98,11 +98,14 @@ prescribed burning and does not include biofuel use and trash burning"
   Wiedinmyer, C., S. K. Akagi, R .J. Yokelson, L. K. Emmons, J. A. Al-Saadi,
   J. J. Orlando, and A. J. Soja. "The Fire INventory from NCAR (FINN): a
   high resolution global model to estimate the emissions from open burning:",
-  __Geosci. Model Dev.__, 4, 625641, 2011.
+  Geosci. Model Dev., 4, 625641, 2011.
 	 
-	 
+	
 TODO: 
-
-	- Place on the same grid as GFED4s for easy comparisons. 
-	- Re-grid to ecmwf grid for easy comparisons. Nearest neighbor. 	 
+	- ~Python/process_FINN.py
+		- This script processes FINN data organized for GEOS-Chem and makes it match
+		  the GFED emissions format already used by this work. 
+	- ~Python/regrid_fire_emissions.py
+		- This script takes fire emissions and places them onto the meteorology grid of 
+		  my choosing. 	 
 	 
