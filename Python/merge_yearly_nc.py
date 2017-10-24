@@ -1,29 +1,42 @@
 #!/usr/bin/env python2
 
 ###############################################################################
-# ------------------------- Description --------------------------------------- 
+# ------------------------- Description ---------------------------------------
 ###############################################################################
 # This script will be used to merge yearly daily era-interim nc files or GFED4s
-# fire emissions files. 
+# fire emissions files.
 
-# Follows ---------------------------------------- 
+# Follows ----------------------------------------
 # 	- average6HourlyData.py | process_FINNY.py
-# Precedes ---------------------------------------- 
+# Precedes ----------------------------------------
 #	- any function that reads in multi-year nc data of the global domain or any
-#     domain subset. 
+#     domain subset.
 
 # import required modules
 import os
 import numpy as np
 import sys
-from netCDF4 import Dataset 
+from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 import cesm_nc_manager as cnm
 
-dirRoot = '/barnes-scratch/sbrey/'
+
+
+# Figure out what machine this code is running on. Set file paths.
+pwd = os.getcwd()
+mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
+if pwd == mac:
+	drive = "/Volumes/Brey_external/"
+else:
+	drive = "/barnes-scratch/sbrey/"
+
+dataDirBase = drive + "era_interim_nc_daily_merged/"
+
+dirRoot = drive
+
 
 ###############################################################################
-# ------------------------- Handle Args --------------------------------------- 
+# ------------------------- Handle Args ---------------------------------------
 ###############################################################################
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
@@ -39,13 +52,13 @@ if len(sys.argv) != 1:
 	endYear   =  int(sys.argv[5])
 
 
-else: 
-	# Development environment. Set variables by manually here. 
-	ncVARType = 'HMS'       # 'era_interim' | 'GFED4s' | 'FINN'
-	ncVAR     = 'SPDH'       # 'tp' | 'C' | 'CO2' | 'SPDH'
-	region    = '_west_'          #  "_" = global | any region in cnm.getRegionBounds()
-	startYear = 2006         # HMS only spans 2006 - 2015
-	endYear   = 2015
+else:
+	# Development environment. Set variables by manually here.
+	ncVARType = 'era_interim'       # 'era_interim' | 'GFED4s' | 'FINN'
+	ncVAR     = 'u10'       # 'tp' | 'C' | 'CO2' | 'SPDH'
+	region    = '_'          #  "_" = global | any region in cnm.getRegionBounds()
+	startYear = 2003         # HMS only spans 2006 - 2015
+	endYear   = 2016
 
 
 # Set directory paths based on the type of data to be merged
@@ -56,14 +69,14 @@ if ncVARType == 'era_interim':
 elif ncVARType == 'GFED4s':
 	dataDir = dirRoot + 'GFED4s/'
 	outDir  = dirRoot + 'GFED4s/'
-	
+
 elif ncVARType == 'FINN':
-	dataDir = dirRoot + 'FINN/'	
-	outDir  = dirRoot + 'FINN/'	
+	dataDir = dirRoot + 'FINN/'
+	outDir  = dirRoot + 'FINN/'
 
 elif ncVARType == 'HMS':
-	dataDir = dirRoot + 'HMS/'	
-	outDir  = dirRoot + 'HMS/'	
+	dataDir = dirRoot + 'HMS/'
+	outDir  = dirRoot + 'HMS/'
 
 ###############################################################################
 # ----------------------- Begin main script -----------------------------------
@@ -75,14 +88,14 @@ for year in years:
 
 	if ncVARType == 'era_interim':
 		loadFile = dataDir + ncVAR + '_' + str(year) + '.nc'
-	elif ncVARType == 'GFED4s': 
+	elif ncVARType == 'GFED4s':
 		loadFile = dataDir + 'GFED4.1s_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 	elif ncVARType == 'FINN':
 		loadFile = dataDir + 'FINN_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 	elif ncVARType == 'HMS':
 		loadFile = dataDir + 'HYSPLITPoints_ecmwf_' + ncVAR + '_' + str(year) + '.nc'
 
-	# Use the first years data to get dimension information 
+	# Use the first years data to get dimension information
 	# and array to be appended too.
 	if year == years[0]:
 
@@ -105,8 +118,8 @@ for year in years:
 
 	else:
 
-		print 'appending: ' + ncVAR + ' ' + str(year)	
-		
+		print 'appending: ' + ncVAR + ' ' + str(year)
+
 		nc  = Dataset(loadFile, 'r')
 		var = nc.variables[ncVAR]
 		t   = nc.variables['time']
@@ -125,43 +138,43 @@ if np.unique(np.diff(tBase)) != 24:
 
 print 'Final merged var size: ' + str(varBase.shape)
 print 'Final merged time array: ' + str(len(tBase))
-	
 
-#######################################################################	
+
+#######################################################################
 # Handle making the spatial subset
-#######################################################################	
+#######################################################################
 if region  != '_':
-	
+
 	# Get the chosen region bounds
 	minLat, maxLat, minLon, maxLon, resolution = cnm.getRegionBounds(region)
-	
-	# Subset the data based on the bounds of this region. 
+
+	# Subset the data based on the bounds of this region.
 	varBase, latitude, longitude = cnm.mask2dims(varBase, longitude[:], latitude[:], 0,\
 							                     xmin=minLon, xmax=maxLon,\
 							                     ymin=minLat, ymax=maxLat)
 
-	print 'Data subset to region ' + region 
+	print 'Data subset to region ' + region
 
 
 
-#######################################################################	
+#######################################################################
 # Write the merged file
-#######################################################################	
+#######################################################################
 if ncVARType == 'era_interim':
 	outputFile = outDir + ncVAR + region + \
 		     str(startYear) + '_' + str(endYear) + '.nc'
 
 elif ncVARType == 'GFED4s':
 	outputFile = dataDir + 'GFED4.1s_ecmwf_' + ncVAR + region + \
-			str(startYear)+ '_' + str(endYear) + '.nc'	
-			
+			str(startYear)+ '_' + str(endYear) + '.nc'
+
 elif ncVARType == 'FINN':
 	outputFile = dataDir + 'FINN_ecmwf_' + ncVAR + region + \
-			str(startYear)+ '_' + str(endYear) + '.nc'		 			
+			str(startYear)+ '_' + str(endYear) + '.nc'
 
 elif ncVARType == 'HMS':
 	outputFile = dataDir + 'HMS_ecmwf_' + ncVAR + region + \
-			str(startYear)+ '_' + str(endYear) + '.nc'		
+			str(startYear)+ '_' + str(endYear) + '.nc'
 
 else:
 	raise ValueError('ncVARType unknown. Please use known ncVARType.')
@@ -172,7 +185,7 @@ print 'Writing the output file. outputFile used:'
 print outputFile
 print '----------------------------------------------------------------------'
 
-# Get lengths of dimensions that are always present 
+# Get lengths of dimensions that are always present
 nDays = len(tBase)
 nLat = len(latitude)
 nLon = len(longitude)
@@ -182,7 +195,7 @@ ncFile = Dataset(outputFile, 'w', format='NETCDF4')
 if ncVARType == 'era_interim':
 	ncFile.description = 'Daily data created by average6HourlyData.py and merged with merge_year_nc.py'
 else:
-	ncFile.description = 'Merged daily' + ncVARType + 'emissions from yearly files after regridding'	
+	ncFile.description = 'Merged daily' + ncVARType + 'emissions from yearly files after regridding'
 
 
 ncFile.location = 'Global'
@@ -190,7 +203,7 @@ ncFile.createDimension('time',  nDays )
 ncFile.createDimension('latitude', nLat )
 ncFile.createDimension('longitude', nLon )
 
-# Create variables on the dimension they live on 
+# Create variables on the dimension they live on
 if len(dims) == 4:
 
 	ncFile.createDimension('level',  len(level) )
@@ -218,12 +231,12 @@ elif (len(dims)==3) & (ncVARType == 'era_interim'):
 
 else:
 	mergedVAR_ = ncFile.createVariable(ncVAR,\
-	            'f4',('time','latitude','longitude'))	
+	            'f4',('time','latitude','longitude'))
 
 # Assign the same units as the loaded file to the main variable
 mergedVAR_.units = ncBase.variables[ncVAR].units
 
-# Create time variable	
+# Create time variable
 time_ = ncFile.createVariable('time', 'i4', ('time',))
 time_.units = ncBase.variables['time'].units
 if ncVARType == 'era_interim':
@@ -245,7 +258,7 @@ time_[:] = tBase[:]
 if len(dims) == 4:
 	level_[:] = level[:]
 
-ncFile.close()	
+ncFile.close()
 
 
 

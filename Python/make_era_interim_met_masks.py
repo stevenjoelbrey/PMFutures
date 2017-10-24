@@ -45,21 +45,31 @@ if pwd == mac:
 else:
 	drive = "/barnes-scratch/sbrey/"
 
-dataDirBase = drive + "era_interim_nc_daily_merged"
+dataDirBase = drive + "era_interim_nc_daily_merged/"
+
+################################################################################
+# ------------------------- Functions  -----------------------------------------
+################################################################################
 
 
-def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2003-12-31",\
-					      minDays=3, plotBlocks=True, minBlobSize=15):
+def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31",\
+					      minDays=3, plotBlocks=False, minBlobSize=15.):
 	"""
 	This function finds blocking days based on a very simple definition.
 	Blocking days are defined as days when the 500 mb geopotential height
 	is one standard deviation above the jDay mean (1979-2016) for at least
 	five days. This function takes one argument.
-    # TODO: Spatial component! Small areas should not be able to ridge alone.
 		Arguments:
-			sdFactor: Number multiplied by monthly std when setting
-					   the threshold.
-	       startDate: The first date to create blocking event mask for.
+			sdFactor:  Number multiplied by monthly std when setting
+					    the threshold.
+			startDate: The first date to create blocking event mask for.
+			endDate:   The last date to create blocking event mask for.
+			minDays:   The minimum number of consecutive days required for high z
+					    values to be considered a block.
+			plotBlocks: True or False. If true the z climatology, daily value, and
+			            identified area of blocking are plotted and saved. SLOW.
+			minBlobSize: The minimum size of a blob in terms of degrees. Value
+						   is squared.
 
 
 		return:
@@ -82,7 +92,8 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2003-12-31
 	dx = np.abs(np.mean(np.diff(lon)))
 	dy = np.abs(np.mean(np.diff(lat)))
 
-	# set a minimum index span to meet minBlobSize
+	# Translates minBlobSpan degree argument to indecies needed to make this many
+	# degrees in our latitude x longitude gridded data.
 	blobSpan = np.round(minBlobSize / dx)
 
 #	# For test plotting make bounds
@@ -218,7 +229,7 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2003-12-31
 			if b !=0: # 0 is background so skip
 				blobMask = b == blobs_labels
 				blobArea = np.sum(blobMask)
-				if blobArea < minBlobSize**2:
+				if blobArea < blobSpan**2:
 					# I do not want this to remain a blob
 					blobs_labels[blobMask] = 0
 
@@ -269,7 +280,7 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2003-12-31
 			          ' Julain day = ' + str(jDays[jDayIndex]))
 			plt.savefig('../Figures/block_test/z_show_' + dateString\
 			            + '_sd='+str(sdFactor)+\
-						'_days='+str(minDays)+'_mibBlobSize='+str(minBlobSize)+\
+						'_days='+str(minDays)+'_minBlobSize='+str(minBlobSize)+\
 						'.png')
 			plt.close(fig)
 
@@ -282,10 +293,12 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2003-12-31
 
 	return blocking_mask
 
-
+# TODO: Make years of analysis arguments? Rather than assume NA and 2003-2016?
+# TODO: 'NA' needs to be changed to 'west' as it only covers 30. - 49.5 N and
+# TODO: 234. - 258.75 E.
 def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
-                               TThresh=297.039, RHThresh=25., windThresh=6.7056,
-			       writeNC=True):
+							   TThresh=297.039, RHThresh=25., windThresh=6.7056,
+							   writeNC=True, region = "_"):
 	"""
 	This function takes limits and creates masks (1 condition is true, 0 condition
 	is not true) for different meteorology event or threshold types.
@@ -299,7 +312,10 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 			RHThresh   = %
 			windThresh = m/s
 			writeNC    = True masks written to nc file. If false
-					they are not.
+					       they are not.
+			region     = regions nc data are presliced into formatted as
+			             '_regionName_'. '_' is no region and correct filename
+						    formatting.
 
 		These are the defualt definitions of stagnation defined:
 		http://www.arl.noaa.gov/documents/reports/atlas.pdf
@@ -307,16 +323,18 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	"""
 
 	startTime = timer.time()
-	###############################################################################
+	#############################################################################
 	# Load surface winds
 	# NOTE: x = store_x/scale + offset.
-	###############################################################################
-	u10_nc = Dataset(dataDirBase + 'u10_NA_2003_2016.nc', 'r')
+	#############################################################################
+
+
+	u10_nc = Dataset(dataDirBase + 'u10' + region + '2003_2016.nc', 'r')
 	u10    = u10_nc.variables['u10'][:]
 	#u10_   = u10[:] #/ u10.scale_factor + u10.scale_factor????
 	u10_nc.close()
 
-	v10_nc = Dataset(dataDirBase + 'v10_NA_2003_2016.nc', 'r')
+	v10_nc = Dataset(dataDirBase + 'v10' + region + '2003_2016.nc', 'r')
 	v10    = v10_nc.variables['v10'][:]
 	v10_nc.close()
 
@@ -325,13 +343,13 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	###############################################################################
 	# Load 500 mb winds
 	###############################################################################
-	v_nc    = Dataset(dataDirBase + 'v_NA_2003_2016.nc', 'r')
+	v_nc    = Dataset(dataDirBase + 'v'+ region +'2003_2016.nc', 'r')
 	level   = v_nc.variables['level']
 	level_i = np.where(level[:] == 500)[0][0]
 	v       = v_nc.variables['v'][:,level_i,:,:]
 	v_nc.close()
 
-	u_nc    = Dataset(dataDirBase + 'u_NA_2003_2016.nc', 'r')
+	u_nc    = Dataset(dataDirBase + 'u'+ region +'2003_2016.nc', 'r')
 	u       = u_nc.variables['u'][:,level_i,:,:]
 	u_nc.close()
 
@@ -340,16 +358,13 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	###############################################################################
 	# Get precipitation
 	###############################################################################
-	tp_nc = Dataset(dataDirBase + 'tp_NA_2003_2016.nc', 'r')
+	tp_nc = Dataset(dataDirBase + 'tp'+ region +'2003_2016.nc', 'r')
 	tp_meters = tp_nc.variables['tp'] # meters per calendar date
 	inchPerM = 39.3701      # [inch/m]
 	tp = tp_meters[:] * inchPerM
 	latitude = tp_nc.variables['latitude']
 	longitude = tp_nc.variables['longitude']
 	time = tp_nc.variables['time']
-
-	# Create numpy arrays to store mask of stagnation events
-	stagnationMask = np.zeros(tp.shape, dtype=int)
 
 	# build the individual masks, first tp (total precipitation)
 	mask_sfc  = np.array(sfc_wind < windSfcLim, dtype=bool)
@@ -376,11 +391,11 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	#	RH% <= 25%
 	#	surface wind >= 15 mph = 6.7056 m/s
 	###############################################################################
-	t2m_nc = Dataset(dataDirBase + 't2m_NA_2003_2016.nc', 'r')
+	t2m_nc = Dataset(dataDirBase + 't2m'+ region +'2003_2016.nc', 'r')
 	t2m = t2m_nc.variables['t2m'][:]
 	t2m_nc.close()
 
-	d2m_nc = Dataset(dataDirBase + 'd2m_NA_2003_2016.nc', 'r')
+	d2m_nc = Dataset(dataDirBase + 'd2m'+ region +'2003_2016.nc', 'r')
 	d2m = d2m_nc.variables['d2m'][:]
 	d2m_nc.close()
 
@@ -400,7 +415,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	high_wind_mask  = np.array(sfc_wind >= windThresh, dtype=int)
 	low_RH_mask     = np.array(RH < RHThresh, dtype=int)
 	high_T_mask     = np.array(t2m >= TThresh, dtype=int)
-	blocking_mask   = np.array(find_blocking_days(), dtype=int)
+	blocking_mask   = np.array(find_blocking_days(), dtype=int) # Calls comlex function
 	low_precip_mask = np.array(tp < precLim, dtype=int)
 
 	writingComplete = timer.time()
@@ -414,7 +429,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	###############################################################################
 	if writeNC:
 
-		saveName = dataDirBase + 'met_event_masks_NA_2003_2016.nc'
+		saveName = dataDirBase + 'met_event_masks' + region + '2003_2016.nc'
 
 		ncFile = Dataset(saveName, 'w', format='NETCDF4')
 		ncFile.description = 'Masks indicating threshold conditions'
