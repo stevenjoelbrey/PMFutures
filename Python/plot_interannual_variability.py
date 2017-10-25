@@ -13,7 +13,7 @@
 # plot_GFED4s_emission_summary.py. These will be consolidated at a later time
 # but I am separating here to make organization more clear. 
 
-# TODO: There is something up with precip. 
+# TODO: HANDLE HMS, get it into this pipeline! 
 
 ################################################################################
 #------------- Arguments to Subset model emissions in space and time -----------
