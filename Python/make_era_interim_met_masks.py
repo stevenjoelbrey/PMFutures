@@ -38,13 +38,7 @@ from skimage import filters
 
 
 # Figure out what machine this code is running on. Set file paths.
-pwd = os.getcwd()
-mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
-if pwd == mac:
-	drive = "/Volumes/Brey_external/"
-else:
-	drive = "/barnes-scratch/sbrey/"
-
+drive = cnm.getDrive()
 dataDirBase = drive + "era_interim_nc_daily_merged/"
 
 ################################################################################

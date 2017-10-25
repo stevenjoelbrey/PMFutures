@@ -29,34 +29,33 @@
 # Datasource: http://www.geo.vu.nl/~gwerf/GFED/GFED4/
 # Data README: http://www.geo.vu.nl/~gwerf/GFED/GFED4/Readme.pdf
 
+# Clear all  variables before running this script.
+#import sys
+#sys.modules[__name__].__dict__.clear()
+import sys
 import h5py # if this creates an error please make sure you have the h5py library
 import os
 import numpy as np
-import sys
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 import datetime
 from datetime import date
 from datetime import timedelta
 from datetime import datetime
+import cesm_nc_manager as cnm
+
 
 # TODO: estimate daily burn area and save this out!
 # TODO: include 'basis_regions' in nc output?
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 startYear = 2003
-endYear   = 2016  # If different than startYear, they will be appended.
-species   = 'C'  # 'C' , 'DM' # (These have daily fraction est.)
+endYear   = 2003  # If different than startYear, they will be appended.
+species   = 'DM'  # 'C' , 'DM' # (These have daily fraction est.)
 getDaily  = False # execute code to create daily nc
 getMonthly= True # execute code to create monthly nc
 
 # Figure out what machine this code is running on. Set file paths.
-pwd = os.getcwd()
-mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
-if pwd == mac:
-	drive = "/Volumes/Brey_external/"
-else:
-	drive = "/barnes-scratch/sbrey/"
-
+drive = cnm.getDrive()
 dataDir   = drive + 'GFED4s/'
 
 
@@ -390,10 +389,10 @@ if getMonthly:
 
 	# When the start year is the same as the end year, only assign one year for file name
 	if startYear == endYear:
-		outputFile = dataDir + 'GFED4.1s_monthly_'+species+'_emissions_' +\
+		outputFile = dataDir + 'GFED4.1s_monthly_'+species+'_' +\
 				str(startYear) + '.nc'
 	else:
-		outputFile = dataDir + 'GFED4.1s_monthly_'+species+'_emissions_' +\
+		outputFile = dataDir + 'GFED4.1s_monthly_'+species+'_' +\
 				str(startYear) + '_' + str(endYear) + '.nc'
 
 	ncFile = Dataset(outputFile, 'w', format='NETCDF4')
