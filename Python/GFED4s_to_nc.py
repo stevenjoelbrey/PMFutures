@@ -45,9 +45,9 @@ from datetime import datetime
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 startYear = 2003
 endYear   = 2016  # If different than startYear, they will be appended.
-species   = 'C'  # 'C' , 'DM' # (These have daily fraction est.)
-getDaily  = False # execute code to create daily nc
-getMonthly= True # execute code to create monthly nc
+species   = 'DM'  # 'C' , 'DM' # (These have daily fraction est.)
+getDaily  = True # execute code to create daily nc
+getMonthly= False # execute code to create monthly nc
 
 # Figure out what machine this code is running on. Set file paths.
 pwd = os.getcwd()
