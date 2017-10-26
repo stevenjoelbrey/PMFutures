@@ -342,5 +342,5 @@ deltaMass_[:] = deltaMass[:]
 
 ncFile.close()
 
-
+print 'Script executed without error!'
 
