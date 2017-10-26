@@ -10,6 +10,7 @@
 # TODO: Calculate and save the grid sizes m**2 to written nc files
 
 import os
+import re # regular expression library
 import sys # for reading command line arguments
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
@@ -18,6 +19,7 @@ import numpy as np
 import scipy.interpolate
 import time as timer
 import cesm_nc_manager as cnm
+
 
 print 'Number of arguments:', len(sys.argv), 'arguments.'
 print 'Argument List:', str(sys.argv)
@@ -28,13 +30,15 @@ if len(sys.argv) != 1:
 	inventory =  str(sys.argv[2])
 	METGrid   =  str(sys.argv[3])
 	species   =  str(sys.argv[4])
+	getBurnArea = False
 
 else:
 	# Development environment. Set variables manually here.
 	year      = str(2003)
 	inventory = 'GFED4s'  # FINN | GFED4s | HMS
-	METGrid   = 'ecmwf' #
-	species   = 'DM'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
+	METGrid   = 'ecmwf'   #
+	species   = 'monthly_DM'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
+	getBurnArea = True    # Only works for monthly data...Will get burn area from C or DM monthly files
 
 # When this is true extra plots are made to ensure that the grids are being
 # handled correctly. These were examined during development
@@ -87,23 +91,61 @@ fire_time = fire_nc.variables['time']
 fire_lat  = fire_nc.variables['latitude'][:]
 fire_lon  = fire_nc.variables['longitude'][:]
 
-t_temp, month_temp, year_temp = cnm.get_era_interim_time(fire_time)
-timeIndex = np.where(year_temp == int(year))[0]
-
 # preserve for writing nc data
 fire_time_units = fire_time.units
 
-# Now subset the time array to the year of interest only
-fire_time = fire_time[timeIndex]
-
-# Remove variables that are no longer needed.
-del t_temp, month_temp, year_temp
 
 print '----------------------------------------------------------------------'
 print 'Working on loading the really big emissions file for year ' + year
 print '----------------------------------------------------------------------'
 timeStart = timer.time()
-emissions = fire_nc.variables[species][timeIndex,:,:]
+
+# TODO: Burn area
+
+# Handle different time format of the monthly data
+if 'monthly' in species:
+
+	fire_time = fire_time[:]
+
+	si = species.index('_') + 1
+	sf = len(species)
+	grid_area = fire_nc.variables['grid_area'][:]
+
+
+	if getBurnArea:
+		emissions = fire_nc.variables['burn_area_fraction'][:]
+		emissions_units = 'm**2'
+		species = 'monthly_burned_area'
+
+	else:
+		emissions = fire_nc.variables[species[si:sf]][:]
+		emissions_units = fire_nc.variables[species[si:sf]].units
+		# The for loop has gotten rid of the area component so we need to remove
+		# from the units
+		emissions_units = re.sub('m\*\*-2 ','',emissions_units)
+
+	for n in range(len(fire_time)):
+		emissions[n,:,:] = emissions[n,:,:] * grid_area
+
+
+else:
+
+	# When daily data subset the arrays?
+	t_temp, month_temp, year_temp = cnm.get_era_interim_time(fire_time)
+	timeIndex = np.where(year_temp == int(year))[0]
+
+	# Now subset the time array to the year of interest only
+	fire_time = fire_time[timeIndex]
+
+	# Remove variables that are no longer needed.
+	del t_temp, month_temp, year_temp
+
+	# Get daily emissions data
+	emissions_units = fire_nc.variables[species].units
+	emissions = fire_nc.variables[species][timeIndex,:,:]
+
+
+
 dt = (timer.time() - timeStart) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to load emissions array into workspace'
@@ -154,8 +196,6 @@ if inventory == 'HMS':
 												  0, minLon, maxLon, minLat, maxLat)
 
 
-
-
 ######################################################################################
 # Sanity plot for interactive analysis mode
 ######################################################################################
@@ -180,7 +220,7 @@ if sanityCheck:
 
 # How make an array that represets all dates in this year to index the yearly data
 # This is needed because HMS is missing dates
-nTStep = len(met_time)
+nTStep = len(fire_time)
 
 # NOTE: float32 specified otherwise addition leads to small errors and mass
 # NOTE: is not conserved in the regridding process.
@@ -195,14 +235,19 @@ timeStart = timer.time()
 for t in range(nTStep): # nTStep
 	#print str(t) + ' time step'
 
+
 	# Where does this date for this year fall in fire_time?
-	tMask = met_time[t] == fire_time[:]
+	if 'monthly' in species:
+		tMask = t
+	else:
+		# Make sure the date exists in both MET and the fire inventory
+		tMask = met_time[t] == fire_time[:]
 
 	# See if the date exists, if it does not that means there is no fire emission
 	# data for this date and we can move forward with the time loop.
-	if np.sum(tMask) > 0:
+	if (np.sum(tMask) > 0) or (nTStep == 12):
 
-		print str(float(t)/nTStep*100.) + " % complete"
+		print str(np.round(float(t)/nTStep*100.)) + " % complete"
 
 		# Loop over fire lon values
 		for x in range(len(fire_lon)):
@@ -245,7 +290,7 @@ nTime = nTStep # should match number of days in calendar year of chosen year
 # TODO: to use
 
 # Handle emissions specific labels
-if inventory == 'GDED4s':
+if inventory == 'GFED4s':
 	outputFile = dataDir + 'GFED4s/' + 'GFED4.1s_' + METGrid + '_' + species + '_' +\
 		         str(year) + '.nc'
 
@@ -268,7 +313,7 @@ ncFile.createDimension('longitude', nLon )
 VAR_ = ncFile.createVariable(species, 'f4',('time','latitude','longitude'))
 
 if inventory != 'HMS':
-	VAR_.units = 'g ' + species + ' per grid cell per day'
+	VAR_.units = emissions_units
 else:
 	VAR_.units = 'smoke production duration hours'
 
@@ -292,7 +337,7 @@ longitude_.units = 'degrees east'
 VAR_[:]       = fire_new_grid[:]
 latitude_[:]  = met_lat
 longitude_[:] = met_lon
-time_[:]      = met_time[:]
+time_[:]      = fire_time[:]
 deltaMass_[:] = deltaMass[:]
 
 ncFile.close()
