@@ -11,8 +11,8 @@ import numpy as np
 from ecmwfapi import ECMWFDataServer
 
 # Get command line arguments
-VAR         = sys.argv[1] 
-startYear   = int(sys.argv[2]) 
+VAR         = sys.argv[1]
+startYear   = int(sys.argv[2])
 endYear     = int(sys.argv[3])
 levtype     = sys.argv[4] #"sfc" # "pl"
 gridSpacing = "0.75/0.75" # "0.75/0.75" | "1.50/1.50"
@@ -27,20 +27,20 @@ nYears = (endYear - startYear) + 1
 yearArray = np.arange(startYear, endYear+1)
 
 
-# Connect to the server 
+# Connect to the server
 server = ECMWFDataServer()
-    
+
 # get param based on dictionary
 # TODO: UPDATE once the better names are known
 param_dict = {"sp":"134.128",
-	          "t2m":"167.128",
+	           "t2m":"167.128",
               "d2m":"168.128",
               "u10":"165.128",
               "v10":"166.128",
               "tp":"228.128",
-	          "z":"129.128",
-	          "vo":"138.128",
-	          "u":"131.128",
+	           "z":"129.128",
+	           "vo":"138.128",
+	           "u":"131.128",
               "v":"132.128",
               "t":"130.128",
               "wgust":"49.128",
@@ -51,8 +51,11 @@ param = param_dict[VAR]
 
 # handle the fact that some variables have different time steps
 if (param == "228.128") or (param == "182.128"):
+	# For explanation on why step needs to be 12 for these times to get daily
+	# totals, please see example 1 of the following link.
+	# https://software.ecmwf.int/wiki/pages/viewpage.action?pageId=56658233
 	print "getting precip, changing step and time"
-	step = "6"
+	step = "12"
 	time = "00:00:00/12:00:00"
 else:
 	step = "0"
@@ -60,9 +63,9 @@ else:
 
 # Loop through years, download each as its own request
 for i in range(nYears):
-		
+
 	year_str = str(yearArray[i])
-	
+
 	# write the save location
 	target = DataDir + VAR + "_" + year_str + ".nc"
 	# write the date range to be downloaded
@@ -71,12 +74,12 @@ for i in range(nYears):
 	print "---------------------------------------------------------------"
 	print "Working on downloading " + VAR +":" +param + " for " + year_str
 	print "writing: " + target
-	print "---------------------------------------------------------------"	
+	print "---------------------------------------------------------------"
 
 	if levtype == "sfc":
 
 		if (param == "228.128") or (param == "182.128"):
-		# precip and evap requires special treatment 
+		# precip and evap requires special treatment
 			server.retrieve({
     				"class": "ei",
     				"dataset": "interim",
@@ -92,7 +95,7 @@ for i in range(nYears):
 				    "format" : "netcdf",
 			    	"target": target,
 			})
-		else: 
+		else:
 			server.retrieve({
 				"class": "ei",
 				"dataset": "interim",
