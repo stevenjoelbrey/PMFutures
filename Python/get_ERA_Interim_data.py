@@ -65,6 +65,14 @@ if (param == "228.128") or (param == "182.128"):
 	time = "00:00:00/12:00:00"
 	type_ = "fc" # forecast
 
+
+elif param == "49.128":
+	# Wind gust needs special time step so that the maximum of the 3 hours steps
+	# in the day can be calculated.
+	step = "3/6/9/12"
+	time = "00:00:00/12:00:00"
+	type_ = "fc" # forecast
+
 else:
 
 	# NOTE: when you choose a step of 0, you are telling the system to use
