@@ -48,7 +48,7 @@ import cesm_nc_manager as cnm
 # TODO: estimate daily burn area and save this out!
 # TODO: include 'basis_regions' in nc output?
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
-startYear = 2003
+startYear = 2016
 endYear   = 2016  # If different than startYear, they will be appended.
 species   = 'burned_area'  # 'C' , 'DM' 'burned_area'# (These have daily fraction est.)
 getDaily  = True # execute code to create daily nc

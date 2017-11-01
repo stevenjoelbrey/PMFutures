@@ -19,6 +19,7 @@
 #       average6hourlyData.py,
 #           merge_nc_data.py
 
+# TODO: Days since last rain mask in func make_era_interim_met_masks()
 
 
 import os
@@ -287,6 +288,31 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31
 
 	return blocking_mask
 
+def daysSinceLastRain(region="_"):
+
+	# Read in the rain nc data
+	tp_nc = Dataset(dataDirBase + 'tp'+ region +'2003_2016.nc', 'r')
+	tp_meters = tp_nc.variables['tp'] # meters per calendar date
+	inchPerM = 39.3701      # [inch/meter]
+	tp = tp_meters[:] * inchPerM
+	latitude = tp_nc.variables['latitude']
+	longitude = tp_nc.variables['longitude']
+	time = tp_nc.variables['time']
+
+
+	# Loop through time and figure out how long it has been since zero rain for
+	# each grid cell.
+	daysSinceRain = np.zeros( tp.shape ,dtype=int)
+
+
+	nTime = len(time)
+	for t in range(nTime):
+		print t
+
+
+
+
+
 # TODO: Make years of analysis arguments? Rather than assume NA and 2003-2016?
 # TODO: 'NA' needs to be changed to 'west' as it only covers 30. - 49.5 N and
 # TODO: 234. - 258.75 E.
@@ -397,8 +423,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	T_C = t2m - 273.15
 	Td_C = d2m - 273.15
 
-	# http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
-	# TODO: Confirm this formula and estimate for RH
+	# https://software.ecmwf.int/wiki/display/CKB/Do+ERA+datasets+contain+parameters+for+near-surface+humidity
 	RH = 100.*(np.exp((17.625*Td_C) / (243.04+Td_C))/np.exp((17.625*T_C)/(243.04+T_C)))
 
 	# Accepted approximation
