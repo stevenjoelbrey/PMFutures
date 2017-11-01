@@ -289,6 +289,8 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31
 	return blocking_mask
 
 def daysSinceLastRain(region="_"):
+	"""This function reads ecmwf reanalysis total daily precipitation and
+	calculates how many days since non zero precip at each location."""
 
 	# Read in the rain nc data
 	tp_nc = Dataset(dataDirBase + 'tp'+ region +'2003_2016.nc', 'r')
@@ -300,6 +302,9 @@ def daysSinceLastRain(region="_"):
 	time = tp_nc.variables['time']
 
 
+	# The minimum value is being interpreted as zero
+	minValue = np.min(tp)
+
 	# Loop through time and figure out how long it has been since zero rain for
 	# each grid cell.
 	daysSinceRain = np.zeros( tp.shape ,dtype=int)
@@ -307,9 +312,12 @@ def daysSinceLastRain(region="_"):
 
 	nTime = len(time)
 	for t in range(nTime):
-		print t
 
+		# Where did it rain today?
+		dailyRainMask = tp[t,:,:] == minValue
 
+		# Where there is rain leave the value of zero in place (zero means it rained today)
+		daysSinceRain[t,:,:][dailyRainMask] = daysSinceRain[t,:,:][dailyRainMask] + 1
 
 
 
