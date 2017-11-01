@@ -852,11 +852,10 @@ def getRegionBounds(region):
 		raise ValueError('unknown region argument. Use _west_, _CONUS_, _PNW_,\
 		_CAL_, _CentralRockies_, _SouthEast_, _CONUS_')
 
-	# TODO: North America and Northern Canada regions.
+	# TODO: North America and Northern Canada regions. B.C.?
 
 	return minLat, maxLat, minLon, maxLon, resolution
-<<<<<<< HEAD
-	
+
 def getDrive():	
 	"Returns hard drive path depending on what machine this code is running on."
 	pwd = os.getcwd()
@@ -868,24 +867,3 @@ def getDrive():
 		
 	return drive
 	
-	
-=======
-
-def getDrive():
-
-	"""Returns hard drive path depending on what machine this code is running on."""
-
-	pwd = os.getcwd()
-
-	mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
-
-	if pwd == mac:
-
-		drive = "/Volumes/Brey_external/"
-
-	else:
-
-		drive = "/barnes-scratch/sbrey/"
-
-	return drive
->>>>>>> 99daf86fd0a1d64951c54ce7f920035dd6787382
