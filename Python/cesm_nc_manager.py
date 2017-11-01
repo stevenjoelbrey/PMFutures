@@ -840,6 +840,14 @@ def getRegionBounds(region):
 		maxLon = 288.
 		resolution = 'h'
 
+	elif region == "_NorthAmerica_":
+		maxLat = 71.
+		minLat = 24.5
+		minLon = 192.
+		maxLon = 303.
+		resolution = 'h'
+
+
 	else:
 		raise ValueError('unknown region argument. Use _west_, _CONUS_, _PNW_,\
 		_CAL_, _CentralRockies_, _SouthEast_, _CONUS_')
