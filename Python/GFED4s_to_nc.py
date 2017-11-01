@@ -49,10 +49,10 @@ import cesm_nc_manager as cnm
 # TODO: include 'basis_regions' in nc output?
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 startYear = 2003
-endYear   = 2003  # If different than startYear, they will be appended.
-species   = 'DM'  # 'C' , 'DM' # (These have daily fraction est.)
-getDaily  = False # execute code to create daily nc
-getMonthly= True # execute code to create monthly nc
+endYear   = 2016  # If different than startYear, they will be appended.
+species   = 'burned_area'  # 'C' , 'DM' 'burned_area'# (These have daily fraction est.)
+getDaily  = True # execute code to create daily nc
+getMonthly= False # execute code to create monthly nc
 
 # Figure out what machine this code is running on. Set file paths.
 drive = cnm.getDrive()
@@ -90,10 +90,6 @@ def getDailyEmissions(dataDir, year, months, species):
 	yearData = np.zeros((366, latitude.shape[0], latitude.shape[1]))
 	yearData[:] = -1
 
-	# Do the same for daily burn area
-	yearBurnArea = np.zeros((366, latitude.shape[0], latitude.shape[1]))
-	yearBurnArea[:] = -1
-
 	# Create an array to append datetime.date objects to
 	date0 = date(year=year, month=1, day=1) # reference date in Jan 1 of year
 	time  = []
@@ -101,16 +97,23 @@ def getDailyEmissions(dataDir, year, months, species):
 	jDay = 0 # Be careful about leap yaers?
 	for m in months:
 
-		print 'Getting ' + str(year) + ' ' + m + ' month daily data'
+		print 'Getting ' + str(year) + ' ' + m + ' month daily data for species ' + species
 
 		# Write species emissions path
-		speciesDir = '/emissions/' + m + '/' + species + '/'
+		if species != 'burned_area':
 
-		# Get the months emission array
+			speciesDir = '/emissions/' + m + '/' + species + '/'
+
+		elif species == 'burned_area':
+
+			speciesDir = 'burned_area/' + m + '/burned_fraction/'
+
+		else:
+
+			raise ValueError('Unknown species. Not available in hdf5 file.')
+
+		# Get this species monthly values array
 		month_emission = f[speciesDir][:]
-
-		# Get the month burn area also
-		month_burn_area = f['burned_area/' + m + '/burned_fraction'][:]
 
 		# How many days in this month?
 		days         = f['/emissions/' + m + '/daily_fraction/']
@@ -134,7 +137,7 @@ def getDailyEmissions(dataDir, year, months, species):
 
 			# Get fraction of monthly emissions that occured on THIS day
 			dayString = 'day_' + str(dayNumber[i])
-			print dayString
+			#print dayString
 			dayFraction = days[dayString][:]
 			month_daily_frac[i,:,:] = dayFraction
 
@@ -144,9 +147,6 @@ def getDailyEmissions(dataDir, year, months, species):
 			# Append the daily data to 'yearData' array
 			yearData[jDay-1, :, :] = daily_emission_data # -1 for python 0 based index
 
-			# Give burn area the same treatment
-			daily_burned_area_data = month_burn_area * dayFraction * grid_cell_area_m2
-			yearBurnArea[jDay-1,:,:] = daily_burned_area_data # need jan 1 to be index 0
 
 		# At the end of looping through each months days data, make sure the
 		# daily fraction at each location adds up to 1 or 0.
@@ -168,14 +168,12 @@ def getDailyEmissions(dataDir, year, months, species):
 	dimProduct = yearData.shape[1] * yearData.shape[2]
 	if np.sum(yearData[365,:,:]) == dimProduct * -1:
 		yearData = yearData[0:365,:,:]
-		yearBurnArea = yearBurnArea[0:365,:,:]
 
 	# now loop over each day in dataframe, making sure every day was aassigned
 	# data.
 	for i in range(yearData.shape[0]):
 		if np.sum(yearData[i,:,:]) == dimProduct * -1:
 			raise ValueError('Time (day) index: ' + str(i) + ' was never assigned data.')
-
 
 	# Make this a much more useful array
 	time = np.array(time)
@@ -338,10 +336,12 @@ if getDaily:
 
 	if species == 'C':
 		VAR_.units = 'g ' + species + ' per grid cell per day'
-	if species == 'DM':
+	elif species == 'DM':
 		VAR_.units = 'kg ' + species + ' per grid cell per day'
-	if species == 'burned_area':
+	elif species == 'burned_area':
 		VAR_.units = 'm**2 ' + species + ' per grid cell per day'
+	else:
+		raise ValueError('The units for the chosen species are not known.')
 
 	# Create time variable
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
