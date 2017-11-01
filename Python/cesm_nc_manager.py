@@ -847,6 +847,7 @@ def getRegionBounds(region):
 	# TODO: North America and Northern Canada regions.
 
 	return minLat, maxLat, minLon, maxLon, resolution
+<<<<<<< HEAD
 	
 def getDrive():	
 	"Returns hard drive path depending on what machine this code is running on."
@@ -860,3 +861,23 @@ def getDrive():
 	return drive
 	
 	
+=======
+
+def getDrive():
+
+	"""Returns hard drive path depending on what machine this code is running on."""
+
+	pwd = os.getcwd()
+
+	mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
+
+	if pwd == mac:
+
+		drive = "/Volumes/Brey_external/"
+
+	else:
+
+		drive = "/barnes-scratch/sbrey/"
+
+	return drive
+>>>>>>> 99daf86fd0a1d64951c54ce7f920035dd6787382

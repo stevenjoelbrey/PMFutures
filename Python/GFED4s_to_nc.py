@@ -49,10 +49,10 @@ import cesm_nc_manager as cnm
 # TODO: include 'basis_regions' in nc output?
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
 startYear = 2003
-endYear   = 2003  # If different than startYear, they will be appended.
-species   = 'DM'  # 'C' , 'DM' # (These have daily fraction est.)
-getDaily  = False # execute code to create daily nc
-getMonthly= True # execute code to create monthly nc
+endYear   = 2016  # If different than startYear, they will be appended.
+species   = 'burned_area'  # 'C' , 'DM' 'burned_area'# (These have daily fraction est.)
+getDaily  = True # execute code to create daily nc
+getMonthly= False # execute code to create monthly nc
 
 # Figure out what machine this code is running on. Set file paths.
 drive = cnm.getDrive()
@@ -63,6 +63,8 @@ dataDir   = drive + 'GFED4s/'
 months = ['01', '02', '03', '04', '05','06',\
           '07', '08', '09', '10', '11', '12']
 
+# TODO: Get daily fraction arrays and save to NETCDF data. Then combine with
+# TODO: monthly burn area. Then regrid to met grid!
 
 def getDailyEmissions(dataDir, year, months, species):
 	"""This function gets all the data for a species for a given year and returns
@@ -86,7 +88,7 @@ def getDailyEmissions(dataDir, year, months, species):
 	# Create an array with the correct lat and lon dimension to append data
 	# NOTE: will trim 366th day if no assignment is made
 	yearData = np.zeros((366, latitude.shape[0], latitude.shape[1]))
-	yearData[365,:,:] = -1
+	yearData[:] = -1
 
 	# Create an array to append datetime.date objects to
 	date0 = date(year=year, month=1, day=1) # reference date in Jan 1 of year
@@ -95,20 +97,31 @@ def getDailyEmissions(dataDir, year, months, species):
 	jDay = 0 # Be careful about leap yaers?
 	for m in months:
 
-		print 'Getting ' + str(year) + ' ' + m + ' month daily data'
+		print 'Getting ' + str(year) + ' ' + m + ' month daily data for species ' + species
 
 		# Write species emissions path
-		speciesDir = '/emissions/' + m + '/' + species + '/'
+		if species != 'burned_area':
 
-		# Get the months emission array
+			speciesDir = '/emissions/' + m + '/' + species + '/'
+
+		elif species == 'burned_area':
+
+			speciesDir = 'burned_area/' + m + '/burned_fraction/'
+
+		else:
+
+			raise ValueError('Unknown species. Not available in hdf5 file.')
+
+		# Get this species monthly values array
 		month_emission = f[speciesDir][:]
 
-		# How many days?
+		# How many days in this month?
 		days         = f['/emissions/' + m + '/daily_fraction/']
 		nDaysInMonth = len(days.keys())
 
 
-		# because keys() does not put them in order
+		# because keys() does not put them in order, make a counter, and get the
+		# data in the correct order
 		dayNumber    = np.arange(1,nDaysInMonth+1)
 		month_daily_frac  = np.zeros((nDaysInMonth, nLat, nLon))
 
@@ -124,31 +137,43 @@ def getDailyEmissions(dataDir, year, months, species):
 
 			# Get fraction of monthly emissions that occured on THIS day
 			dayString = 'day_' + str(dayNumber[i])
+			#print dayString
 			dayFraction = days[dayString][:]
 			month_daily_frac[i,:,:] = dayFraction
 
-			# apply fraction to monthly data
-			daily_data = month_emission * dayFraction * grid_cell_area_m2
+			# apply fraction to monthly data, area gets per m**-2 out of emission units
+			daily_emission_data = month_emission * dayFraction * grid_cell_area_m2
 
 			# Append the daily data to 'yearData' array
-			yearData[jDay-1, :, :] = daily_data # -1 for python 0 based index
+			yearData[jDay-1, :, :] = daily_emission_data # -1 for python 0 based index
+
 
 		# At the end of looping through each months days data, make sure the
 		# daily fraction at each location adds up to 1 or 0.
 		month_daily_frac_sum = np.sum(month_daily_frac, axis=0)
 		# At locations not equal to zero, how different are values from 1?
+		# these are locations with non-zero emissions, so the daily fract of monthly
+		# emissions needs to total 1 in these locations.
 		notZero = month_daily_frac_sum != 0.
 		notZeroValues = month_daily_frac_sum[notZero]
-	   	diff = np.abs(notZeroValues - 1.)
-	   	test = diff > 1e-4
-	   	if np.sum(test) > 0:
-	   		print 'These is a monthly fraction sum equal to: ' + str(np.max(diff))
-	   		raise ValueError('Monthly Fraction array non 0 or 1 at a location.')
+		diff = np.abs(notZeroValues - 1.)
+		test = diff > 1e-5
+		if np.sum(test) > 0:
+			print 'These is a month daily fraction array sum equal to: ' + str(np.max(diff))
+			raise ValueError('Monthly Fraction array of non 0 or 1 at a location.')
 
 
+	# Outside loop going over months.
 	# Check for leap year, if 366 day of year is still all -1 get rid of it
-	if np.unique(yearData[365,:,:])[0] == -1:
+	dimProduct = yearData.shape[1] * yearData.shape[2]
+	if np.sum(yearData[365,:,:]) == dimProduct * -1:
 		yearData = yearData[0:365,:,:]
+
+	# now loop over each day in dataframe, making sure every day was aassigned
+	# data.
+	for i in range(yearData.shape[0]):
+		if np.sum(yearData[i,:,:]) == dimProduct * -1:
+			raise ValueError('Time (day) index: ' + str(i) + ' was never assigned data.')
 
 	# Make this a much more useful array
 	time = np.array(time)
@@ -311,8 +336,12 @@ if getDaily:
 
 	if species == 'C':
 		VAR_.units = 'g ' + species + ' per grid cell per day'
-	if species == 'DM':
+	elif species == 'DM':
 		VAR_.units = 'kg ' + species + ' per grid cell per day'
+	elif species == 'burned_area':
+		VAR_.units = 'm**2 ' + species + ' per grid cell per day'
+	else:
+		raise ValueError('The units for the chosen species are not known.')
 
 	# Create time variable
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
