@@ -37,20 +37,21 @@ server = ECMWFDataServer()
 
 # get param based on dictionary
 # TODO: UPDATE once the better names are known
-param_dict = {"sp":"134.128",
-	      "t2m":"167.128",
-              "d2m":"168.128",
-              "u10":"165.128",
-              "v10":"166.128",
-              "tp":"228.128",
-	      "z":"129.128",
-	      "vo":"138.128",
-	      "u":"131.128",
-              "v":"132.128",
-              "t":"130.128",
-              "wgust":"49.128",
-              "evap":"182.128"
-              }
+param_dict = {
+		"sp":"134.128",
+		"t2m":"167.128",
+		"d2m":"168.128",
+		"u10":"165.128",
+		"v10":"166.128",
+		"tp":"228.128",
+		"z":"129.128",
+		"vo":"138.128",
+		"u":"131.128",
+		"v":"132.128",
+		"t":"130.128",
+		"wgust":"49.128",
+		"e":"182.128"
+		}
 
 param = param_dict[VAR]
 
@@ -104,16 +105,16 @@ for i in range(nYears):
 				"class": "ei",
 				"dataset": "interim",
 				"date": date,
-		                "expver": "1",
-			        "grid": gridSpacing,
-		    	        "levtype": levtype,
-		    	        "param": param,
-		    	        "step": step,
-		    	        "stream": "oper",
-		    	        "time": time,
-		    	        "type": type_,
-		                "format" : "netcdf",
-		    	        "target": target,
+				"expver": "1",
+				"grid": gridSpacing,
+				"levtype": levtype,
+				"param": param,
+				"step": step,
+				"stream": "oper",
+				"time": time,
+				"type": type_,
+				"format" : "netcdf",
+				"target": target,
 		})
 
 
