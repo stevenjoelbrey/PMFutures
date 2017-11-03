@@ -72,9 +72,9 @@ ii     = 0 # for counting total iterations
 for year in years:
 
 	year = str(year)
-	print '---------------------------------------------------------------'
+	print '---------------------------------------------------------------------'
 	print 'Working on : ' + year
-	print '---------------------------------------------------------------'
+	print '---------------------------------------------------------------------'
 
 
 	# Load 6-hourly data
@@ -111,43 +111,36 @@ for year in years:
 	# Create arrays to store datetime objects
 	t = []
 	dates = []
-	year = []
+	yearList = []
+	monthList = []
+	hourList = []
 	for i in range(len(time_hour)):
 		dt = timedelta(hours=time_hour[i])
 		date_new = date0 + dt
 		t_new  = t0 + dt
+		year_new = t_new.year
 		t.append(t_new)
 		dates.append(date_new)
+		yearList.append(year_new)
+		monthList.append(t_new.month)
+		hourList.append(t_new.hour)
+
 	t = np.array(t)
 	dates = np.array(dates)
-
-	# Mask out any forecast/analysis hours that occur on the next calendar date.
-	# This needs to be done because of the annoying way ECMWF gives you data for
-	# a selected calendar year.
-	# For precip we download 00:00:00 and 12:00:00 with 12 hour time step to get
-	# total precipitation for a calendar date UTC. If you download say 2003 data
-	# Jan 1 through Dec 31, the firt 12 hour forecast accumulation time you get
-	# is 2003-01-01 12:00:00, not 2003-01-01 00:00:00. The last is
-	# 2004-01-01 00:00:00, not 2003-12-31 12:00:00.
-	# Example 1 here https://software.ecmwf.int/wiki/pages/viewpage.action?pageId=56658233
-	# makes it seem as though you need to sum the 00:00:00 and 12:00:00 values
-	# to get daily total precipitation.
+	dateYears = np.array(yearList)
+	dateMonths = np.array(monthList)
+	dateHours = np.array(hourList)
 
 
+	# NOTE: Accumulation parameters (total precip (tp) and evap) represent
+	# NOTE: accumulated values from intitialization time. For these data those
+	# NOTE: times are 00:00:00 and 12:00:00. I downloaded the data in 12 hour steps.
+	# NOTE: So for tehse parameters, each time in the data represents a total for the
+	# NOTE: previous 12 hours. This is why time series start at 12:00:00 for
+	# NOTE: these fields and 00:00:00 for analysis fields.
 
-	# Create structure to save daily data and do the averaging
-	unique_dates = np.unique(dates)
-	nDays = len(unique_dates) # might have to do a - 1 here now. Or search for feb 29th and set length based on that.
-	nLon  = len(lon)
-	nLat  = len(lat)
 
 
-	# Create array to store daily averaged data, based on dimensions
-	if len(dims) == 4:
-		nLevel= len(level)
-		dailyVAR  = np.zeros((nDays, nLevel, nLat, nLon))
-	else:
-		dailyVAR  = np.zeros((nDays, nLat, nLon))
 
 	# Get all values numpy array into workspace
 	print '---------------------------------------------------'
@@ -156,49 +149,132 @@ for year in years:
 	VAR_array = VAR[:]
 
 	print 'Working on the large loop averaging 6-hourly values for each day'
-	for i in range(nDays):
-		ii = ii + 1.
-		print str(ii/(float(nDays)*len(years))*100.) + " % complete"
 
-		# find unique day to work on
-		indexMask = np.where(dates == unique_dates[i])[0]
+	if (hourlyVAR != 'tp') & (hourlyVAR != 'evap'): # Try checking first time hour?
+		# these are the analysis variables that always require averages for a
+		# given calendar date.
 
+		print '---------------------------------------------------------------------'
+		print 'Working with an analysis parameter whos first hour is 0. '
+		print '---------------------------------------------------------------------'
+		if dateHours[0] != 0:
+			raise ValueError('The first hour of analysis field was not 0Z.')
+
+		# Create structure to save daily data and do the averaging
+		unique_dates = np.unique(dates)
+		nDays = len(unique_dates) # might have to do a - 1 here now. Or search for feb 29th and set length based on that.
+		nLon  = len(lon)
+		nLat  = len(lat)
+
+
+		# Create array to store daily averaged data, based on dimensions
 		if len(dims) == 4:
-
-			VAR_array_subset = VAR_array[indexMask, :, :, :]
-			day_time_mean = np.mean(VAR_array_subset, 0)
-			dailyVAR[i, :, : , :] = day_time_mean
-
-		elif (len(dims) == 3) & (hourlyVAR == 'tp'):
-
-			# Precip units of m per 12 hour window. Requires a sum NOT an average.
-			VAR_array_subset = VAR_array[indexMask, :, :]
-			day_time_total = np.sum(VAR_array_subset, axis=0)
-			dailyVAR[i, :, : ] = day_time_total
-			#print 'treating precip differently'
-
+			nLevel= len(level)
+			dailyVAR  = np.zeros((nDays, nLevel, nLat, nLon))
 		else:
+			dailyVAR  = np.zeros((nDays, nLat, nLon))
 
-			# Non-precip variables of this size need an average.
-			VAR_array_subset = VAR_array[indexMask, :, :]
-			day_time_mean = np.mean(VAR_array_subset, 0)
-			dailyVAR[i, :, : ] = day_time_mean
+
+		for i in range(nDays):
+			ii = ii + 1.
+			print str(ii/(float(nDays)*len(years))*100.) + " % complete"
+
+			# find unique day to work on
+			indexMask = np.where(dates == unique_dates[i])[0]
+
+			if len(dims) == 4:
+
+				VAR_array_subset = VAR_array[indexMask, :, :, :]
+				day_time_mean = np.mean(VAR_array_subset, 0)
+				dailyVAR[i, :, : , :] = day_time_mean
+
+			else:
+
+				# Non-precip variables of this size need an average.
+				VAR_array_subset = VAR_array[indexMask, :, :]
+				day_time_mean    = np.mean(VAR_array_subset, 0)
+				dailyVAR[i, :, : ] = day_time_mean
+
+
+	elif (dateHours[0] == 12) & (dateHours[-1]) == 0 & (dateYears[-1] > int(year)):
+
+		print '---------------------------------------------------------------------'
+		print 'Working with an accumulation parameter with start time hour == 12. '
+		print '---------------------------------------------------------------------'
+
+		# These strange time conditions are all true when we are working with
+		# tp and evap accumulation forecast fields.
+
+		# Precip units of m per 12 hour window. Requires a sum NOT an average.
+		# Need matching dates noon and next dates midnight to get a days total.
+		# e.g. total precip for Jan 1 is sum of tp at 01-01-year 12:00:00 AND
+		# 01-02-year 00:00:00.
+
+		# the last date in the time array will be the next year, since midnight or
+		# 0Z.
+
+		nTime = len(t)
+		if nTime % 2 != 0:
+			raise ValueError("There is something wrong. Somehow there is a date without two 23 hour chuncks. ")
+
+
+		nDays = len(t)/2
+		nLon  = len(lon)
+		nLat  = len(lat)
+
+		# Now that these strange time contrains have been met, we know we can
+		# sum the values of every other
+		dailyVAR = np.zeros((nDays, nLat, nLon))
+		dayIndex = -1
+		for j in range(0, nTime, 2):
+
+			# Advance the day index (day of year - 1)
+			dayIndex = dayIndex + 1
+
+			if (dateHours[j] == 12) & (dateHours[j+1] == 0):
+
+				# Subset the dataframe to include the two twelve hour slices we
+				# want.
+				timeSlice  = VAR[j:j+2, :, :]
+
+				# This statement makes sure we are really getting a time slice with
+				# a dimension of 2, e.g. 2 12 hour segments.
+				if timeSlice.shape[0] == 2:
+
+					dailySum = np.sum(timeSlice, axis=0)
+					dailyVAR[dayIndex,:,:] = dailySum
+
+				else:
+
+					raise ValueError("The time size was not two deep in time dim.")
+
+				# if the sum of the dailyVAR array for this date is still zero,
+				# no data was assigned.
+				if np.sum(dailyVAR[dayIndex, :,:]) == 0:
+
+					raise ValueError("No data was assigned to dayIndex: " + str(dayIndex))
+
 
 	meansCompleteTime = timer.time()
 	dt = (meansCompleteTime - timeStart) / 60.
-	print '----------------------------------------------------------------------'
+	print '---------------------------------------------------------------------'
 	print 'It took ' + str(dt) + ' minutes to create daily averages.'
-	print '----------------------------------------------------------------------'
+	print '---------------------------------------------------------------------'
 
 
 	# Check to see if the total amount of precip was conserved.
 	if hourlyVAR == 'tp':
-		sixHourSum = np.sum(VAR, axis=0)
+		originalSum = np.sum(VAR, axis=0)
 		dailySum   = np.sum(dailyVAR, axis=0)
-		dtp = sixHourSum - dailySum
+		dtp = np.abs(originalSum - dailySum)
 		# ideally dtp is all zero. With float rounding issues it could be slightly
 		# different. This matrix needs to be examined.
-		print 'Maximum annual difference in rainfall is: ' + str(np.max(dtp))
+		maxDiff = np.max(dtp)
+		print '------------------------------------------------------------------'
+		print 'Maximum annual difference in rainfall is: ' + str(maxDiff)
+		print '------------------------------------------------------------------'
+		if maxDiff > 1e-10:
+			raise ValueError("Total rainfall depth in meters not conserved within tolerance")
 
 
 	###############################################################################
@@ -232,21 +308,22 @@ for year in years:
 
 		ncFile.createDimension('level',  nLevel )
 
-		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
-		            'f4',('time','level','latitude','longitude'),
-			    fill_value=VAR._FillValue)
+		dailyVAR_ = ncFile.createVariable(hourlyVAR,'f4',
+									('time','level','latitude','longitude'),
+									fill_value=VAR._FillValue)
 
 		# While here create the level dimesion
 		level_ = ncFile.createVariable('level', 'i4', ('level',))
 		level_.units = level.units
 
 	else:
-		dailyVAR_ = ncFile.createVariable(hourlyVAR,\
-		            'f4',('time','latitude','longitude'),
-                            fill_value=VAR._FillValue)
+
+		dailyVAR_ = ncFile.createVariable(hourlyVAR,
+									'f4',('time','latitude','longitude'),
+									fill_value=VAR._FillValue)
 
 	# Assign the same units as the loaded file to the main variable
-	# NOTE: Does this change values? Since
+	# NOTE: Does this change values? Since netCDF4 package "accounts" for this?
 	dailyVAR_.units = VAR.units
 	dailyVAR_.scale_factor = VAR.scale_factor
 	dailyVAR_.add_offset = VAR.add_offset
@@ -273,9 +350,9 @@ for year in years:
 		level_[:] = level[:]
 
 	# NOTE: In general, every 4th element, starting at 0th, since there
-	# NOTE: are 4 sets of 6 hourly data for any given date. However, tp
-	# NOTE: (total precip) only has two chunks of 6 hourly data per day.
-	# NOTE: so this needs to be handled seperately.
+	# NOTE: are 4 analysis snapshots space by 6 hours for any given date.
+	# NOTE: However, tp (total precip) only has two chunks of 12 hourly data per
+	# NOTE: day so this needs to be handled seperately.
 	tstep = len(time) / nDays
 	time_[:] = time[0::tstep]
 	# The difference in each time_[:] element in hours must be 24 or
@@ -291,6 +368,3 @@ dt = (timer.time() - timeStart) / 60.
 print '----------------------------------------------------------------------'
 print 'It took ' + str(dt) + ' minutes to run entire script.'
 print '----------------------------------------------------------------------'
-
-
-
