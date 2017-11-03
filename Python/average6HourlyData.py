@@ -176,8 +176,9 @@ for year in years:
 
 
 		for i in range(nDays):
-			ii = ii + 1.
-			print str(ii/(float(nDays)*len(years))*100.) + " % complete"
+
+#			ii = ii + 1.
+#			print str(ii/(float(nDays)*len(years))*100.) + " % complete"
 
 			# find unique day to work on
 			indexMask = np.where(dates == unique_dates[i])[0]
@@ -213,36 +214,48 @@ for year in years:
 		# the last date in the time array will be the next year, since midnight or
 		# 0Z.
 
+		# In order for the code to work for these variables the same as the
+		# analysis fields, we are going to subtract 12 hours from each time
+		# element.
+		t = t - timedelta(hours=12)
+
 		nTime = len(t)
 		if nTime % 2 != 0:
 			raise ValueError("There is something wrong. Somehow there is a date without two 23 hour chuncks. ")
-
 
 		nDays = len(t)/2
 		nLon  = len(lon)
 		nLat  = len(lat)
 
+		# To make a mask of unique dates, we need to make timetime.datetime objects
+		# a more simple datetime.date object.
+		dates = []
+		for i in range(nDays*2):
+			dates.append(t[i].date())
+		dates = np.array(dates)
+		unique_dates = np.unique(dates)
+
 		# Now that these strange time contrains have been met, we know we can
-		# sum the values of every other
+		# sum the values of every other. Create an array to store daily data in.
+
 		dailyVAR = np.zeros((nDays, nLat, nLon))
-		dayIndex = -1
-		for j in range(0, nTime, 2):
+		for j in range(nDays):
 
-			# Advance the day index (day of year - 1)
-			dayIndex = dayIndex + 1
+			# The hours that match our date.
+			indexMask = np.where(dates == unique_dates[j])[0]
 
-			if (dateHours[j] == 12) & (dateHours[j+1] == 0):
+			if (dateHours[indexMask[0]] == 12) & (dateHours[indexMask[1]] == 0):
 
 				# Subset the dataframe to include the two twelve hour slices we
 				# want.
-				timeSlice  = VAR[j:j+2, :, :]
+				timeSlice  = VAR[indexMask, :, :]
 
 				# This statement makes sure we are really getting a time slice with
 				# a dimension of 2, e.g. 2 12 hour segments.
 				if timeSlice.shape[0] == 2:
 
 					dailySum = np.sum(timeSlice, axis=0)
-					dailyVAR[dayIndex,:,:] = dailySum
+					dailyVAR[j,:,:] = dailySum
 
 				else:
 
@@ -250,9 +263,9 @@ for year in years:
 
 				# if the sum of the dailyVAR array for this date is still zero,
 				# no data was assigned.
-				if np.sum(dailyVAR[dayIndex, :,:]) == 0:
+				if np.sum(dailyVAR[j, :,:]) == 0:
 
-					raise ValueError("No data was assigned to dayIndex: " + str(dayIndex))
+					raise ValueError("No data was assigned to day index j = " + str(j))
 
 
 	meansCompleteTime = timer.time()
@@ -352,7 +365,9 @@ for year in years:
 	# NOTE: In general, every 4th element, starting at 0th, since there
 	# NOTE: are 4 analysis snapshots space by 6 hours for any given date.
 	# NOTE: However, tp (total precip) only has two chunks of 12 hourly data per
-	# NOTE: day so this needs to be handled seperately.
+	# NOTE: day so this needs to be handled seperately. Because tp and evap fields
+	# NOTE: time were adjusted by minus 12 hours, all daily mean or sum fields
+	# NOTE: have a time stamp of the 0Z for the date of the data.
 	tstep = len(time) / nDays
 	time_[:] = time[0::tstep]
 	# The difference in each time_[:] element in hours must be 24 or
