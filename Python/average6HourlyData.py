@@ -11,6 +11,8 @@
 # Precedes
 #	- merge_yearly_nc.py
 
+# TODO: Handle fg10 (wind gust) daily value creation.
+
 ###############################################################################
 # ---------------------- Set analysis variables--------------------------------
 ###############################################################################
@@ -132,7 +134,7 @@ for year in years:
 	dateHours = np.array(hourList)
 
 
-	# NOTE: Accumulation parameters (total precip (tp) and evap) represent
+	# NOTE: Accumulation parameters (total precip (tp) and e) represent
 	# NOTE: accumulated values from intitialization time. For these data those
 	# NOTE: times are 00:00:00 and 12:00:00. I downloaded the data in 12 hour steps.
 	# NOTE: So for tehse parameters, each time in the data represents a total for the
@@ -150,7 +152,7 @@ for year in years:
 
 	print 'Working on the large loop averaging 6-hourly values for each day'
 
-	if (hourlyVAR != 'tp') & (hourlyVAR != 'evap'): # Try checking first time hour?
+	if (hourlyVAR != 'tp') & (hourlyVAR != 'e'): # Try checking first time hour?
 		# these are the analysis variables that always require averages for a
 		# given calendar date.
 
@@ -177,9 +179,6 @@ for year in years:
 
 		for i in range(nDays):
 
-#			ii = ii + 1.
-#			print str(ii/(float(nDays)*len(years))*100.) + " % complete"
-
 			# find unique day to work on
 			indexMask = np.where(dates == unique_dates[i])[0]
 
@@ -204,7 +203,7 @@ for year in years:
 		print '---------------------------------------------------------------------'
 
 		# These strange time conditions are all true when we are working with
-		# tp and evap accumulation forecast fields.
+		# tp and e accumulation forecast fields.
 
 		# Precip units of m per 12 hour window. Requires a sum NOT an average.
 		# Need matching dates noon and next dates midnight to get a days total.
@@ -341,6 +340,8 @@ for year in years:
 	dailyVAR_.scale_factor = VAR.scale_factor
 	dailyVAR_.add_offset = VAR.add_offset
 	dailyVAR_.missing_value = VAR.missing_value
+	# NOTE: tests on the loaded values of nc files I write show that it does
+	# NOTEL not actually matter if these off_set and scale factors are used.
 
 	# Create time variable
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
@@ -365,10 +366,10 @@ for year in years:
 	# NOTE: In general, every 4th element, starting at 0th, since there
 	# NOTE: are 4 analysis snapshots space by 6 hours for any given date.
 	# NOTE: However, tp (total precip) only has two chunks of 12 hourly data per
-	# NOTE: day so this needs to be handled seperately. Because tp and evap fields
+	# NOTE: day so this needs to be handled seperately. Because tp and e fields
 	# NOTE: time were adjusted by minus 12 hours, all daily mean or sum fields
 	# NOTE: have a time stamp of the 0Z for the date of the data.
-	if (hourlyVAR == 'tp') | (hourlyVAR == 'evap'):
+	if (hourlyVAR == 'tp') | (hourlyVAR == 'e'):
 		time = time[:] - 12
 
 	tstep = len(time) / nDays
