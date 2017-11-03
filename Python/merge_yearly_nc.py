@@ -23,12 +23,7 @@ import cesm_nc_manager as cnm
 
 
 # Figure out what machine this code is running on. Set file paths.
-pwd = os.getcwd()
-mac = '/Users/sbrey/GoogleDrive/sharedProjects/PMFutures/Python'
-if pwd == mac:
-	drive = "/Volumes/Brey_external/"
-else:
-	drive = "/barnes-scratch/sbrey/"
+drive = cnm.getDrive()
 
 dataDirBase = drive + "era_interim_nc_daily_merged/"
 
@@ -54,10 +49,10 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables by manually here.
-	ncVARType = 'era_interim'       # 'era_interim' | 'GFED4s' | 'FINN'
-	ncVAR     = 'u10'       # 'tp' | 'C' | 'CO2' | 'SPDH'
-	region    = '_'          #  "_" = global | any region in cnm.getRegionBounds()
-	startYear = 2003         # HMS only spans 2006 - 2015
+	ncVARType = 'era_interim'   # 'era_interim' | 'GFED4s' | 'FINN'
+	ncVAR     = 'tp'           # 'tp' | 'C' | 'CO2' | 'SPDH'
+	region    = '_'             #  "_" = global | any region in cnm.getRegionBounds()
+	startYear = 2003            # HMS only spans 2006 - 2015
 	endYear   = 2016
 
 
