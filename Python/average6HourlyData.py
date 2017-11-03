@@ -368,6 +368,9 @@ for year in years:
 	# NOTE: day so this needs to be handled seperately. Because tp and evap fields
 	# NOTE: time were adjusted by minus 12 hours, all daily mean or sum fields
 	# NOTE: have a time stamp of the 0Z for the date of the data.
+	if (hourlyVAR == 'tp') | (hourlyVAR == 'evap'):
+		time = time[:] - 12
+
 	tstep = len(time) / nDays
 	time_[:] = time[0::tstep]
 	# The difference in each time_[:] element in hours must be 24 or
