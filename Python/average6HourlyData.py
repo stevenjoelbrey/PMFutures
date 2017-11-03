@@ -31,7 +31,7 @@ else:
 	# Development environment. Set variables by manually here.
 	hourlyVAR =  'tp'
 	startYear = 2003
-	endYear   = 2003
+	endYear   = 2016
 
 
 
