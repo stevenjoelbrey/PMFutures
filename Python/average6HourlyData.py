@@ -29,7 +29,7 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables by manually here.
-	hourlyVAR =  'tp'
+	hourlyVAR =  'rh2m'
 	startYear = 2003
 	endYear   = 2016
 

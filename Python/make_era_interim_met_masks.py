@@ -431,8 +431,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	T_C = t2m - 273.15
 	Td_C = d2m - 273.15
 
-	# https://software.ecmwf.int/wiki/display/CKB/Do+ERA+datasets+contain+parameters+for+near-surface+humidity
-	RH = 100.*(np.exp((17.625*Td_C) / (243.04+Td_C))/np.exp((17.625*T_C)/(243.04+T_C)))
+	# RH = LOAD CALCULATED VALUE HERE
 
 	# Accepted approximation
 	# http://journals.ametsoc.org/doi/pdf/10.1175/BAMS-86-2-225
