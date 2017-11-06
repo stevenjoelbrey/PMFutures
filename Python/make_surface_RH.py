@@ -40,7 +40,7 @@ import os.path
 
 drive = cnm.getDrive()
 dataDir   = os.path.join(drive,"era_interim_nc_6_hourly/")
-years = np.arange(2003, 2017)
+years = np.arange(2003, 2016)
 
 # Create surface RH for each year of chosen range
 for year in years:
@@ -124,9 +124,10 @@ for year in years:
 	longitude_.units = longitude.units
 	longitude_[:] = longitude
 
-	# Stagnation
-	RH_ = ncFile.createVariable('rh2m', 'i', ('time','latitude','longitude'))
+	# Create the RH variable as a floating point value
+	RH_ = ncFile.createVariable('rh2m', 'f4', ('time','latitude','longitude'))
 	RH_.units = '%'
+
 	RH_[:] = RH
 
 	ncFile.close()

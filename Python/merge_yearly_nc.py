@@ -24,9 +24,7 @@ import cesm_nc_manager as cnm
 
 # Figure out what machine this code is running on. Set file paths.
 drive = cnm.getDrive()
-
 dataDirBase = drive + "era_interim_nc_daily_merged/"
-
 dirRoot = drive
 
 
@@ -50,7 +48,7 @@ if len(sys.argv) != 1:
 else:
 	# Development environment. Set variables by manually here.
 	ncVARType = 'era_interim'   # 'era_interim' | 'GFED4s' | 'FINN'
-	ncVAR     = 'tp'           # 'tp' | 'C' | 'CO2' | 'SPDH'
+	ncVAR     = 'v10'           # 'tp' | 'C' | 'CO2' | 'SPDH'
 	region    = '_'             #  "_" = global | any region in cnm.getRegionBounds()
 	startYear = 2003            # HMS only spans 2006 - 2015
 	endYear   = 2016
@@ -210,19 +208,11 @@ if len(dims) == 4:
 	level_ = ncFile.createVariable('level', 'i4', ('level',))
 	level_.units = level.units
 
-	mergedVAR_.scale_factor = ncBase.variables[ncVAR].scale_factor
-	mergedVAR_.add_offset = ncBase.variables[ncVAR].add_offset
-	mergedVAR_.missing_value = ncBase.variables[ncVAR].missing_value
 
 elif (len(dims)==3) & (ncVARType == 'era_interim'):
 
 	mergedVAR_ = ncFile.createVariable(ncVAR,\
-	            'f4',('time','latitude','longitude'),
-                     fill_value=ncBase.variables[ncVAR]._FillValue)
-
-	mergedVAR_.scale_factor = ncBase.variables[ncVAR].scale_factor
-	mergedVAR_.add_offset = ncBase.variables[ncVAR].add_offset
-	mergedVAR_.missing_value = ncBase.variables[ncVAR].missing_value
+	            'f4',('time','latitude','longitude'))
 
 else:
 	mergedVAR_ = ncFile.createVariable(ncVAR,\

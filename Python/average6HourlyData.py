@@ -29,7 +29,7 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables by manually here.
-	hourlyVAR =  'rh2m'
+	hourlyVAR =  'v10'
 	startYear = 2003
 	endYear   = 2016
 
@@ -289,6 +289,9 @@ for year in years:
 			raise ValueError("Total rainfall depth in meters not conserved within tolerance")
 
 
+
+	#print 'The min value of dailyVAR is: ' + str(np.min(dailyVAR))
+	#print 'The max value of dailyVAR is: ' + str(np.max(dailyVAR))
 	###############################################################################
 	# Write the new netcdf data with the exact same formatting as the
 	# data read here.
@@ -321,8 +324,7 @@ for year in years:
 		ncFile.createDimension('level',  nLevel )
 
 		dailyVAR_ = ncFile.createVariable(hourlyVAR,'f4',
-									('time','level','latitude','longitude'),
-									fill_value=VAR._FillValue)
+									('time','level','latitude','longitude'))
 
 		# While here create the level dimesion
 		level_ = ncFile.createVariable('level', 'i4', ('level',))
@@ -331,17 +333,10 @@ for year in years:
 	else:
 
 		dailyVAR_ = ncFile.createVariable(hourlyVAR,
-									'f4',('time','latitude','longitude'),
-									fill_value=VAR._FillValue)
+									'f4',('time','latitude','longitude'))
 
 	# Assign the same units as the loaded file to the main variable
-	# NOTE: Does this change values? Since netCDF4 package "accounts" for this?
 	dailyVAR_.units = VAR.units
-	dailyVAR_.scale_factor = VAR.scale_factor
-	dailyVAR_.add_offset = VAR.add_offset
-	dailyVAR_.missing_value = VAR.missing_value
-	# NOTE: tests on the loaded values of nc files I write show that it does
-	# NOTEL not actually matter if these off_set and scale factors are used.
 
 	# Create time variable
 	time_ = ncFile.createVariable('time', 'i4', ('time',))
