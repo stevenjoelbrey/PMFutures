@@ -201,8 +201,7 @@ if len(dims) == 4:
 
 	ncFile.createDimension('level',  len(level) )
 	mergedVAR_ = ncFile.createVariable(ncVAR,\
-	            'f4',('time','level','latitude','longitude'),
-                     fill_value=ncBase.variables[ncVAR]._FillValue)
+	            'f4',('time','level','latitude','longitude'))
 
 	# While here create the level dimesion
 	level_ = ncFile.createVariable('level', 'i4', ('level',))

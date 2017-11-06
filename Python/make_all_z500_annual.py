@@ -54,7 +54,7 @@ latUnits    = lat.units
 
 
 # get unique year sequence
-t, months, years = cnm.get_era_interim_time(time_hour)
+t, months, years = cnm.get_era_interim_time(time)
 uniqueYears = np.unique(years)
 
 # want just boring old date though, for looping
@@ -159,9 +159,7 @@ longitude_[:]    = lon[:]
 
 
 # NOTE: In general, every 4th element, starting at 0th, since there
-# NOTE: are 4 sets of 6 hourly data for any given date. However, tp
-# NOTE: (total precip) only has two chunks of 6 hourly data per day.
-# NOTE: so this needs to be handled seperately.
+# NOTE: are 4 sets of 6 hourly data for any given date.
 tstep = len(time) / nDays
 time_[:] = time[0::tstep]
 # The difference in each time_[:] element in hours must be 24 or
