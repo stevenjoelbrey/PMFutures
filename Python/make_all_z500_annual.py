@@ -11,7 +11,7 @@
 ###############################################################################
 # ---------------------- Set analysis variables--------------------------------
 ###############################################################################
-domain = "_" # "_NA_" subsets domain to North America lat lon. Any other
+domain = "_NA_" # "_NA_" subsets domain to North America lat lon. Any other
 				# string returns the whole world
 
 

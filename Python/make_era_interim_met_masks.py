@@ -47,8 +47,8 @@ dataDirBase = drive + "era_interim_nc_daily_merged/"
 ################################################################################
 
 
-def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31",\
-					      minDays=3, plotBlocks=False, minBlobSize=15.):
+def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31",
+					   minDays=3, plotBlocks=False, minBlobSize=15.):
 	"""
 	This function finds blocking days based on a very simple definition.
 	Blocking days are defined as days when the 500 mb geopotential height
@@ -85,7 +85,7 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31
 	lon = z_nc.variables['longitude'][:]
 	time = z_nc.variables['time']
 
-
+	# These are for measuring feature size
 	dx = np.abs(np.mean(np.diff(lon)))
 	dy = np.abs(np.mean(np.diff(lat)))
 
@@ -433,7 +433,8 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	T_C = t2m - 273.15
 	Td_C = d2m - 273.15
 
-	# RH = LOAD CALCULATED VALUE HERE
+	# LOAD THE NEW AND IMPROVED RH ESTIMATE
+	RH = T_C
 
 	# Accepted approximation
 	# http://journals.ametsoc.org/doi/pdf/10.1175/BAMS-86-2-225
