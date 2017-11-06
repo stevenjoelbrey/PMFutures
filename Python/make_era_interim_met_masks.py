@@ -76,6 +76,8 @@ def find_blocking_days(sdFactor=0.5, startDate="2003-01-01", endDate="2016-12-31
 	startDate = datetime.datetime.strptime(startDate, '%Y-%m-%d')
 	endDate   = datetime.datetime.strptime(endDate, '%Y-%m-%d')
 
+	# NOTE: File with all 6 hourly z500 files downloaded with get_all_era_interim_z.py
+	# NOTE: These 6 hourly data were made daily using make_all_z500_annual.py
 	all_Z500_dir = drive + 'era_interim_nc_daily/'
 	z_nc    = Dataset(all_Z500_dir + 'z_all_daily.nc', 'r')
 	z       = z_nc.variables['z500']
