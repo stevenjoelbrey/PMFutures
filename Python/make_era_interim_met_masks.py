@@ -454,12 +454,8 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	mask_tp   = np.array(tp < precLim, dtype=bool)
 
 	# Combined stagnation mask, one at a time to save working memory
-	m1 = mask_sfc & mask_500
-	del mask_sfc, mask_500
-	m2 = m1 & mask_tp
-	del m1
-
-	stagnation_mask = np.array(m2, dtype=int)
+	m1 = mask_sfc + mask_500 + mask_tp
+	stagnation_mask = np.array(m1 == 3, dtype=int)
 
 
 	###############################################################################
@@ -469,7 +465,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		print 'The maximum value of precip on stangation days exceeds threshold!'
 		raise ValueError("This means creating the mask has failed!!!!!")
 
-	del mask_tp
+	del mask_tp, mask_sfc, mask_500, m1
 
 
 	###############################################################################
