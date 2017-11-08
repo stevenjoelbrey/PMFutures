@@ -431,7 +431,11 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	u       = u_nc.variables['u'][:,level_i,:,:]
 	u_nc.close()
 
+
 	upper_wind = np.sqrt(v**2 + u**2)
+
+	del u,v, v10, u10
+
 
 	###############################################################################
 	# Get precipitation
@@ -452,6 +456,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	# Combined stagnation mask
 	stagnation_mask = np.array(mask_sfc & mask_500 & mask_tp, dtype=int)
 
+	del mask_sfc, mask_500
 
 	###############################################################################
 	# Sanity check the output before writing the mask to an nc file
@@ -459,6 +464,8 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	if np.max(tp[mask_tp]) >= precLim:
 		print 'The maximum value of precip on stangation days exceeds threshold!'
 		raise ValueError("This means creating the mask has failed!!!!!")
+
+	del mask_tp
 
 
 	###############################################################################
