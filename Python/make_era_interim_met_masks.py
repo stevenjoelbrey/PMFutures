@@ -454,7 +454,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	mask_tp   = np.array(tp < precLim, dtype=bool)
 
 	# Combined stagnation mask, one at a time to save working memory
-	m1 = mask_sfc + mask_500 + mask_tp
+	m1 = int(mask_sfc) + int(mask_500) + int(mask_tp)
 	stagnation_mask = np.array(m1 == 3, dtype=int)
 
 
