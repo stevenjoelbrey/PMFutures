@@ -301,8 +301,8 @@ def daysSinceLastRain(region="_"):
 	tp_meters = tp_nc.variables['tp'] # meters per calendar date
 	inchPerM = 39.3701      # [inch/meter]
 	tp = tp_meters[:] * inchPerM # This loads a really big file into the workspace
-#	latitude = tp_nc.variables['latitude']
-#	longitude = tp_nc.variables['longitude']
+	latitude = tp_nc.variables['latitude']
+	longitude = tp_nc.variables['longitude']
 	time = tp_nc.variables['time']
 
 	# We are going to round the daily rainfall totals to 5 decimal places, even
@@ -337,6 +337,36 @@ def daysSinceLastRain(region="_"):
 			# Where there is rain leave the value of zero in place (zero means it rained today)
 			# Everywhere else, increase the value of the array by 1.
 			daysSinceRain[t,:,:][dailyRainMask] = daysSinceRain[t-1,:,:][dailyRainMask] + 1
+
+
+	# Write this as a met nc file
+	saveName = dataDirBase + 'days_since_rain' + region + '2003_2016.nc'
+
+	ncFile = Dataset(saveName, 'w', format='NETCDF4')
+	ncFile.description = 'Counter indicating days since rain > 0 at a location.'
+	ncFile.location = 'Global'
+	ncFile.createDimension('time', len(time[:]) )
+	ncFile.createDimension('latitude', len(latitude[:]) )
+	ncFile.createDimension('longitude', len(longitude[:]) )
+
+	days_since_rain_ = ncFile.createVariable('days_since_rain', 'i4', ('time','latitude','longitude'))
+	days_since_rain_.units = 'days since daily rain > 0'
+	days_since_rain_[:] = daysSinceRain
+
+	# dimension values assignments
+	time_ = ncFile.createVariable('time', 'i4', ('time',))
+	time_.units = time.units
+	time_[:] = time[:]
+
+	latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
+	latitude_.units = latitude.units
+	latitude_[:] = latitude[:]
+
+	longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
+	longitude_.units = longitude.units
+	longitude_[:]    = longitude[:]
+
+	tp_nc.close()
 
 	return daysSinceRain
 
@@ -393,7 +423,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	###############################################################################
 	v_nc    = Dataset(dataDirBase + 'v'+ region +'2003_2016.nc', 'r')
 	level   = v_nc.variables['level']
-	level_i = np.where(level[:] == 500)[0][0]
+	level_i = level[:] == 500
 	v       = v_nc.variables['v'][:,level_i,:,:]
 	v_nc.close()
 
@@ -426,7 +456,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	###############################################################################
 	# Sanity check the output before writing the mask to an nc file
 	###############################################################################
-	if tp[mask_tp].max() >= precLim:
+	if np.max(tp[mask_tp]) >= precLim:
 		print 'The maximum value of precip on stangation days exceeds threshold!'
 		raise ValueError("This means creating the mask has failed!!!!!")
 
@@ -443,25 +473,16 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 	t2m = t2m_nc.variables['t2m'][:]
 	t2m_nc.close()
 
-	d2m_nc = Dataset(dataDirBase + 'd2m'+ region +'2003_2016.nc', 'r')
-	d2m = d2m_nc.variables['d2m'][:]
-	d2m_nc.close()
-
-	# Calculate (and save) relative humidity
-	T_C = t2m - 273.15
-	Td_C = d2m - 273.15
-
 	# LOAD THE NEW AND IMPROVED RH ESTIMATE
-	RH = T_C
+	RH_nc = Dataset(dataDirBase + 'rh2m'+ region +'2003_2016.nc', 'r')
+	RH = RH_nc.variables['rh2m'][:]
+	RH_nc.close()
 
-	# Accepted approximation
-	# http://journals.ametsoc.org/doi/pdf/10.1175/BAMS-86-2-225
-	#RH = 100. - 5. * (T_C - Td_C)
 
 	# Make the masks
-	high_wind_mask  = np.array(sfc_wind >= windThresh, dtype=int)
+	high_wind_mask  = np.array(sfc_wind > windThresh, dtype=int)
 	low_RH_mask     = np.array(RH < RHThresh, dtype=int)
-	high_T_mask     = np.array(t2m >= TThresh, dtype=int)
+	high_T_mask     = np.array(t2m > TThresh, dtype=int)
 	blocking_mask   = np.array(find_blocking_days(), dtype=int) # Calls comlex function
 	low_precip_mask = np.array(tp < precLim, dtype=int)
 
@@ -494,7 +515,6 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 		stagnation_mask_[:] = stagnation_mask
 
 		# Precip
-		low_precip_mask
 		low_precip_mask_ = ncFile.createVariable('low_precip_mask', 'i', ('time','latitude','longitude'))
 		low_precip_mask_.units = 'days precip < ' + str(precLim) + ' inches/day'
 		low_precip_mask_[:] = low_precip_mask[:]
@@ -516,7 +536,7 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 
 		# Blocking days
 		blocking_mask_ = ncFile.createVariable('blocking_mask', 'i', ('time','latitude','longitude'))
-		blocking_mask_.units = 'Location date has z > monthly mean + std for today and yesterday.'
+		blocking_mask_.units = 'Daily z > Jday mean by 0.5 sd for 3 days'
 		blocking_mask_[:] = blocking_mask[:]
 
 		# dimension values assignments
@@ -534,36 +554,6 @@ def make_era_interim_met_masks(windSfcLim=8., wind500Lim=13., precLim=0.01,
 
 		ncFile.close()
 
-		#######################################################################
-		# Save RH as its own met variable!!!
-		#######################################################################
-		saveName = dataDirBase + 'RH_NA_2003_2016.nc'
-
-		ncFile = Dataset(saveName, 'w', format='NETCDF4')
-		ncFile.description = 'Mask indicating stangation days'
-		ncFile.location = 'Global'
-		ncFile.createDimension('time', len(time[:]) )
-		ncFile.createDimension('latitude', len(latitude[:]) )
-		ncFile.createDimension('longitude', len(longitude[:]) )
-
-		RH_ = ncFile.createVariable('RH', 'i', ('time','latitude','longitude'))
-		RH_.units = '%'
-		RH_[:] = RH
-
-		# dimension values assignments
-		time_ = ncFile.createVariable('time', 'i4', ('time',))
-		time_.units = time.units
-		time_[:] = time[:]
-
-		latitude_ = ncFile.createVariable('latitude', 'f4', ('latitude',))
-		latitude_.units = latitude.units
-		latitude_[:] = latitude[:]
-
-		longitude_ = ncFile.createVariable('longitude', 'f4', ('longitude',))
-		longitude_.units = longitude.units
-		longitude_[:]    = longitude[:]
-
-		ncFile.close()
 
 		dt = (timer.time() - writingComplete) / 60.
 		print '----------------------------------------------------------------------'
