@@ -38,6 +38,8 @@ from skimage import measure
 from skimage import filters
 
 
+region = "_"
+
 # Figure out what machine this code is running on. Set file paths.
 drive = cnm.getDrive()
 dataDirBase = drive + "era_interim_nc_daily_merged/"
@@ -298,29 +300,45 @@ def daysSinceLastRain(region="_"):
 	tp_nc = Dataset(dataDirBase + 'tp'+ region +'2003_2016.nc', 'r')
 	tp_meters = tp_nc.variables['tp'] # meters per calendar date
 	inchPerM = 39.3701      # [inch/meter]
-	tp = tp_meters[:] * inchPerM
-	latitude = tp_nc.variables['latitude']
-	longitude = tp_nc.variables['longitude']
+	tp = tp_meters[:] * inchPerM # This loads a really big file into the workspace
+#	latitude = tp_nc.variables['latitude']
+#	longitude = tp_nc.variables['longitude']
 	time = tp_nc.variables['time']
 
+	# We are going to round the daily rainfall totals to 5 decimal places, even
+	# this is probably beyond the significant figure.
 
-	# The minimum value is being interpreted as zero
+	tp = np.round(tp, decimals=5)
+
+	# The minimum value is being interpreted as zero. This is partially why I
+	# rounded the values.
+	# NOTE: In Python -0 is a thing and it is equal to 0.
 	minValue = np.min(tp)
+
+	# Make sure there are no negative precip values floating around in these here
+	# datas
+	if (np.sum(tp < 0) > 0):
+		raise ValueError('Precip less than zero detected in data. Evaulated chosen precip file pipeline.')
 
 	# Loop through time and figure out how long it has been since zero rain for
 	# each grid cell.
 	daysSinceRain = np.zeros( tp.shape ,dtype=int)
 
-
 	nTime = len(time)
 	for t in range(nTime):
 
-		# Where did it rain today?
+		# Where did it not rain today?
 		dailyRainMask = tp[t,:,:] == minValue
 
-		# Where there is rain leave the value of zero in place (zero means it rained today)
-		daysSinceRain[t,:,:][dailyRainMask] = daysSinceRain[t,:,:][dailyRainMask] + 1
+		# The first day has no memory, needs to be treated differently
+		if t == 0:
+			daysSinceRain[t,:,:][dailyRainMask] = daysSinceRain[t,:,:][dailyRainMask] + 1
+		else:
+			# Where there is rain leave the value of zero in place (zero means it rained today)
+			# Everywhere else, increase the value of the array by 1.
+			daysSinceRain[t,:,:][dailyRainMask] = daysSinceRain[t-1,:,:][dailyRainMask] + 1
 
+	return daysSinceRain
 
 
 # TODO: Make years of analysis arguments? Rather than assume NA and 2003-2016?
