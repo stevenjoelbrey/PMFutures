@@ -1,24 +1,24 @@
 #!/usr/bin/env python2
 
-# plot_interannual_variability.py 
+# plot_interannual_variability.py
 
 ###############################################################################
-# ------------------------- Description --------------------------------------- 
+# ------------------------- Description ---------------------------------------
 ###############################################################################
 # This script will be used to explore the monthly and seasonal relationships
-# between emissions (TODO: Burn area) and meteorology. 
+# between emissions (TODO: Burn area) and meteorology.
 
-# currently, this script contains much of the same functionality and load 
-# statements as plotObservationParameterSpace.py and 
+# currently, this script contains much of the same functionality and load
+# statements as plotObservationParameterSpace.py and
 # plot_GFED4s_emission_summary.py. These will be consolidated at a later time
-# but I am separating here to make organization more clear. 
+# but I am separating here to make organization more clear.
 
-# TODO: HANDLE HMS, get it into this pipeline! 
+# TODO: HANDLE HMS, get it into this pipeline!
 
 ################################################################################
 #------------- Arguments to Subset model emissions in space and time -----------
 ################################################################################
-region = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_" 
+region = "_west_" # "_west_"| "_PNW_" | "_CAL_" | "_CentralRockies_"  | "CONUS"
 
 
 # Load resources
@@ -42,25 +42,20 @@ import statsmodels
 # for multilinear regression
 from sklearn import linear_model
 
-# Get region lat lon range and basemap plotting resolution based on the 
+# Get region lat lon range and basemap plotting resolution based on the
 # chosen region
-# TODO: Make a SE region! 
+# TODO: Make a SE region!
 minLat, maxLat, minLon, maxLon, resolution  = cnm.getRegionBounds(region)
 
 # Figure out what machine this code is running on
-pwd = os.getcwd()
-mac = '/Users/sbrey/Google Drive/sharedProjects/PMFutures/Python'
-if pwd == mac:
-	drive = "/Volumes/Brey_external/"
-else:
-	drive = "/barnes-scratch/sbrey/"
+drive = cnm.getDrive()
 
 # Set directory paths
 metDataDirBase = drive + "era_interim_nc_daily_merged/"
-figureDir = '../Figures/GFED_era_interm_analysis/' # always relativ to py
-	
+figureDir = '../Figures/GFED_era_interm_analysis/' # always relativ to /Python
+
 # Get emissions, use this to get dimensions
-ncFile  = drive + "GFED4s/GFED4.1s_METGrid_C_NA_2003_2016.nc"
+ncFile  = drive + "rebuild/GFED4.1s_METGrid_C_NA_2003_2016.nc"
 nc = Dataset(ncFile, 'r')
 latitude = nc.variables['latitude'][:]
 longitude = nc.variables['longitude'][:]
@@ -71,7 +66,7 @@ nc.close()
 # Make time into datetime arrays
 time, month, year = cnm.get_era_interim_time(time)
 
-# Spatially subset the data 
+# Spatially subset the data
 C, ynew, xnew = cnm.mask2dims(C, longitude, latitude, 0, minLon, maxLon, minLat, maxLat)
 
 ################################################################################
@@ -136,14 +131,14 @@ for i in range(nYears):
 	julyMask = (month == 7.) & (year == uniqueYears[i])
 	augMask  = (month == 8.) & (year == uniqueYears[i])
 	septMask  = (month == 9.) & (year == uniqueYears[i])
-	
+
 	C_summer[i] = np.sum(C_daily_total[summerMask])
 	C_june[i] = np.sum(C_daily_total[juneMask])
 	C_july[i] = np.sum(C_daily_total[julyMask])
 	C_aug[i] = np.sum(C_daily_total[augMask])
 	C_sept[i] = np.sum(C_daily_total[septMask])
 
-# First plot with all one color 
+# First plot with all one color
 fig = plt.figure(figsize=(12,8))
 ax = plt.subplot(111)
 p1 = plt.bar(uniqueYears, C_summer)
@@ -157,14 +152,14 @@ plt.title("GDED4.1s June-Sept Emissions, 2003-2016", fontsize=27)
 plt.savefig(figureDir + "summer_interannual_variability"+region+".png")
 plt.close()
 
-# Now stack the monthly contributions 
+# Now stack the monthly contributions
 fig = plt.figure(figsize=(12,8))
 ax = plt.subplot(111)
 p1 = plt.bar(uniqueYears, C_june, color="blue")
 p2 = plt.bar(uniqueYears, C_july, bottom=C_june, color="green")
 p3 = plt.bar(uniqueYears, C_aug, bottom=(C_june + C_july), color="grey")
 p4 = plt.bar(uniqueYears, C_sept, bottom=(C_june + C_july + C_aug), color="brown")
-plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"), 
+plt.legend( (p1[0], p2[0], p3[0], p4[0]), ("June", "July", "Aug", "Sept"),
 			frameon=False, loc="best", fontsize=27)
 # Style this plot like a pro
 ax.spines['top'].set_visible(False)
@@ -179,16 +174,16 @@ plt.close()
 
 
 ################################################################################
-# Transitioning to looking at monthly 
+# Transitioning to looking at monthly
 ################################################################################
 
-# TODO: MASK LOCATIONS THAT DO NOT HAVE LOTS OF EMISSIONS. 
-# UPDATE: No probably not. 
+# TODO: MASK LOCATIONS THAT DO NOT HAVE LOTS OF EMISSIONS.
+# UPDATE: No probably not.
 
 ################################################################################
 # Bring in meteorology and event masks
 ################################################################################
-# make a handy little function for getting met 
+# make a handy little function for getting met
 def ncGetSelf(Dir, varname):
 	nc = Dataset(Dir + varname +"_NA_2003_2016.nc", 'r')
 	VAR = nc.variables[varname][:]
@@ -196,10 +191,10 @@ def ncGetSelf(Dir, varname):
 	return VAR
 
 t2m = ncGetSelf(metDataDirBase, 't2m')[:]
-tp = ncGetSelf(metDataDirBase, 'tp')[:] 
-u10 = ncGetSelf(metDataDirBase, 'u10')[:] 
+tp = ncGetSelf(metDataDirBase, 'tp')[:]
+u10 = ncGetSelf(metDataDirBase, 'u10')[:]
 v10 = ncGetSelf(metDataDirBase, 'v10')[:]
-windSpeed = np.sqrt(u10**2 + v10**2) 
+windSpeed = np.sqrt(u10**2 + v10**2)
 z   = ncGetSelf(metDataDirBase, 'z')[:,1,:,:] / 9.81
 RH   = ncGetSelf(metDataDirBase, 'RH')[:] # created by make_era_interim_met_masks.py
 d2m = ncGetSelf(metDataDirBase, 'd2m')[:]
@@ -216,15 +211,15 @@ d2m, ynew, xnew = cnm.mask2dims(d2m, longitude, latitude, 0, minLon, maxLon, min
 # Make temperature units America
 d2m = cnm.KtoF(d2m)
 t2m = cnm.KtoF(t2m)
-tp = tp * 39.3701 # 39.37 inches per meter 
+tp = tp * 39.3701 # 39.37 inches per meter
 
 # These are the only lat lon values moving forward
 latitude = ynew
-longitude = xnew 
+longitude = xnew
 
 ################################################################################
 # Make Monthly totals and or means for meteorology. This dataframe will be used
-# for analysis for the rest of the script. 
+# for analysis for the rest of the script.
 ################################################################################
 
 # rows of dataframe
@@ -233,7 +228,7 @@ nMonths = nYears * 12.
 # columns of dataframe, TODO: soil moisture
 colnames = ['year', 'month', 'E', 't2m', 'tp', 'windSpeed', 'z', 'RH', 'd2m']
 # Create monthly dataframe
-monthBlank = np.zeros(shape=(int(nMonths), len(colnames))) 
+monthBlank = np.zeros(shape=(int(nMonths), len(colnames)))
 month_df = pd.DataFrame(data=monthBlank, columns=colnames)
 # Create summer (6-9) dataframe
 summerBlank = np.zeros(shape=(nYears, len(colnames)))
@@ -245,7 +240,7 @@ for y in range(nYears):
 	# identify this years summer days to make summer average
 	summerMask = (year == uniqueYears[y]) & (month >= 6) & (month <= 9)
 	summer_df.year[y] = uniqueYears[y]
-	
+
 	# variables requiring summing first
 	summer_df["E"][y] = np.sum(C[summerMask, :,:])
 	summer_df["tp"][y] = np.sum(tp[summerMask, :,:])
@@ -263,10 +258,10 @@ for y in range(nYears):
 		monthMask = (uniqueMonths[m] == month) & (year == uniqueYears[y])
 		month_df.year[df_i] = uniqueYears[y]
 		month_df.month[df_i]= uniqueMonths[m]
-		
-		# Assign met values for this month mask (~30 days) and all of 
-		# the spatial domain 
-		
+
+		# Assign met values for this month mask (~30 days) and all of
+		# the spatial domain
+
 		# variables requiring summing first
 		month_df["E"][df_i] = np.sum(C[monthMask, :,:])
 		month_df["tp"][df_i] = np.sum(tp[monthMask, :,:])
@@ -276,12 +271,12 @@ for y in range(nYears):
 		month_df["z"][df_i] = np.mean(z[monthMask, :,:])
 		month_df["RH"][df_i] = np.mean(RH[monthMask, :,:])
 		month_df["d2m"][df_i] = np.mean(d2m[monthMask, :,:])
-		
-		
-		
-################################################################################		
+
+
+
+################################################################################
 # plot monthly and yearly values against each-other in a 7x7 figure
-# where each frame is a scatterplot and each 		
+# where each frame is a scatterplot and each
 ################################################################################
 units = {}
 units['E'] = 'emission (g carbon)'
@@ -293,94 +288,94 @@ units['RH'] = "RH%"
 units['d2m'] = "dew point (f)"
 
 
-# TODO: make it possible for emissions to lag weather in this plot 
-def plotParameterSpace(df, units, region, figureDir, string): 
+# TODO: make it possible for emissions to lag weather in this plot
+def plotParameterSpace(df, units, region, figureDir, string):
 
 	colnames = df.columns
 	col_i = np.where(colnames == "E")[0][0] # Start with E column
 	col_f = len(colnames) # end with the last column
-	
+
 	fig = plt.figure(figsize=(30, 30))
 	figSaveName = figureDir + string + 'MeanCorrelations' + region + '.png'
-				
+
 	frameN = 0
 	frameRow = 0
 	for c1 in colnames[col_i:col_f]:
-		
+
 		frameRow = frameRow + 1
 		frameColumn = 0
-		
+
 		for c2 in colnames[col_i:col_f]:
-		    
+
 		    frameN = frameN + 1
 		    frameColumn = frameColumn + 1
-		    
+
 		    if frameColumn >= frameRow:
 				# Get the data to plot against each-other
 				yData = df[c1]
 				xData = df[c2] # ~predictor
-		
-				# Get the linear fit 
+
+				# Get the linear fit
 				# https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.stats.linregress.html
 				# Just to the pierceson cor r for now
 				r = np.corrcoef(xData, yData)[0][1]
 				r = round(r,3)
 				#p = round(p,5)
-				
-				ax = fig.add_subplot(7,7, frameN, frame_on=False)	
-				ax.scatter(xData, yData, 
+
+				ax = fig.add_subplot(7,7, frameN, frame_on=False)
+				ax.scatter(xData, yData,
 						   edgecolors='none',\
 						   color="k",
 						   s=50)
-						   
-				# show linear fit if r is decent 
+
+				# show linear fit if r is decent
 				if (np.abs(r) >= 0.5):
-					lm = stats.linregress(xData, yData)		
-					yhat = lm.slope * xData + lm.intercept   
+					lm = stats.linregress(xData, yData)
+					yhat = lm.slope * xData + lm.intercept
 					plt.plot(xData, yhat, linewidth=3)
-						   
+
 				plt.xlabel(units[c2], fontsize=20, weight='bold')
 				plt.ylabel(units[c1], fontsize=20, weight='bold')
 				titleString = 'r=' + str(r)
 				plt.title(titleString, fontsize=20, weight='bold')
-		
+
 				ax.spines['top'].set_visible(False)
 				ax.spines['right'].set_visible(False)
 				ax.yaxis.set_ticks_position('left')
 				ax.xaxis.set_ticks_position('bottom')
 				ax.tick_params(axis='y', labelsize=20)
 				ax.tick_params(axis='x', labelsize=20)
-			
+
 			# TODO: plot linear model and R**2
-			# TODO: when not plotting emissions as x or y, colorcode by emissions? 
-		
-	fig.tight_layout()		
+			# TODO: when not plotting emissions as x or y, colorcode by emissions?
+
+	fig.tight_layout()
 	plt.savefig(figSaveName)
 	plt.close()
-	
-plotParameterSpace(month_df, units, region, figureDir, "monthly")	
-plotParameterSpace(summer_df, units, region, figureDir, "summer")	
+
+plotParameterSpace(month_df, units, region, figureDir, "monthly")
+plotParameterSpace(summer_df, units, region, figureDir, "summer")
 
 
 
-		
-		
-# TODO: make it possible for emissions to lag weather in this plot 
+
+
+# TODO: make it possible for emissions to lag weather in this plot
 def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 	"""This basically just gives the top row of plotParameterSpace()"""
-	
+
 	colnames = df.columns
 	col_i = np.where(colnames == "E")[0][0] + 1 # Start with first column after E
 	col_f = len(colnames) # end with the last column
-    
+
 	fig = plt.figure(figsize=(22, 4))
 	figSaveName = figureDir + string + 'EmissionsVsMet_' + plotType + region + '.png'
-				
+
 	frameN = 0
 	for c2 in colnames[col_i:col_f]:
-		
+
 		frameN = frameN + 1
-		
+
 		# Get the data to plot against each-other
 		yData = df["E"] # This is always the y ~predicated
 		xData = df[c2] # ~predictor
@@ -389,51 +384,51 @@ def plotEmissionVsMet(df, units, region, figureDir, string, plotType):
 		r = np.corrcoef(xData, yData)[0][1]
 		r = round(r,3)
 		#p = round(p,5)
-		
-		ax = fig.add_subplot(1,6, frameN, frame_on=False)			
+
+		ax = fig.add_subplot(1,6, frameN, frame_on=False)
 
 		if plotType=="scatter":
-			# Sometimes we want to show a scatterplot of these data 
-			ax.scatter(xData, yData, 
+			# Sometimes we want to show a scatterplot of these data
+			ax.scatter(xData, yData,
 					   edgecolors='none',
 					   color="k")
-				   
-			# show linear fit if r is decent 
+
+			# show linear fit if r is decent
 			if np.abs(r) >= 0.4:                       #& (string == 'summer') )
-				lm = stats.linregress(xData, yData)		
-				yhat = lm.slope * xData + lm.intercept   
+				lm = stats.linregress(xData, yData)
+				yhat = lm.slope * xData + lm.intercept
 				plt.plot(xData, yhat, linewidth=3)
-				   
+
 			plt.xlabel(units[c2], fontsize=20, weight='bold')
 			plt.ylabel(units["E"], fontsize=20, weight='bold')
-			titleString = 'r=' + str(r) 
+			titleString = 'r=' + str(r)
 			plt.title(titleString, fontsize=20, weight='bold')
-			
-		elif plotType=="ccf": 		
-			# Sometimes we want to do a cross correlation to see what 
+
+		elif plotType=="ccf":
+			# Sometimes we want to do a cross correlation to see what
 			# lag provides the highest correlation pearson coef
 			ccf = plt.xcorr(df['E'], df[c2], maxlags=12, normed=True,
 							usevlines=True, color="blue")
 			lag = ccf[0]
 			cor = ccf[1]
 			j = np.where(lag==0)[0][0]
-			correlation = cor[j]			
-		
+			correlation = cor[j]
+
 			plt.plot(lag, cor, color="blue")
 			plt.ylim( (0, 0.6) )
 			plt.xlabel('lag (months)', fontsize=16, weight='bold')
 			plt.ylabel('correlation', fontsize=16, weight='bold')
-			plt.title('cor(E, ' + c2 + ')', weight='bold', fontsize=20)				
-	
-		# universal style 
+			plt.title('cor(E, ' + c2 + ')', weight='bold', fontsize=20)
+
+		# universal style
 		ax.spines['top'].set_visible(False)
 		ax.spines['right'].set_visible(False)
 		ax.yaxis.set_ticks_position('left')
 		ax.xaxis.set_ticks_position('bottom')
 		ax.tick_params(axis='y', labelsize=16)
 		ax.tick_params(axis='x', labelsize=16)
-					
-	fig.tight_layout()		
+
+	fig.tight_layout()
 	plt.savefig(figSaveName)
 	plt.close()
 
@@ -448,7 +443,7 @@ plotEmissionVsMet(month_df, units, region, figureDir, "monthly", "ccf")
 
 
 ################################################################################
-# We saw that total precip ~4 months before summer is well correlated with 
+# We saw that total precip ~4 months before summer is well correlated with
 # summertime emissions. Show this relationship
 ################################################################################
 spring_tp = np.zeros(nYears)
@@ -456,7 +451,7 @@ for y in range(nYears):
 	springMask = (year == uniqueYears[y]) & (month >= 4) & (month <= 9)
 	spring_tp[y] = np.sum(tp[springMask,:,:])
 
-# Add this to the dataframe 
+# Add this to the dataframe
 #summer_df["spring_tp"] = spring_tp
 figureName = figureDir + 'spring+summer_tp_vs_E'+region+'.png'
 
@@ -466,8 +461,8 @@ plt.scatter(spring_tp, summer_df.E)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 
-lm = stats.linregress(spring_tp, summer_df.E)		
-yhat = lm.slope * spring_tp + lm.intercept   
+lm = stats.linregress(spring_tp, summer_df.E)
+yhat = lm.slope * spring_tp + lm.intercept
 r = round(lm.rvalue,3)
 
 plt.plot(spring_tp, yhat, linewidth=3)
@@ -477,13 +472,13 @@ plt.ylabel('Emissions (grams carbon)', fontsize=15, weight='bold')
 #plt.legend('r=' + str(r), loc='best', frameon=False, fontsize=15)
 plt.title(region[1:-1] + ', r=' + str(r), fontsize=16, weight='bold')
 
-fig.tight_layout()	
+fig.tight_layout()
 
 plt.savefig(figureName)
 plt.close()
 
 ################################################################################
-# Estimate multilinear regression curve on summer data. 
+# Estimate multilinear regression curve on summer data.
 # https://www.datarobot.com/blog/multiple-regression-using-statsmodels/
 ################################################################################
 import statsmodels.api as sm
@@ -491,14 +486,14 @@ X = summer_df[['t2m', 'tp', 'RH', 'z']]
 #X = summer_df[['t2m', 'tp']]
 y = summer_df['E']
 
-# Fit an OLS model with intercept 
+# Fit an OLS model with intercept
 #X = sm.add_constant(X) # NOTE: I have no idea why examples do this...
 est = sm.OLS(y, X).fit()
 
 
 fig = plt.figure()
 plt.scatter(uniqueYears, summer_df.E, label='GFED4s')
-plt.plot(uniqueYears, est.fittedvalues, label='OLS model ~ T + Precip + RH% + Z', 
+plt.plot(uniqueYears, est.fittedvalues, label='OLS model ~ T + Precip + RH% + Z',
 			color='k')
 plt.title('Adj R-squared = ' + str(round(est.rsquared_adj,3)), weight='bold', fontsize=24 )
 plt.ylabel('grams carbon', weight='bold', fontsize=20)
@@ -508,48 +503,48 @@ fig.tight_layout()
 plt.savefig(figureDir+'multilinear_regression_summer' + region + '.png')
 
 
-# Test using different X values into the predictive model 
+# Test using different X values into the predictive model
 # est.predict()
 
 
 
 ################################################################################
 # Make emissions to precip relationship grid box specific
-# For every day with emissions, I want to know how long it has been since it 
+# For every day with emissions, I want to know how long it has been since it
 # rained in that grid box
 ################################################################################
 # daysSinceRain = np.zeros(C.shape)
 # daysSinceRain[:] =-9999
 # nLat = len(latitude)
 # nLon = len(longitude)
-# nTime = len(time) 
+# nTime = len(time)
 # for x in range(nLon):
 # 	for y in range(nLat):
-# 		
+#
 # 		tp_ = tp[:,y,x]
-# 		daysSinceRain_  = 0. # reset the counter for each new grid point 
-# 		
+# 		daysSinceRain_  = 0. # reset the counter for each new grid point
+#
 # 		for t in range(nTime):
-# 		
+#
 # 			if tp_[t] > 0.001:
 # 				# If in here it rained, reset daily counter
 # 				daysSinceRain_  = 0.
 # 				daysSinceRain[t,y,x] = 0.
-# 				
+#
 # 			elif tp_[t] <= 0.001:
-# 				# If here it has not rained, advance the daily counter 
+# 				# If here it has not rained, advance the daily counter
 # 				daysSinceRain_ = daysSinceRain_ + 1
 # 				daysSinceRain[t,y,x] = daysSinceRain_
 # 			else:
 # 				print 'how did you get here?'
-# 		
+#
 # summerMask = (month >= 6) & (month <= 9)
 #plt.scatter(daysSinceRain[summerMask,:,:], C[summerMask,:,:])
 
 ################################################################################
 # Now see if the inter-annual variability in the occurrence of difference events
-# predicts inter-annual variability in summer emissions. 
-# TODO: look at these masks monthly too. 
+# predicts inter-annual variability in summer emissions.
+# TODO: look at these masks monthly too.
 ################################################################################
 maskFile = drive + 'era_interim_nc_daily_merged/met_event_masks_NA_2003_2016.nc'
 nc = Dataset(maskFile, 'r')
@@ -566,10 +561,10 @@ metMaskDict['blocking_mask']   = nc.variables['blocking_mask'][:]
 # TODO: cyclone days coming soon
 nc.close()
 
-# Spatially subset these met masks 
+# Spatially subset these met masks
 for key in metMaskDict.keys():
 	summer_df[key] = np.zeros(nYears) # Need to place these columns in here now
-	metMaskDict[key], ynew, xnew, = cnm.mask2dims(metMaskDict[key], longitude, latitude, 
+	metMaskDict[key], ynew, xnew, = cnm.mask2dims(metMaskDict[key], longitude, latitude,
 											      0, minLon, maxLon, minLat, maxLat)
 
 # Add summer totals of these identified events to summer_df
@@ -579,7 +574,7 @@ for y in range(nYears):
 
 	# identify this years summer days to make summer average
 	summerMask = (year == uniqueYears[y]) & (month >= 6) & (month <= 9)
-	
+
 	# Assign the new variables
 	for key in newColumns:
 		summer_df[key][y] = np.sum(metMaskDict[key][summerMask, :,:])
@@ -593,27 +588,27 @@ fig = plt.figure(figsize=(15,10))
 i = 0
 for key in newColumns:
 	i = i + 1
-	ax = fig.add_subplot(2,3,i, frame_on=True)		
+	ax = fig.add_subplot(2,3,i, frame_on=True)
 	plt.scatter(summer_df[key], summer_df.E, label=key)
 	plt.xlabel(key + ' metric', fontsize=15, weight='bold')
 	plt.ylabel('Emissions (grams carbon)', fontsize=15, weight='bold')
-	
-	lm = stats.linregress(summer_df[key], summer_df.E)		
-	yhat = lm.slope * summer_df[key] + lm.intercept   
+
+	lm = stats.linregress(summer_df[key], summer_df.E)
+	yhat = lm.slope * summer_df[key] + lm.intercept
 	r = round(lm.rvalue,3)
 	ax.text(0.45, 0.9, 'r='+str(r),
         verticalalignment='bottom', horizontalalignment='right',
         transform=ax.transAxes,
         color='green', fontsize=19)
-	
+
 	if r > 0.5:
 		plt.plot(summer_df[key], yhat, linewidth=3)
-	
+
 	plt.title(key, fontsize=20, weight='bold')
 	ax.spines['top'].set_visible(False)
 	ax.spines['right'].set_visible(False)
 
-fig.tight_layout()		
+fig.tight_layout()
 plt.savefig(figureDir + 'mask_predictors'+region+'.png')
 plt.close()
 
@@ -621,7 +616,7 @@ plt.close()
 
 #matplotlib.pyplot.xkcd(scale=1, length=100, randomness=2)
 ###############################################################################
-# bring on the FPA-FOD data for the same analysis 
+# bring on the FPA-FOD data for the same analysis
 ###############################################################################
 dataFile = "/home/sbrey/projects/PMFutures/Dataframes/fireOccurrence_t.csv"
 df = pd.read_csv(dataFile)
@@ -656,7 +651,7 @@ for y in range(nYears):
 	summerMask = (df.year == uniqueYears[y]) & (df.month >= 6) & (df.month <= 9)
 	acres_lighting[y] = np.sum(df.FIRE_SIZE[summerMask & lightningMask])
 	acres_other[y] = np.sum(df.FIRE_SIZE[summerMask & (lightningMask==False)])
-	
+
 acres_total = acres_lighting + acres_other
 
 # Add these totals to the ongoing summer dataframe
@@ -668,7 +663,7 @@ summer_df['FOD_acres_total'] = acres_total
 # plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_total[0:10], label="All acres")
 # plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_lightning[0:10], label="lightning caused")
 # plt.scatter(summer_df.E[0:10], summer_df.FOD_acres_other[0:10], label="human caused")
-# 
+#
 # plt.legend()
 # plt.show()
 
@@ -687,15 +682,15 @@ for metName in metCols:
 
 
 	lm_all = stats.linregress(xData, y_all)
-	yhat_all = lm_all.slope * xData + lm_all.intercept	
-	r_all = round(lm_all.rvalue, 3) 
+	yhat_all = lm_all.slope * xData + lm_all.intercept
+	r_all = round(lm_all.rvalue, 3)
 
-	lm_lightning = stats.linregress(xData, y_lightning)		
-	yhat_lightning = lm_lightning.slope * xData + lm_lightning.intercept   
+	lm_lightning = stats.linregress(xData, y_lightning)
+	yhat_lightning = lm_lightning.slope * xData + lm_lightning.intercept
 	r_lightning = round(lm_lightning.rvalue,3)
 
 	lm_human = stats.linregress(xData, y_human)
-	yhat_human = lm_human.slope * xData + lm_human.intercept   
+	yhat_human = lm_human.slope * xData + lm_human.intercept
 	r_human = round(lm_human.rvalue,3)
 
 	plt.scatter(xData, y_all, label="Total reported burn area, r$^{2}$="+ str(r_all))
@@ -711,7 +706,7 @@ for metName in metCols:
 	plt.plot(xData, yhat_lightning, color="k")
 	plt.plot(xData, yhat_human, color="k")
 
-	fig.tight_layout()		
+	fig.tight_layout()
 
 	plt.savefig(figureDir + metName + '_FPA' + region + '.png')
 	plt.close()
