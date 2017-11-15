@@ -47,8 +47,8 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables by manually here.
-	ncVARType = 'era_interim'   # 'era_interim' | 'GFED4s' | 'FINN'
-	ncVAR     = 'v10'           # 'tp' | 'C' | 'CO2' | 'SPDH'
+	ncVARType = 'GFED4s'   # 'era_interim' | 'GFED4s' | 'FINN'
+	ncVAR     = 'burned_area'           # 'tp' | 'C' | 'CO2' | 'SPDH'
 	region    = '_'             #  "_" = global | any region in cnm.getRegionBounds()
 	startYear = 2003            # HMS only spans 2006 - 2015
 	endYear   = 2016

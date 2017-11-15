@@ -5,7 +5,8 @@ if(length(args)==0){
 }
 
 # readFPAFODFireFeatures.R
-
+# execute via command line 
+# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003
 ################################################################################
 # readUSFSFireOccurance.R
 
@@ -152,6 +153,12 @@ df$NA_L2CODE <- NA_L2CODE
 #           row.names = FALSE)
 FPA_FOD <- df
 save(FPA_FOD, file=paste0(drive, "FPA_FOD_", year, ".RData"))
+
+print(paste("Complete:", year))
+
+
+# TODO: Source border assignment script? 
+
 
 # # What percent of the data have DISCOVERY_DATE
 # nRecords <- length(con_date)
