@@ -47,6 +47,7 @@ FPA_FOD_merged$NA_L2CODE <- as.numeric(as.character(FPA_FOD_merged$NA_L2CODE))
 print(sum(is.na(FPA_FOD_merged$NA_L2CODE)))
 
 
+coordinates <- cbind(FPA_FOD_merged$LONGITUDE, FPA_FOD_merged$LATITUDE)
 fireLocations <- SpatialPoints(coordinates)
 
 map("world", ylim=c(10,80), xlim=c(-170, -50))
@@ -61,4 +62,8 @@ plot(fireLocations[FPA_FOD_merged$NA_L2CODE==7.1,], add=T, col="lightblue",pch="
 plot(fireLocations[FPA_FOD_merged$NA_L2CODE==10.1,], add=T, col="tan",pch=".")
 # South tip of Florida
 plot(fireLocations[FPA_FOD_merged$NA_L2CODE==15.4,], add=T, col="purple",pch=".")
+
+FPA_FOD <- FPA_FOD_merged
+save(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD",startYear,"_",endYear,".RData"))
+write.csv(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD",startYear,"_",endYear,".csv"))
 
