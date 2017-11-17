@@ -65,5 +65,5 @@ plot(fireLocations[FPA_FOD_merged$NA_L2CODE==15.4,], add=T, col="purple",pch="."
 
 FPA_FOD <- FPA_FOD_merged
 save(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD",startYear,"_",endYear,".RData"))
-write.csv(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD",startYear,"_",endYear,".csv"))
+write.csv(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD_",startYear,"_",endYear,".csv"))
 

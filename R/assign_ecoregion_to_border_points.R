@@ -7,6 +7,7 @@ year <- args
 
 ################################################################################
 # assign_ecoregion_to_border_points.R
+# Rscript --vanilla R/assign_ecoregion_to_border_points.R 2003
 # This is run right after assign_ecoregion_to_FPAFOD.R. It assigns ecoregion to
 # points that did not fall inside of polygons. 
 
