@@ -1,14 +1,12 @@
-# createGridAttributeMasks.R
+# createECMWFGridAttributes.R
 
-# This script will be used to mask the 0.25 and 0.75 degree grids used in this
+# This script will be used to mask the 0.75 degree grids used in this
 # analysis. Each grid will have a layer with the following descriptive attributes
 # 1) Area, these will be from GFED4s grids
 # 2) state/province
 # 3) ecoregion
 # 4) elevation 
 
-# TODO: make the same, based on averages or some other regridding tecnique, for 
-# TODO: 0.75 degree gridded data
 
 library(stringr)
 library(maps)
@@ -20,80 +18,71 @@ library(raster)
 library(ncdf4)
 library(geosphere)
 
-# Get the quarter degree grid that all data lives on (GFED4s grid). All attribute
-# layers will live on the same lat lon grid as this. 
-fgrid <- "/Volumes/Brey_external/GFED4s/GFED4.1s_burned_area_2004.nc"
+# # Get the elevation grid
+fgrid <- "Data/GIS/elev.0.75-deg.nc"
 nc <- nc_open(fgrid)
-grid_area <- ncvar_get(nc, "grid_area")
-longitude <- ncvar_get(nc, "longitude")
-latitude  <- ncvar_get(nc, "latitude")
-nc_close(nc)
-
-# Load political borders of North America (sans Mexico)
-load("Data/GIS/north_america.RData")
-
-# Ecoregions
-load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
-
-# Load the levation data
-felev <- "Data/GIS/elev.0.25-deg.nc"
-nc <- nc_open(felev)
 elevation <- ncvar_get(nc, "data")
-elevationUnits <- ncatt_get(nc,"data","units")
-elev_longitude <- ncvar_get(nc, "lon")
-elev_latitude  <- ncvar_get(nc, "lat")
+longitude <- ncvar_get(nc, "lon")
+latitude  <- ncvar_get(nc, "lat")
 nc_close(nc)
 
-# These data need to be shifted in the longitude direction to match the GFED
-# grid.
-elevation_new <- elevation
-elev_longitude_new <- longitude
-elevation_new[] <- NA
-elev_longitude_new[] <- NA
-# Start shifting, one half of the world at a time
-elevation_new[1:720,] <- elevation[721:1440,]
-elevation_new[721:1440,] <- elevation[1:720,]
-# Do the same for the longitude array, provides direct and easy check
-elev_longitude_new[1:720] <- longitude[721:1440]
-elev_longitude_new[721:1440] <- longitude[1:720]
+# Make sure these dimensions match ecmwf file exactly
+externalFile <- "/Volumes/Brey_external/era_interim_nc_daily/u10_2011.nc"
+nc <- nc_open(externalFile)
+longitude_era <- ncvar_get(nc, "longitude")
+latitude_era  <- ncvar_get(nc, "latitude")
+nc_close(nc)
 
-# Make sure all values have been replaced. 
-if(sum(is.na(elevation_new)) > 0 ){
-  warning("There is an NA value present in the new elevation data")
-  # where? 
-  #elevation_new[is.na(elevation_new)] <- 1e6
-  quartz()
-  image(is.na(elevation_new))
-  title("Locations where new elevation data is still NA")
+
+dlat <- unique(latitude - latitude_era)
+dlon <- unique(longitude - longitude_era) 
+if(dlat != 0 | dlon != 0){
+  stop("Elevation and ECMWF meteorology do not live on the same grid!")
 }
 
-# # Sanity check figures
-# quartz()
-# image(elevation)
-# title("original elevation nc data")
-# 
-# quartz()
-# image(elevation_new)
-# title("shifted elevation nc data")
-elevation <- elevation_new
+################################################################################
+# Calculate area of grid cells 
+# http://badc.nerc.ac.uk//help/coordinates/cell-surf-area.html
+################################################################################
+lat_rad <- latitude * pi/180
+lon_rad <- longitude * pi/180
+dx <- diff(lon_rad)[1]
+R <- 6371*1e3 # radius of earth m
 
-unique(elev_latitude - latitude)
-# I do not care about ozone. Anywhere less than zero will be set to 0
-# elevation[elevation<0] <- 0 
+nLat <- length(lat_rad)
+area <- rep(NA, nLat)
 
-# NOTE: setting this to NA makes it really easy to see land
-# NOTE: I am setting all below 
+for (i in 1:(nLat-1)){
+  area[i] <- R^2 * dx * (sin(lat_rad[i]) - sin(lat_rad[i+1]))
+}
+area[nLat] <- area[1]
+
+areaMax <- max(area)
+
+# At equator, where each deg of lat and lon are 111km
+mathAreaMax <- (0.75*111*1e3)^2
+
+PercentDifferent <- abs(mathAreaMax - areaMax)/areaMax * 100
+print(paste("Difference in max grid cell area calculated from assumed 111km/deg at equator=", PercentDifferent))
+
+# Assign to each longitude, does not change in longitude
+grid_area <- elevation
+grid_area[] <- NA
+for (j in 1:length(lon_rad)){
+  grid_area[j,] <- area
+}
+
+################################################################################
+# Now overlap calculations for state and ecoregions
+################################################################################
+lon <- longitude - 180
+lat <- latitude
 
 # point over polygon calculations. Now we need to assign ecoregions as well as
 # political borders. 
 # Speed this up by only looping through North America coordinates 
-lon_index <- which(longitude >= -168 & longitude <= -52)
+lon_index <- which(lon >= -168 & lon <= -52) # needs to be the shifted grid
 lat_index <- which(latitude >= 25 & latitude <= 80)
-
-# quartz()
-# image(elevation[lon_index, lat_index])
-# title("Spatial subset where we will be making overlap calculations")
-
 
 # Load ecoregions "SPDF". Use this CRS for all spatial objects
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
@@ -118,15 +107,15 @@ print("Starting work on the main, large loop.")
 t1 <- Sys.time()
 for (xi in lon_index){
   
-  gridLon <- longitude[xi]
+  gridLon <- lon[xi]
   
   for (yi in lat_index){
     
-    gridLat <- latitude[yi]
+    gridLat <- lat[yi]
     
     # Make this grid location a spatial point opject
     pt <- SpatialPoints(cbind(gridLon, gridLat), proj4string = SPDF@proj4string)
-
+    
     ############################################################################        
     # State overlap calculation
     ############################################################################   
@@ -135,8 +124,7 @@ for (xi in lon_index){
     StateMask <- centriodDist <= cuttoffDistance
     # Perform overlap calculation for close points
     state[xi, yi] <- over(pt, north_america[StateMask,])$NAME_1
-    #state[xi, yi] <- over(pt, north_america)$NAME_1 # SLOW
-    
+
     ############################################################################
     # Ecoregion overlap calculation 
     ############################################################################
@@ -146,8 +134,7 @@ for (xi in lon_index){
     SPDFMask <- centriodDist <= cuttoffDistance
     # Perform calculation on the remaining, close points
     ecoregion[xi,yi] <- over(pt, SPDF[SPDFMask,])$NA_L2CODE
-    #ecoregion[xi,yi] <- over(pt, SPDF)$NA_L2CODE # SLOW
-    
+
     # Keep track of our progress
     count <- count + 1
     
@@ -156,18 +143,13 @@ for (xi in lon_index){
     }
     
   }
- 
+  
 }
 
 t2 <- Sys.time()
 dt <- t2 - t1
 print("Since starting the loop:")
 print(dt)
-
-
-################################################################################
-# Write out the nc data
-################################################################################
 
 dataDir <- "Data/grid_attributes/"
 
@@ -182,7 +164,6 @@ state_numeric <- matrix(0, nrow = dim(state)[1], ncol = dim(state)[2])
 stateID <- 0
 stateID_ <- numeric()
 for (s in stateNamesOrdered){
-  print(s)
   stateID_ <- append(stateID_, stateID)
   mask <- s == state
   state_numeric[mask] <- stateID
@@ -193,12 +174,12 @@ for (s in stateNamesOrdered){
 state_dict <- data.frame(stateID=stateID_, 
                          stateName=stateNamesOrdered)
 
-write.csv(state_dict, file=paste0(dataDir, "state_dict.csv"), 
+write.csv(state_dict, file=paste0(dataDir, "state_dict_75.csv"), 
           row.names = FALSE)
 
 # path and file name, set dname
 ncpath <- dataDir
-ncname <- "grid_attributes_25x25"  
+ncname <- "grid_attributes_75x75"  
 ncfname <- paste(ncpath, ncname, ".nc", sep="")
 
 # create and write the netCDF file -- ncdf4 version
@@ -220,9 +201,6 @@ state.def <- ncvar_def("state","none",list(londim,latdim),fillvalue,dlname, prec
 dlname <- "elevation"
 elevation.def <- ncvar_def("elevation","m",list(londim,latdim),fillvalue,dlname,prec="float")
 
-# Same dimensions as variables too
-latitude.def <- ncvar_def("lat","m", list(latdim), fillvalue,"lat", prec="float")
-longitude.def <- ncvar_def("lon","m", list(londim), fillvalue,"lon", prec="float")
 
 # create netCDF file and put arrays. All sperarate working. Together not. 
 # Likes grid_area.df + elevation.def + ecoregion.def
@@ -237,8 +215,6 @@ ncvar_put(ncout, grid_area.def, grid_area)
 ncvar_put(ncout, ecoregion.def, ecoregion)
 ncvar_put(ncout, state.def, state_numeric)
 ncvar_put(ncout, elevation.def, elevation)
-# ncvar_put(ncout, latitude.def, latitude)
-# ncvar_put(ncout, longitude.def, longitude)
 
 
 # put additional attributes into dimension and data variables
@@ -246,7 +222,7 @@ ncatt_put(ncout,"longitude","axis","X") #,verbose=FALSE) #,definemode=FALSE)
 ncatt_put(ncout,"latitude","axis","Y")
 
 # add global attributes
-ncatt_put(ncout,0,"title","grid attributes for GFED4s grid. Create by createGridAttributeMasks.R")
+ncatt_put(ncout,0,"title","grid attributes for ecmwf grid. Created by createECMWFGridAttributeMasks.R")
 ncatt_put(ncout,0,"institution","Colorado State University")
 history <- paste("Steven J. Brey", date(), sep=", ")
 
@@ -255,6 +231,3 @@ ncout
 
 # close the file, writing data to disk
 nc_close(ncout)
-
-
-
