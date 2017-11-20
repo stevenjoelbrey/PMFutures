@@ -151,8 +151,3 @@ ncout
 
 # close the file, writing data to disk
 nc_close(ncout)
-
-
-
-
-
