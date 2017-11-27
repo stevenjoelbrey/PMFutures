@@ -11,8 +11,8 @@ if(length(args)==0){
 }
 
 # grid_FPA_FOD_burn_area.R
-# TODO: Sum all area burned in dataframe to be gridded and grid. They need to be
-# TODO: the same number for us to know the gridding happenned correctly!
+
+# NOTE: Short et. al. says that fire size are stored in acres. 
 
 # ------------------------- Description ---------------------------------------
 # This script will be used to grid monthly burn area of FPA_FOD data. The grid 
