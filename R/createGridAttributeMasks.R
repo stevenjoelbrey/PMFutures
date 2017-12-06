@@ -7,8 +7,8 @@
 # 3) ecoregion
 # 4) elevation 
 
-# TODO: make the same, based on averages or some other regridding tecnique, for 
-# TODO: 0.75 degree gridded data
+# TODO: Make sure no land ecoregions are left as "0" meaning water label
+
 
 library(stringr)
 library(maps)
@@ -18,7 +18,7 @@ library(maptools)
 library(rgeos)
 library(raster)
 library(ncdf4)
-library(geosphere)
+library(geosphere) # for calculating distance of point to polygon edge
 
 # Get the quarter degree grid that all data lives on (GFED4s grid). All attribute
 # layers will live on the same lat lon grid as this. 
@@ -35,7 +35,7 @@ load("Data/GIS/north_america.RData")
 # Ecoregions
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
 
-# Load the levation data
+# Load the elevation data
 felev <- "Data/GIS/elev.0.25-deg.nc"
 nc <- nc_open(felev)
 elevation <- ncvar_get(nc, "data")
@@ -44,8 +44,8 @@ elev_longitude <- ncvar_get(nc, "lon")
 elev_latitude  <- ncvar_get(nc, "lat")
 nc_close(nc)
 
-# These data need to be shifted in the longitude direction to match the GFED
-# grid.
+# These elevation data need to be shifted in the longitude direction to match 
+# the GFED grid.
 elevation_new <- elevation
 elev_longitude_new <- longitude
 elevation_new[] <- NA
@@ -112,6 +112,7 @@ ecoregion[] <- 0
 state <- ecoregion
 state[] <- ""
 
+
 nIterations <- length(lon_index) * length(lat_index)
 count <- 0
 print("Starting work on the main, large loop.")
@@ -142,11 +143,20 @@ for (xi in lon_index){
     ############################################################################
     # Eliminate points that are far away
     centriodDist <- distHaversine(pt, ecoregion_centriods)
-    cuttoffDistance <- sort(centriodDist)[7] # ecoregions have wierd shapes so keep many around
+    cuttoffDistance <- sort(centriodDist)[20] # ecoregions have wierd shapes so keep many around
     SPDFMask <- centriodDist <= cuttoffDistance
     # Perform calculation on the remaining, close points
     ecoregion[xi,yi] <- over(pt, SPDF[SPDFMask,])$NA_L2CODE
-    #ecoregion[xi,yi] <- over(pt, SPDF)$NA_L2CODE # SLOW
+    
+    # If a state has been assigned but an ecoregion has not, then that means
+    # we have an on the border type situation
+    if(is.na(ecoregion[xi,yi]) & !is.na(state[xi, yi]) ){
+      print("No ecoregion selected, requires expensive calculations")
+      dist.mat <- geosphere::dist2Line(p = pt, line = SPDF)
+      ecoregion[xi,yi] <- SPDF[dist.mat[4],]$NA_L2CODE
+    }
+    
+    #ecoregion[xi,yi] <- over(pt, SPDF)$NA_L2CODE # VERY SLOW
     
     # Keep track of our progress
     count <- count + 1
