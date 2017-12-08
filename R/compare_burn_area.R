@@ -3,7 +3,6 @@
 # variability in total burn area across inventories. 
 # sister function for spatial component is called Python/compare_burn_area_maps.py
 
-
 # What region are you investigating? 
 minLat <- 31
 maxLat <- 49
@@ -20,10 +19,14 @@ library(ggplot2)
 library(fields)
 library(RColorBrewer)
 
+# Load ecoregions spatial shapes
+load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
+
+
 # Load the needed burn area products and grid attributes
 grid_nc_file <- "Data/grid_attributes/grid_attributes_25x25.nc"
 nc_grid   <- nc_open(grid_nc_file)
-ecoregion <- round(ncvar_get(nc_grid, "ecoregion"),2) # annoying precision issues
+ecoregion <- round(ncvar_get(nc_grid, "ecoregion"),3) # annoying precision issues
 elevation <- ncvar_get(nc_grid, "elevation")
 state     <- ncvar_get(nc_grid, "state")
 latitude  <- nc_grid$dim[["latitude"]][["vals"]]
@@ -118,7 +121,6 @@ geographyMask[, GFED_latitude > 49] <- FALSE
 # TODO: Make this variable!
 ecoregionMask <- 0 != ecoregion 
 
-
 # ------------------------- temporalSubsets ------------------------------------
 # First make sure that the datasets time dimensions match. This will be limited
 # by FPA-FOD when it is used, since it only goes up to 2013. 
@@ -178,6 +180,7 @@ lonSubset <- GFED_longitude[lonMask]
 # remove zero values, they are not interesting and clog the visuals. 
 GFED_BA_NA <- GFED_BA[,lonMask, latMask]
 FPA_BA_NA <- FPA_BA[,lonMask, latMask]
+ecoregion_NA <- ecoregion[lonMask, latMask]
 
 GFED_BA_NA[GFED_BA_NA==0] <- NA 
 FPA_BA_NA[FPA_BA_NA==0]   <- NA
@@ -193,23 +196,41 @@ FPA_BA_NA_flip <- FPA_BA_NA[,,flipper]
 for (i in 1:length(YYYYMM)){
   
   saveName <- paste0(figureDir, "GFED4s_FPA_FOD_",YYYYMM[i], ".png")
-  png(filename=saveName, width=1500, height=750)
+  png(filename=saveName, width=3500, height=1500, res=200)
   #quartz(width=5, height=5)
   par(mfrow=c(1,2), las=1, mar=c(4,4,4,8))
   
   # SETUP
   # shade burn area by these colors 
-  BREAKS <- c(0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9)
+  logGFED <- log10(GFED_BA_flip[i,,])
+  logFPA  <- log10(FPA_BA_NA_flip[i,,])
   
+  # Take the log10 of the burn areas to setup a common colorbar for the two. 
+  maxVal <- max(c(logGFED,logFPA), na.rm=T)
+  minVal <- min(c(logGFED,logFPA), na.rm=T)
   
-  fields::image.plot(lonSubset, latSubset_flip, log10(GFED_BA_flip[i,,]), 
-                     axis.args=list( at=log10(BREAKS), labels=BREAKS))
+  zMax <- round(maxVal)
+  zMin <- round(minVal)  
+  x <- zMin:zMax
+  xLabels <- 10^x
+  
+  fields::image.plot(lonSubset, latSubset_flip, logGFED, 
+                     zlim=c(zMin, zMax),
+                     axis.args=list( at=x, labels=xLabels, cex.axis = 1.5),
+                     xlab="",
+                     ylab=""
+                     )
   map("state", add=T)
   map("world", add=T)
   title(paste("GFED4s:", YYYYMM[i]))
   
-  fields::image.plot(lonSubset, latSubset_flip, log10(FPA_BA_NA_flip[i,,]), 
-                     axis.args=list( at=log10(BREAKS), labels=BREAKS))
+  fields::image.plot(lonSubset, latSubset_flip, logFPA, 
+                     zlim=c(zMin, zMax),
+                     axis.args=list( at=x, labels=xLabels, cex.axis = 1.5),
+                     xlab="",
+                     ylab=""
+                     )
+  
   map("state", add=T)
   map("world", add=T)
   title(paste("FPA-FOD:", YYYYMM[i]))
@@ -218,9 +239,236 @@ for (i in 1:length(YYYYMM)){
   
 }
 
+
+# ----------------------------- mapTimespanSum ---------------------------------
 # Plot total burn area for each! Over the whole time period! Show ecoregion
 # perimeters? No, totals in each ecoregion! 
 
+
+GFED_BA_flip_total <- apply(GFED_BA_flip, 2:3, sum, na.rm=T)
+FPA_BA_flip_total  <- apply(FPA_BA_NA_flip, 2:3, sum, na.rm=T)
+
+# remove zeros from plotting again
+GFED_BA_flip_total[GFED_BA_flip_total==0] <- NA
+FPA_BA_flip_total[FPA_BA_flip_total==0] <- NA
+
+eco_mask <- as.character(SPDF$NA_L2CODE) == "6.2"
+eco_6.2 <- SPDF[eco_mask,]
+
+quartz(width=10, height=5)
+
+png(filename="Figures/burn_area_comparison/summary/maps/western_US_2003_2013_burn_area.png", 
+    res=200,
+    width=3500, 
+    height=1500)
+
+par(mfrow=c(1,2), las=1, mar=c(4,4,4,9))
+
+# TODO: Add ecoregions? 
+
+# Label the legend. Span the orders of magnitude needed. 
+x <- -2:6
+acreLabel <- 10^x
+
+image.plot(lonSubset, latSubset_flip, log10(GFED_BA_flip_total), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5, bty="n"),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+           )
+map("state", add=T, lty=1)
+#plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("GFED4s burn area 2003-2013"))
+
+image.plot(lonSubset, latSubset_flip, log10(FPA_BA_flip_total), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+           )
+map("state", add=T, lty=1)
+#plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("FPA-FOD burn area 2003-2013"))
+
+
+dev.off()
+
+################################################################################
+# Show the totals again only this time only show region 6.2
+################################################################################
+nTime <- dim(GFED_BA_NA)[1]
+GFED_BA_6.2 <- GFED_BA_NA
+FPA_BA_6.2  <- FPA_BA_NA
+
+spaceMask <- ecoregion_NA!=6.2
+
+# Should plot blue over the area of the ecoregion polygon 
+quartz()
+image.plot(lonSubset, latSubset_flip, ecoregion_NA[,flipper])
+plot(eco_6.2, add=T)
+
+for (i in 1:nTime){
+  # Plot this spatial mask to make sure that it incliudes southern colorado
+  GFED_BA_6.2[i,,][spaceMask] <- NA 
+  FPA_BA_6.2[i,,][spaceMask]  <- NA
+}
+
+# Flip
+GFED_6.2_flip   <- GFED_BA_6.2[,,flipper]
+FPA_BA_6.2_flip <- FPA_BA_6.2[,,flipper]
+
+# Sum
+GFED_6.2_total <- apply(GFED_6.2_flip, 2:3, sum, na.rm=T)
+FPA_6.2_total  <- apply(FPA_BA_6.2_flip, 2:3, sum, na.rm=T)
+
+
+png(filename="Figures/burn_area_comparison/summary/maps/western_US_2003_2013_6.2_burn_area.png", 
+    res=200,
+    width=3500, 
+    height=1500)
+
+par(mfrow=c(1,2), las=1, mar=c(4,4,4,9))
+
+# Label the legend. Span the orders of magnitude needed. 
+x <- -2:6
+acreLabel <- 10^x
+
+image.plot(lonSubset, latSubset_flip, log10(GFED_6.2_total), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5, bty="n"),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+)
+map("state", add=T, lty=3)
+plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("GFED4s burn area 2003-2013"))
+
+image.plot(lonSubset, latSubset_flip, log10(FPA_6.2_total), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+)
+map("state", add=T, lty=3)
+plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("FPA-FOD burn area 2003-2013"))
+
+
+dev.off()
+
+################################################################################
+# Now show human ignition totals vs. non - human totals 
+################################################################################
+human     <- FPA_BA_human[,lonMask, latMask][,,flipper]
+lightning <- FPA_BA_lightning[,lonMask, latMask][,,flipper]
+
+human_sum <- apply(human, 2:3, sum, na.rm=T)
+lightning_sum <- apply(lightning, 2:3, sum, na.rm=T)
+
+png(filename="Figures/burn_area_comparison/summary/maps/western_US_2003_2013_6.2_burn_area_ignition.png", 
+    res=200,
+    width=3500, 
+    height=1500)
+
+par(mfrow=c(1,2), las=1, mar=c(4,4,4,9))
+
+# Label the legend. Span the orders of magnitude needed. 
+x <- -2:6
+acreLabel <- 10^x
+
+image.plot(lonSubset, latSubset_flip, log10(lightning_sum), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5, bty="n"),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+)
+map("state", add=T, lty=3)
+plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("Lightning burn area 2003-2013"))
+
+image.plot(lonSubset, latSubset_flip, log10(human_sum), 
+           zlim=c(-2, 6),
+           axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+)
+map("state", add=T, lty=3)
+plot(eco_6.2, add=T, border="black", lwd=3)
+title(paste("Human burn area 2003-2013"))
+
+
+dev.off()
+
+
+# Log scale makes for a tough comparison. Now try doing % 
+
+png(filename="Figures/burn_area_comparison/summary/maps/percent_human_burn_area.png", 
+    res=200,
+    width=3500/2, 
+    height=1500)
+
+human_plus_lightning <- (human_sum + lightning_sum)
+percentHuman <- human_sum / human_plus_lightning * 100
+
+# Mask out Nans, this is where both numbers are zero
+percentHuman[is.nan(percentHuman)] <- NA
+
+# TODO: compare this addition sum to the overall value stored in the nc file 
+
+
+image.plot(lonSubset, latSubset_flip, percentHuman, 
+           #zlim=c(-2, 6),
+           col=tim.colors(100),
+           #axis.args=list( at=x, labels=acreLabel, cex.axis = 1.5),
+           xlab="", 
+           ylab="",
+           cex.axis=1.5,
+           legend.width=3,
+           cex.axis=1.5,
+           xaxt="n",
+           yaxt="n",
+           bty="n"
+)
+map("state", add=T, lwd=3)
+plot(eco_6.2, add=T, border="white", lwd=3)
+
+dev.off()
 
 # ----------------------------- monthlyScatterPlots -----------------------------------
 
