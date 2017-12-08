@@ -38,11 +38,6 @@ SPDF_subset <- SPDF[regionMask, ]
 ORDER <- match(includedRegions, SPDF_subset$NA_L2CODE)
 SPDF_subset <- SPDF_subset[ORDER, ]
 
-map("state",  lty=3, col="darkgray", 
-    xlim=c(minLon, maxLon), ylim=c(minLat, maxLat))
-plot(SPDF_subset, col=regionColors, add=T)
-map("state",  lty=3, col="black",  add=T)
-
 
 # load burn area grids, subset spatial domain right away. 
 ncFile <- "Data/FPA_FOD/burn_area_monthly_25x25_2003_2013.nc"
@@ -162,6 +157,27 @@ for (y in 1:length(years) ){
   
 }
 
+################################################################################
+# Make the figure, two panal with the map on the left.
+################################################################################
+png(filename="Figures/summary/figure_1.png",
+    width=2200, 
+    height=1000,
+    res=200)
+
+par(mfrow=c(1,2), mar=c(5,8,4,11))
+
+map("state",  lty=3, col="darkgray", 
+    xlim=c(minLon, maxLon), ylim=c(minLat, maxLat))
+plot(SPDF_subset, col=regionColors, add=T)
+map("state",  lty=3, col="black",  add=T)
+
+legend("topleft",inset=c(-0.2, 0), xpd=T,
+       legend=c(includedRegions),
+       fill=regionColors,
+       bty="n"
+       )
+
 # Weave the two annual datasets together
 fpa <- t(as.matrix(fpa_yearly_df))
 gfed <- t(as.matrix(gfed_yearly_df))
@@ -177,16 +193,84 @@ for (i in 1:14){
   
 }
 
+# Set the spacing between bars such that the years are separated
+space     <- rep(c(1,0), 14)
 
-space <- rep(c(1,0), 14)
-
-barplot(both, col= regionColors, border=NA, yaxt='n', space=space)
-eaxis(2, cex.axis=1.6)
-
-
-
-
+labels  <- as.character()
+for (i in 1:length(years)){
+  labels <- append(labels, c(years[i]," "))
+}
 
 
+bp <- barplot(both, col= regionColors, border=NA, yaxt='n', 
+              space=space, width=1.5)
 
+# Get the midpoints of bp
+atValue <- bp[-length(bp)] + diff(bp)/2
+# I want the 1st and 3rd, and so on
+at <- atValue[seq(1,27, by=2)]
+
+eaxis(2, cex.axis=1.0)
+mtext("Burn Area\n(acres)  ", side=2, cex=1.4, las=2, line=3.5)
+axis(1, at=at, labels=years, las=2, cex.axis=1.0)
+
+dev.off()
+
+
+################################################################################
+# Now, a histogram of the monthly totals
+################################################################################
+
+# TODO: Make sure these draw from the same years!
+
+# make the monthly totals by ecoregion
+df  <- data.frame(matrix(NA, nrow=12, ncol=length(includedRegions)))
+names(df) <- as.character(includedRegions)
+gfed_seasonality <- df
+fpa_seasonality  <- df
+
+
+gfed_monthly_df <- gfed_monthly_df[gfedYear <= 2013,]
+fpa_monthly_df <- fpa_monthly_df[gfedYear <= 2013,]
+gfedMonth <- gfedMonth[gfedYear <= 2013]
+
+for (m in 1:12){
+  
+  monthMask <- m == gfedMonth
+  
+  for (eco in includedRegions){
+    
+    ecoMask <- eco == includedRegions
+    gfed_seasonality[m, ecoMask] <- sum(gfed_monthly_df[monthMask, ecoMask])
+    fpa_seasonality[m, ecoMask] <- sum(fpa_monthly_df[monthMask, ecoMask], na.rm=T)
+    
+  }
+}
+
+png(filename="Figures/summary/western_US_seasonality.png", res=200,
+    width=2000, height=1000)
+par(mfrow=c(1,2), mar=c(4,5,4,4))
+
+# Make a common y-axis
+ylim <- c(0,1.4*10^7)
+
+bp <- barplot(t(as.matrix(gfed_seasonality)), 
+              col=regionColors, border=NA, yaxt='n',
+              ylim=ylim)
+axis(1, at=bp, labels=1:12)
+mtext("Month", side=1, line=2)
+title("GFED4s")
+eaxis(2)
+#mtext("Burn Area\n(acres)  ", side=2, cex=1.4, las=2, line=3.5)
+
+
+bp <- barplot(t(as.matrix(fpa_seasonality)), 
+              col=regionColors, border=NA, yaxt='n',
+              ylim=ylim)
+axis(1, at=bp, labels=1:12)
+mtext("Month", side=1, line=2)
+title("FPA-FOD")
+#eaxis(2)
+
+dev.off()
 
