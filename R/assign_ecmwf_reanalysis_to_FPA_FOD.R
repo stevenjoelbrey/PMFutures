@@ -23,6 +23,7 @@ if(length(args)==0){
 library(stringr)
 library(maps)
 library(ncdf4)
+library(fields)
 
 # Load FPA-FOD data, the one with all attributes (ecoregions) assgined.
 load("Data/FPA_FOD/FPA_FOD_2003_2013.RData")
@@ -178,8 +179,8 @@ for (i in 1:nRow){
   pastIndicies <- (ti-29):ti # length == 30
   if(pastIndicies[1] > 0){
     
-    tm2_lastMonth[i] <- mean(tp[xi, yi, pastIndicies])
-    tp_lastMonth[i]  <- sum(t2m[xi, yi, pastIndicies])
+    tm2_lastMonth[i] <- mean(t2m[xi, yi, pastIndicies])
+    tp_lastMonth[i]  <- sum(tp[xi, yi, pastIndicies])
     rh2m_lastMonth[i]<- mean(rh2m[xi, yi, pastIndicies])
     
   }
