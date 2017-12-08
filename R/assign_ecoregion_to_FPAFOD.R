@@ -56,12 +56,12 @@ df <- df[timeMask,]
 # [1] "OBJECTID"                   "FOD_ID"                     "FPA_ID"                     "SOURCE_SYSTEM_TYPE"        
 # [5] "SOURCE_SYSTEM"              "NWCG_REPORTING_AGENCY"      "NWCG_REPORTING_UNIT_ID"     "NWCG_REPORTING_UNIT_NAME"  
 # [9] "SOURCE_REPORTING_UNIT"      "SOURCE_REPORTING_UNIT_NAME" "LOCAL_FIRE_REPORT_ID"       "LOCAL_INCIDENT_ID"         
-# [13] "FIRE_CODE"                  "FIRE_NAME"                  "ICS_209_INCIDENT_NUMBER"    "ICS_209_NAME"              
-# [17] "MTBS_ID"                    "MTBS_FIRE_NAME"             "COMPLEX_NAME"               "FIRE_YEAR"                 
-# [21] "DISCOVERY_DATE"             "DISCOVERY_DOY"              "DISCOVERY_TIME"             "STAT_CAUSE_CODE"           
-# [25] "STAT_CAUSE_DESCR"           "CONT_DATE"                  "CONT_DOY"                   "CONT_TIME"                 
-# [29] "FIRE_SIZE"                  "FIRE_SIZE_CLASS"            "LATITUDE"                   "LONGITUDE"                 
-# [33] "OWNER_CODE"                 "OWNER_DESCR"                "STATE"                      "COUNTY"                    
+# [13] "FIRE_CODE"                  "FIRE_NAME"                  "ICS_209_INCIDENT_NUMBER"   "ICS_209_NAME"              
+# [17] "MTBS_ID"                    "MTBS_FIRE_NAME"             "COMPLEX_NAME"              "FIRE_YEAR"                 
+# [21] "DISCOVERY_DATE"             "DISCOVERY_DOY"              "DISCOVERY_TIME"            "STAT_CAUSE_CODE"           
+# [25] "STAT_CAUSE_DESCR"           "CONT_DATE"                  "CONT_DOY"                  "CONT_TIME"                 
+# [29] "FIRE_SIZE"                  "FIRE_SIZE_CLASS"            "LATITUDE"                  "LONGITUDE"                 
+# [33] "OWNER_CODE"                 "OWNER_DESCR"                "STATE"                     "COUNTY"                    
 # [37] "FIPS_CODE"                  "FIPS_NAME"                 
 
 
