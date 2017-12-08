@@ -143,18 +143,18 @@ for (xi in lon_index){
     ############################################################################
     # Eliminate points that are far away
     centriodDist <- distHaversine(pt, ecoregion_centriods)
-    cuttoffDistance <- sort(centriodDist)[20] # ecoregions have wierd shapes so keep many around
+    cuttoffDistance <- sort(centriodDist)[25] # ecoregions have wierd shapes so keep many around
     SPDFMask <- centriodDist <= cuttoffDistance
     # Perform calculation on the remaining, close points
     ecoregion[xi,yi] <- over(pt, SPDF[SPDFMask,])$NA_L2CODE
     
-    # If a state has been assigned but an ecoregion has not, then that means
-    # we have an on the border type situation
-    if(is.na(ecoregion[xi,yi]) & !is.na(state[xi, yi]) ){
-      print("No ecoregion selected, requires expensive calculations")
-      dist.mat <- geosphere::dist2Line(p = pt, line = SPDF)
-      ecoregion[xi,yi] <- SPDF[dist.mat[4],]$NA_L2CODE
-    }
+    # # If a state has been assigned but an ecoregion has not, then that means
+    # # we have an on the border type situation
+    # if(is.na(ecoregion[xi,yi]) & !is.na(state[xi, yi]) ){
+    #   print("No ecoregion selected, requires expensive calculations")
+    #   dist.mat <- geosphere::dist2Line(p = pt, line = SPDF)
+    #   ecoregion[xi,yi] <- SPDF[dist.mat[4],]$NA_L2CODE
+    # }
     
     #ecoregion[xi,yi] <- over(pt, SPDF)$NA_L2CODE # VERY SLOW
     
