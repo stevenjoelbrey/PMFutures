@@ -195,6 +195,7 @@ for year in years:
 				day_time_mean    = np.mean(VAR_array_subset, 0)
 				dailyVAR[i, :, : ] = day_time_mean
 
+	# TODO: elif statement for wind gust goes here! 
 
 	elif (dateHours[0] == 12) & (dateHours[-1]) == 0 & (dateYears[-1] > int(year)):
 
