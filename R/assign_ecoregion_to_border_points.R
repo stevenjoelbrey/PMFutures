@@ -65,7 +65,7 @@ for (i in 1:nMissing){
   # This is super fast, so get rid of polygons that are really far away from this
   # point. 
   centriodDist <- distHaversine(pt, centriods)
-  cuttoffDistance <- sort(centriodDist)[10]
+  cuttoffDistance <- sort(centriodDist)[20]
   SPDFMask <- centriodDist <= cuttoffDistance
   
   # Now this calculation can be done on many fewer polygons
