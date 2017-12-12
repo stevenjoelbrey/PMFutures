@@ -6,7 +6,14 @@ if(length(args)==0){
 
 # readFPAFODFireFeatures.R
 # execute via command line 
+# cd GoogleDrive/sharedProjects/PMFutures/
 # Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003
+
+# NOTE:
+# Rscript --vanilla R/assign_ecoregion_to_border_points.R 2003 
+# Should be run after to fix the points that do not get original assignment
+# TODO: integrate the functionality. 
+# NOTE: THIS HAS BEEN ATTEMPTED BUT NOT TESTED
 ################################################################################
 # readUSFSFireOccurance.R
 
@@ -133,7 +140,22 @@ for (i in 1:nRow){
   p_ecoregion <- over(p, SPDF, returnList = FALSE)
   
   # Assign level 2 identification
-  NA_L2CODE[i] <- p_ecoregion$NA_L2CODE
+  assignment <- p_ecoregion$NA_L2CODE
+  
+  if(is.na(assignment)){
+    
+    # Now this calculation can be done on many fewer polygons
+    dist.mat <- geosphere::dist2Line(p = p, line = SPDF)
+    
+    # Assign the closest polygon in the ecoregions polygons
+    NA_L2CODE[i] <- SPDF@data$NA_L2CODE[dist.mat[,4]]
+    
+  } else{
+    
+    NA_L2CODE[i] <- assignment
+    
+  }
+  
 
   # Output progress to the screen
   if(i %% 1000 == 0){
