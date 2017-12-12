@@ -40,7 +40,7 @@ import os.path
 
 drive = cnm.getDrive()
 dataDir   = os.path.join(drive,"era_interim_nc_6_hourly/")
-years = np.arange(2003, 2016)
+years = np.arange(1992, 2002)
 
 # Create surface RH for each year of chosen range
 for year in years:
