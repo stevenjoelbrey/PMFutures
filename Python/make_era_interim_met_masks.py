@@ -297,7 +297,7 @@ def daysSinceLastRain(region="_"):
 	calculates how many days since non zero precip at each location."""
 
 	# Read in the rain nc data
-	tp_nc = Dataset(dataDirBase + 'tp'+ region +'2003_2016.nc', 'r')
+	tp_nc = Dataset(dataDirBase + 'tp'+ region +'1992_2016.nc', 'r')
 	tp_meters = tp_nc.variables['tp'] # meters per calendar date
 	inchPerM = 39.3701      # [inch/meter]
 	tp = tp_meters[:] * inchPerM # This loads a really big file into the workspace
@@ -317,7 +317,7 @@ def daysSinceLastRain(region="_"):
 
 	# Make sure there are no negative precip values floating around in these here
 	# datas
-	if (np.sum(tp < 0) > 0):
+	if (np.sum(tp < 0) > 0.01):
 		raise ValueError('Precip less than zero detected in data. Evaulated chosen precip file pipeline.')
 
 	# Loop through time and figure out how long it has been since zero rain for
@@ -340,7 +340,7 @@ def daysSinceLastRain(region="_"):
 
 
 	# Write this as a met nc file
-	saveName = dataDirBase + 'days_since_rain' + region + '2003_2016.nc'
+	saveName = dataDirBase + 'days_since_rain' + region + '1992_2016.nc'
 
 	ncFile = Dataset(saveName, 'w', format='NETCDF4')
 	ncFile.description = 'Counter indicating days since rain > 0 at a location.'
