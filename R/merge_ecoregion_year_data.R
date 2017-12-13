@@ -6,6 +6,9 @@
 # files together. Really this whole script and seperation of the former is
 # only needed because I do not know how to parallel program in R. 
 
+# TODO: Eventually this will  not need to draw from the "_borderfix_" version of
+# TODO: the yearly data. 
+
 library(maps)
 library(sp)
 library(rgdal)
@@ -13,7 +16,7 @@ library(maptools)
 library(rgeos)
 
 dataDir   <- "Data/FPA_FOD/"
-startYear <- 2003
+startYear <- 1992
 endYear   <- 2013
 years <- startYear:endYear
 
@@ -37,13 +40,14 @@ print(unique(FPA_FOD_merged$FIRE_YEAR))
 
 FPA_FOD_merged$NA_L2CODE <- as.numeric(as.character(FPA_FOD_merged$NA_L2CODE))
 
-# Need to handle the points that feel inbetween polygons. Assignments must be
+# Need to handle the points that fall inbetween polygons. Assignments must be
 # made for these ~ 33,000 fires. 
 
-# TODO: Remove peurto rico fires, these are outside our scope and do not have
+# TODO: Remove Puerto Rico fires, these are outside our scope and do not have
 # TODO: ecoregions. AND HAWAII
+unique(FPA_FOD_merged$STATE)
 
-
+print("Number of fires with no ecoregion assignment made:")
 print(sum(is.na(FPA_FOD_merged$NA_L2CODE)))
 
 
@@ -64,6 +68,6 @@ plot(fireLocations[FPA_FOD_merged$NA_L2CODE==10.1,], add=T, col="tan",pch=".")
 plot(fireLocations[FPA_FOD_merged$NA_L2CODE==15.4,], add=T, col="purple",pch=".")
 
 FPA_FOD <- FPA_FOD_merged
-save(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD",startYear,"_",endYear,".RData"))
+save(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD_",startYear,"_",endYear,".RData"))
 write.csv(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD_",startYear,"_",endYear,".csv"))
 
