@@ -1,12 +1,21 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0){
-  args=2003
+  year1 <- 1992
+  year2 <- 2013
+}else{
+  year1 <- args[1]
+  year2 <- args[2]
 }
 
+# TODO: wind gusts
+# TODO: early years
+
+# TODO: could subset lat lon domain loaded from ecmwf
+
 # readFPAFODFireFeatures.R
-# execute via command line 
-# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003
+# execute via command line, e.g. below  
+# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003 2016
 ################################################################################
 # assign_ecmwf_reanalysis_to_FPA_FOD.R
 
@@ -26,7 +35,8 @@ library(ncdf4)
 library(fields)
 
 # Load FPA-FOD data, the one with all attributes (ecoregions) assgined.
-load("Data/FPA_FOD/FPA_FOD_2003_2013.RData")
+FPAFOD_file <- paste0("Data/FPA_FOD/FPA_FOD_", year1, "_", year2, ".RData")
+load(FPAFOD_file)
 nRow     <- dim(FPA_FOD)[1]
 fireDate <- FPA_FOD$DISCOVERY_DATE
 fireLat  <- FPA_FOD$LATITUDE
@@ -40,9 +50,9 @@ fireLonAdjusted <- fireLon + 360
 ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
 #ncDir <- "/Volumes/Brey_external/era_interim_nc_daily/"
 
-print("Loading lots of nc data")
+print("Loading lots of large nc data")
 
-nc_file <- paste0(ncDir,"t2m_2003_2016.nc")
+nc_file <- paste0(ncDir,"t2m_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
 
 # Handle ecmwf time with origin 1900-01-01 00:00:0.0
@@ -54,7 +64,7 @@ t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
 ecmwfDate <- t0 + ecmwf_seconds
 
 # We only want to load through 2013
-tf <- which(ecmwfDate == as.POSIXct("2013-12-31", tz="UTC"))
+tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
 
 # Now actually load the data
 ecmwf_latitude <- ncvar_get(nc, "latitude")
@@ -62,7 +72,21 @@ ecmwf_longitude <- ncvar_get(nc, "longitude")
 nLat <- length(ecmwf_latitude)
 nLon <- length(ecmwf_longitude)
 
-t2m <- ncvar_get(nc, "t2m", start=c(1,1,1), count=c(nLon, nLat, tf))
+# Figure out the lon and lat subsets 
+lon1 <- which(ecmwf_longitude == 180)
+lon2 <- which(ecmwf_longitude == 310.5)
+lonCount <- (lon2 - lon1) + 1
+
+lat1 <- which(ecmwf_latitude == 87)
+lat2 <- which(ecmwf_latitude == 15)
+latCount <- (lat2 - lat1) + 1
+
+# Get the spatial dims again using the new lonCount and latCount variables 
+ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
+ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
+
+t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
+
 nc_close(nc)
 
 # To keep things as clear as possible, subset the time array so that they ALL
@@ -73,38 +97,44 @@ if(length(ecmwfDate) != dim(t2m)[3]){
 }
 
 # RH% 
-nc_file <- paste0(ncDir,"rh2m_2003_2016.nc")
+nc_file <- paste0(ncDir,"rh2m_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-rh2m <- ncvar_get(nc, "rh2m", start=c(1,1,1), count=c(nLon, nLat, tf))
+rh2m <- ncvar_get(nc, "rh2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
 # days since rain 
-nc_file <- paste0(ncDir,"days_since_rain_2003_2016.nc")
+nc_file <- paste0(ncDir,"days_since_rain_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-daysSinceRain <- ncvar_get(nc, "days_since_rain", start=c(1,1,1), count=c(nLon, nLat, tf))
+daysSinceRain <- ncvar_get(nc, "days_since_rain", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
 # total precip
-nc_file <- paste0(ncDir,"tp_2003_2016.nc")
+nc_file <- paste0(ncDir,"tp_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-tp <- ncvar_get(nc, "tp", start=c(1,1,1), count=c(nLon, nLat, tf))
+tp <- ncvar_get(nc, "tp", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
 # dew point
-nc_file <- paste0(ncDir,"d2m_2003_2016.nc")
+nc_file <- paste0(ncDir,"d2m_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-d2m <- ncvar_get(nc, "d2m", start=c(1,1,1), count=c(nLon, nLat, tf))
+d2m <- ncvar_get(nc, "d2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
+nc_close(nc)
+
+# Evaporation
+nc_file <- paste0(ncDir,"e_",year1,"_",2016,".nc")
+nc <- nc_open(nc_file)
+evap <- ncvar_get(nc, "e", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
 # Wind speed
-nc_file <- paste0(ncDir,"u10_2003_2016.nc")
+nc_file <- paste0(ncDir,"u10_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-u10 <- ncvar_get(nc, "u10", start=c(1,1,1), count=c(nLon, nLat, tf))
+u10 <- ncvar_get(nc, "u10", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
-nc_file <- paste0(ncDir,"v10_2003_2016.nc")
+nc_file <- paste0(ncDir,"v10_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
-v10 <- ncvar_get(nc, "v10", start=c(1,1,1), count=c(nLon, nLat, tf))
+v10 <- ncvar_get(nc, "v10", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
 nc_close(nc)
 
 windSpeed <- sqrt(u10^2 + v10^2)
@@ -140,7 +170,6 @@ points(fireLonAdjusted, fireLat, pch=".", col="black")
 title("The fire locations (black dots, should be over thge U.S. )")
 #dev.off()
 
-
 # Get the assignment loop working, first just for temperature
 t2m_assigned           <- rep(NA, nRow)
 rh2m_assigned          <- rep(NA, nRow)
@@ -153,6 +182,7 @@ elev_assigned          <- rep(NA, nRow)
 tm2_lastMonth  <- rep(NA, nRow)
 rh2m_lastMonth <- rep(NA, nRow)
 tp_lastMonth   <- rep(NA, nRow)
+evap_lastMonth <- rep(NA, nRow)
 
 # After fire start days metric. Namely I am going to look at precip and wind
 windSpeed_MonthAfter <- rep(NA, nRow)
@@ -181,6 +211,7 @@ for (i in 1:nRow){
     
     tm2_lastMonth[i] <- mean(t2m[xi, yi, pastIndicies])
     tp_lastMonth[i]  <- sum(tp[xi, yi, pastIndicies])
+    evap_lastMonth[i]<- sum(evap[xi, yi, pastIndicies])
     rh2m_lastMonth[i]<- mean(rh2m[xi, yi, pastIndicies])
     
   }
@@ -219,6 +250,7 @@ FPA_FOD$d2m             <- d2m_assigned
 FPA_FOD$tm2_lastMonth  <- tm2_lastMonth
 FPA_FOD$tp_lastMonth   <- tp_lastMonth
 FPA_FOD$rh2m_lastMonth <- rh2m_lastMonth
+FPA_FOD$evap_lastMonth <- evap_lastMonth
 
 # Future environment
 FPA_FOD$windSpeed_MonthAfter <- windSpeed_MonthAfter
@@ -228,5 +260,5 @@ FPA_FOD$t2m_monthAfter       <- t2m_monthAfter
 # static in time 
 FPA_FOD$elevation <- elev_assigned
 
-save(FPA_FOD, file = "Data/FPA_FOD/FPA_FOD_ecmwf_2003_2013.RData")
+save(FPA_FOD, file = paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,".RData"))
 # The end. 
