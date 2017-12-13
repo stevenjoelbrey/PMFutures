@@ -196,6 +196,7 @@ for year in years:
 				dailyVAR[i, :, : ] = day_time_mean
 
 	# TODO: elif statement for wind gust goes here! 
+	# elif (hourlyVAR == 'fg10'):
 
 	elif (dateHours[0] == 12) & (dateHours[-1]) == 0 & (dateYears[-1] > int(year)):
 
