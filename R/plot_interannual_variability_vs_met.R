@@ -16,8 +16,8 @@ library(fields)
 library(sfsmisc)
 
 year1 <- 1992
-year2 <- 2013
-ecoregion_select <- 9.4 
+year2 <- 2013 # extent of current FPA-FOD, will be 2015 soon. 
+ecoregion_select <- 6.2 
 month_select     <- 5:10
 
 years  <- year1:year2
@@ -66,6 +66,13 @@ legendText <- c("(10 - 99]", "(100 - 1,000]",
 FPA_BA_lightning <- rep(NA, nYears)
 FPA_BA_human     <- rep(NA, nYears)
 
+# Keep track of monthly totals too. 
+nMonths <- nYears * 12
+monthlyTimeArray   <- rep(as.POSIXct("1750-04-26", tz="UTC"), nMonths)
+FPA_BA_lightning_m <- rep(NA, nMonths)
+FPA_BA_human_m     <- rep(NA, nMonths)
+
+monthCount <- 0
 for (i in 1:nYears){
   
   yearMask <- years[i] == fireYear
@@ -76,11 +83,85 @@ for (i in 1:nYears){
   FPA_BA_human[i]     <- sum(fireSize[m & humanStart])
   FPA_BA_lightning[i] <- sum(fireSize[m & !humanStart])
   
+  # keep track of monthly totals too. 
+  for (m in 1:12){
+
+    # Advance the month index 
+    monthCount <- monthCount + 1
+
+    # Make a nice time array for plotting monthly data
+    if(m < 10){
+      mm <- paste0("0", m)
+    } else{
+      mm <- as.character(m)
+    }
+    dateString <- paste0(years[i], "-", mm, "-15")
+    monthlyTimeArray[monthCount] <- as.POSIXct(dateString, tz="UTC")
+    
+    # Mask isloated month in year timeframe    
+    oneMonthMask <- fireMonth == m
+    m2 <- oneMonthMask & yearMask & ecoRegionMask
+    
+    FPA_BA_human_m[monthCount]     <- sum(fireSize[m2 & humanStart])
+    FPA_BA_lightning_m[monthCount] <- sum(fireSize[m2 & !humanStart])
+    
+  }
 }
 
 
+# Plot Monthly time series of burn area
+pdf(file=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",ecoregion_select,".pdf"),
+    height=10, width=15)
 
-pdf(file=paste0("Figures/summary/FPA_FOD_interannual_variability_mapped_",ecoregion_select,".pdf"),
+par(mar=c(4,8,4,4), lty=1, cex=2)
+
+# Set the limits on the y-axis for the plot so we can create a correct sized
+# blank. 
+yMin <- min( c(FPA_BA_human_m, FPA_BA_lightning_m) )
+yMax <- max( c(FPA_BA_human_m, FPA_BA_lightning_m) )
+
+# Create the blank space (baby, I'll right your name)
+plot(monthlyTimeArray, FPA_BA_lightning_m, col="purple", 
+     bty="n", yaxt="n", xaxt="n",
+     ylab="", xlab="", cex=1,
+     ylim = c(yMin, yMax),
+     xlim = c(min(monthlyTimeArray), max(monthlyTimeArray)),
+     pch="")
+lines(monthlyTimeArray, FPA_BA_lightning_m, col="purple")
+
+# Label the x-axis
+BY <- seq(1, length(monthlyTimeArray), by = 12)
+axis(1, at = monthlyTimeArray[BY], labels = years)
+
+
+# vertical axis
+eaxis(2)
+mtext("Acres Burned", side=2, line=5, cex=2)
+
+# Human
+#points(monthlyTimeArray, FPA_BA_human_m, col="orange", pch=1)
+lines(monthlyTimeArray, FPA_BA_human_m, col="orange")
+
+title(paste("Monthly Burn area in ecoregion", ecoregion_select),
+      cex.main=2)
+
+
+legend("topleft",
+       bty="n",
+       legend=c("Human", "Lightning"),
+       pch= 19,
+       col=c("Orange", "Purple"),
+       cex=1.3
+       )
+
+dev.off()
+
+################################################################################
+# Plot Interannual variability over time for selected months 
+################################################################################
+pdf(file=paste0("Figures/summary/FPA_FOD_interannual_variability_mapped_",
+                ecoregion_select,
+                ".pdf"),
     height=10, width=24)
 
 par(mfrow=c(1,2), xpd=T, mar=c(4,10,4,0))
@@ -112,7 +193,7 @@ legend("topleft",
 # TODO: make sure to plot the fires in ascending size! That way we can see small
 # TODO: fires next to big fires. 
 
-par(xpd=T, mar=c(4,4,4,4))
+par(xpd=F, mar=c(4,4,4,4))
 
 monthMask      <- fireMonth %in% month_select
 ecoRegionMask  <- fireEcoregion == ecoregion_select
@@ -153,43 +234,74 @@ legend("bottomleft", bty="n",
 
 dev.off()
 
-# # NOTE: This only works since all fires are treated as points, and only exist
-# # NOTE: in the western hemisphere. 
-# fireLonAdjusted <- fireLon + 360
-# 
-# 
-# # Get temperature
-# ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
-# 
-# print("Loading lots of nc data")
-# 
-# nc_file <- paste0(ncDir,"t2m_2003_2016.nc")
-# nc <- nc_open(nc_file)
-# 
-# # Handle ecmwf time with origin 1900-01-01 00:00:0.0
-# ecmwf_hours <- ncvar_get(nc, "time")
-# ecmwf_seconds <- ecmwf_hours * 60^2
-# 
-# # make time useful unit
-# t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
-# ecmwfDate <- t0 + ecmwf_seconds
-# 
-# # We only want to load through 2013
-# tf <- which(ecmwfDate == as.POSIXct("2013-12-31", tz="UTC"))
-# 
-# # Now actually load the data
-# ecmwf_latitude <- ncvar_get(nc, "latitude")
-# ecmwf_longitude <- ncvar_get(nc, "longitude")
-# nLat <- length(ecmwf_latitude)
-# nLon <- length(ecmwf_longitude)
-# 
-# t2m <- ncvar_get(nc, "t2m", start=c(1,1,1), count=c(nLon, nLat, tf))
-# nc_close(nc)
-# 
-# 
-# timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
-# mon <- timeLT$mon + 1
-# yr  <- timeLT$year + 1900
+
+################################################################################
+# Get corrosponding environmental data 
+################################################################################
+
+# NOTE: This only works since all fires are treated as points, and only exist
+# NOTE: in the western hemisphere.
+fireLonAdjusted <- fireLon + 360
+
+# Location of local nc data batch
+ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
+
+# Get temperature
+# TODO: Consider making this a function, as it is getting used all over the place
+nc_file <- paste0(ncDir,"t2m_",year1,"_",2016,".nc")
+nc <- nc_open(nc_file)
+
+# Handle ecmwf time with origin 1900-01-01 00:00:0.0
+ecmwf_hours <- ncvar_get(nc, "time")
+ecmwf_seconds <- ecmwf_hours * 60^2
+
+# make time useful unit
+t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
+ecmwfDate <- t0 + ecmwf_seconds
+
+# We only want to load through 2013
+tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
+
+# Now actually load the data
+ecmwf_latitude <- ncvar_get(nc, "latitude")
+ecmwf_longitude <- ncvar_get(nc, "longitude")
+nLat <- length(ecmwf_latitude)
+nLon <- length(ecmwf_longitude)
+
+# Figure out the lon and lat subsets that cover North America, but not more. 
+lon1 <- which(ecmwf_longitude == 180)
+lon2 <- which(ecmwf_longitude == 310.5)
+lonCount <- (lon2 - lon1) + 1
+
+lat1 <- which(ecmwf_latitude == 87)
+lat2 <- which(ecmwf_latitude == 15)
+latCount <- (lat2 - lat1) + 1
+
+# Get the spatial dims again using the new lonCount and latCount variables 
+ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
+ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
+
+t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
+
+nc_close(nc)
+
+# To keep things as clear as possible, subset the time array so that they ALL
+# match in terms of dimensions. 
+ecmwfDate <- ecmwfDate[1:tf]
+
+# Get time is useful subsets and masks 
+timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
+mon <- timeLT$mon + 1
+yr  <- timeLT$year + 1900
+
+# Make sure these coordinates match! 
+flipper <- length(ecmwf_latitude):1
+quartz(width=8, height=5)
+image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
+# Add fire
+points(fireLonAdjusted, fireLat, pch=".")
+map("state", add=T)
+
 # 
 # 
 # 
