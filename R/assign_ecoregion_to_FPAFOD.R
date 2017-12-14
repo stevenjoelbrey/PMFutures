@@ -52,7 +52,10 @@ print(paste("Working on year: ", year))
 print("-----------------------------------------------------------------------")
 
 drive <- "Data/FPA_FOD/"
-dataFile <- paste0(drive,"fire_featureclass.RData")
+# #dataFile <- paste0(drive,"fire_featureclass.RData")
+
+# UPDATED SEE read2017FPAFOD.R for details
+dataFile <- paste0(drive, "FPA_FOD_1992_2015.RData") 
 df <- get(load(dataFile))
 
 # Temporal subset of the FPA-FOD
@@ -144,6 +147,8 @@ for (i in 1:nRow){
   
   if(is.na(assignment)){
     
+    print(paste("Using distances Matrix for: ", i))
+    
     # Now this calculation can be done on many fewer polygons
     dist.mat <- geosphere::dist2Line(p = p, line = SPDF)
     
@@ -156,7 +161,6 @@ for (i in 1:nRow){
     
   }
   
-
   # Output progress to the screen
   if(i %% 1000 == 0){
     print(paste("Percent Complete: ", i/nRow*100))
@@ -170,9 +174,7 @@ print(paste("It took", tf - t1, "to complete loop"))
 # Assign all overlap analysis information to the df and save it! 
 df$NA_L2CODE <- NA_L2CODE
 
-# Write out this data as a csv for easy viewing and sharing
-# write.csv(df, file=paste0(drive, "FPA_FOD.csv"),
-#           row.names = FALSE)
+# Save the data as .RData
 FPA_FOD <- df
 save(FPA_FOD, file=paste0(drive, "FPA_FOD_", year, ".RData"))
 
