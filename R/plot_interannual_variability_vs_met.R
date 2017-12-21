@@ -9,6 +9,9 @@
 
 # This is done using ecmwf reanalysis fields and FPA-FOD fire occurance data 
 
+# TODO: Mean seasonal relationships between burn area and mean conditions. 
+################################################################################
+
 library(stringr)
 library(maps)
 library(ncdf4)
@@ -16,7 +19,7 @@ library(fields)
 library(sfsmisc)
 
 year1 <- 1992
-year2 <- 2013 # extent of current FPA-FOD, will be 2015 soon. 
+year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
 ecoregion_select <- 6.2 
 month_select     <- 5:10
 
@@ -108,8 +111,9 @@ for (i in 1:nYears){
   }
 }
 
-
+################################################################################
 # Plot Monthly time series of burn area
+################################################################################
 pdf(file=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",ecoregion_select,".pdf"),
     height=10, width=15)
 
