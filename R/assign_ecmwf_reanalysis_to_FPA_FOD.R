@@ -2,7 +2,7 @@
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0){
   year1 <- 1992
-  year2 <- 2013
+  year2 <- 2015
 }else{
   year1 <- args[1]
   year2 <- args[2]
@@ -15,7 +15,7 @@ if(length(args)==0){
 
 # readFPAFODFireFeatures.R
 # execute via command line, e.g. below  
-# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003 2016
+# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003 2015
 ################################################################################
 # assign_ecmwf_reanalysis_to_FPA_FOD.R
 
@@ -72,7 +72,8 @@ ecmwf_longitude <- ncvar_get(nc, "longitude")
 nLat <- length(ecmwf_latitude)
 nLon <- length(ecmwf_longitude)
 
-# Figure out the lon and lat subsets 
+# Figure out the lon and lat subsets. These hard coded numbers are known limits
+# to the spatial extent of North America when in lat lon [0 360] space. 
 lon1 <- which(ecmwf_longitude == 180)
 lon2 <- which(ecmwf_longitude == 310.5)
 lonCount <- (lon2 - lon1) + 1
