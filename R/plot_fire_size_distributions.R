@@ -4,7 +4,15 @@ library(sfsmisc) # For engineering axis
 
 # TODO: subset by region and ecoregion
 
-load("Data/FPA_FOD/FPA_FOD_ecmwf_2003_2013.RData")
+# TODO: Monte Carlo method to show that the environmental conditions of igition
+# TODO: types are the same when you account for elevation and month.
+
+# TODO: Further demonstrate that distributions are the same when looking at fires
+# TODO: that end up larger than 10 acres. 
+
+# TODO: Update these data to include many more years of FPA-FOD! No reason not 
+# TODO: to be looking at 1992_2013 version
+load("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
 
 burn_area <- FPA_FOD$FIRE_SIZE
 fire_cause <- FPA_FOD$STAT_CAUSE_DESCR
