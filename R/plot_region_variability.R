@@ -1,5 +1,11 @@
 # plot_region_varaibility.R
 
+# This script will be used for comparing the interannual variability, and 
+# relations to mean synoptic meteorology for human and lightning started fires. 
+
+# Are human-started fires independent of inter-annual variability? 
+################################################################################
+
 
 library(sp)
 library(maps)
@@ -16,7 +22,6 @@ minLon <- -125
 maxLon <- -100
 
 includedMonths <- c(5:10)
-
 
 # Load required datasets
 # 1) Burn area from FPA and GFED4s (FINN)
