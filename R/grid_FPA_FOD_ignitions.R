@@ -5,6 +5,8 @@ if(length(args)==0){
 }
 year <- args
 
+# TODO: Rerun for early years.
+
 print(paste("Working on year:", year))
 
 # grid_FPA_FOD_ignitions.R
@@ -38,7 +40,7 @@ time <- seq(t1,t2, by="day")
 nTime <- length(time)
 
 # Load the FPA_FOD_data
-load(paste0("Data/FPA_FOD/FPA_FOD_borderfix_",year,".RData"))
+load(paste0("Data/FPA_FOD/FPA_FOD_",year,".RData"))
 
 # three categories to hold on to. Human, unknown, and lightning
 humanIgnition <- array(data=0, dim=c(nTime, length(longitude), length(latitude)))
