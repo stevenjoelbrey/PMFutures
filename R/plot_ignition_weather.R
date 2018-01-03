@@ -1,19 +1,14 @@
 # assign_ignition_weather.R 
 
-# This script is designed to assignb ecmwf reanalysis weather and other
-# environmental factors to fires documented in the FPA-FOD database. 
+# ------------------------- Description ---------------------------------------
+# This script will be used to determine if the weather on ignition days is 
+# different for different ignition types. 
 
 # Load the required libraries
 library(maps)
 library(sfsmisc)
 
-load("Data/FPA_FOD/FPA_FOD_ecmwf_2003_2013.RData")
-FPA_FOD$t2m <- FPA_FOD$t2m - 273.15 # C is much nicer
-
-
-##################
-# Subset arguments
-##################
+# ----------------------- Subset arguments -------------------------------------
 
 # Lat lon extent
 minLat <- 30
@@ -29,17 +24,20 @@ includeMonths <- c(5:10)
 
 # ecoregion 
 ecoregion <- 6.2
+
 # Leave this line uncommented if you want to retain all ecoregions
 #ecoregion <- unique(FPA_FOD$NA_L2CODE)
 
+dataFile <- paste0("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
+load(dataFile)
 
+# C is much nicer than K. What am I a chemist?
+FPA_FOD$t2m <- FPA_FOD$t2m - 273.15  
+
+# Get the spatial coordinates of the fires 
 lat <- FPA_FOD$LATITUDE
 lon <- FPA_FOD$LONGITUDE
 startMonth <- FPA_FOD$START_MONTH
-
-#################
-# Subset the data 
-#################
 
 # spatial subset 
 latMask <- lat > minLat & lat < maxLat
@@ -51,23 +49,121 @@ timeMask <- FPA_FOD$START_MONTH %in% includeMonths
 # Ecoregion ecoregion
 ecoregionMask <- FPA_FOD$NA_L2CODE %in% ecoregion
 
-# Fire size mask 
-sizeMask <- FPA_FOD$FIRE_SIZE >= minFireSize
+# # Fire size mask 
+# sizeMask <- FPA_FOD$FIRE_SIZE >= minFireSize
 
 # Subset the data, one mask to rule them all. 
-m <- timeMask & latMask & lonMask & ecoregionMask & sizeMask
-FPA_FOD_subset <- FPA_FOD[m,]
+m <- timeMask & latMask & lonMask & ecoregionMask 
+FPA_FOD <- FPA_FOD[m,]
 
-fireCause <- FPA_FOD_subset$STAT_CAUSE_DESCR
-humanMask <- fireCause != "Lightning"
+# Get the cuase so we can create comparisons 
+fireCause     <- FPA_FOD$STAT_CAUSE_DESCR
+lightningMask <- fireCause == "Lightning"
 
-# t2m
-# rh2m
-# days_since_rain
-# tp 
-# mean temperature last 10 days
-# total rain last 10 days. 
+################################################################################
+# Sample mean differences vs. Julain day
+################################################################################
 
+# Time difference tolerance in JDays for fires to be comparable
+JDayTol       <- 10
+minSampleSize <- 50
+
+# TODO: preset the elevation bins and store differences for these bins to see
+# TOOD: if differences in ignition temp occur at different elevations
+
+JDay <- FPA_FOD$DISCOVERY_DOY
+JDaysArray <- sort(unique(JDay))
+nDays <- length(JDaysArray)
+
+# Find the edges of the julain day experiment using a histogram of JDay counts
+# TODO: Do this by ignition type 
+hist(JDay, breaks = JDaysArray)
+hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T)
+span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
+abline(v=span, col="red", lwd=3)
+
+minJDay <- span[1]
+maxJDay <- span[2]
+
+# Create expiment data storage arrays
+loopJDays <- minJDay:maxJDay
+JDayFireCount <- rep(NA, length(loopJDays))
+
+# Loop through each day and perform experiment
+# TODO: Should I loop over every JDay or by the tolerance? Probably Tol.
+for (i in 1:length(loopJDays)){ 
+  
+  # Subset fires to a given julain day (or maybe range of +-10 or something?)
+  JDayMask <- abs(JDay - loopJDays[i]) < JDayTol
+  JDayFireCount[i] <- sum(JDayMask)
+  
+  # Subset the dataframe by those that are within the JDay tolerance
+  df <- FPA_FOD[JDayMask,]
+  lMask <- df$STAT_CAUSE_DESCR == "Lightning"
+  
+  COL <- rep("orange", sum(JDayMask))
+  COL[lMask] <- "gray"
+  
+  # TODO: boxplot of these data by elevation bin! 
+  # TODO: Also show the 
+  plot(df$elevation, df$t2m, col=COL, pch=19, cex=0.5)
+  
+  # All elevations difference of means 
+  meanLT <- mean(df$t2m[lMask])
+  meanHT <- mean(df$t2m[!lMask])
+  
+  abline(h=meanLT, col="gray", lwd=3)
+  abline(h=meanHT, col="orange", lwd=3)
+  
+  allDT <- meanLT - meanHT
+  
+  # Now account for elevation 
+  # IDEA: Adjust temperature based on elevation using standard lapse rate?
+  sampleElavations <- df$elevation
+  
+  elevationBins <- seq(min(sampleElavations), 
+                       max(sampleElavations), 
+                       by = 300)
+  # Need to make sure that these bins span the range of eleavations in the data
+  # TODO: Maybe better to change existing limit to maximum elevation value? 
+  if(max(elevationBins) < max(sampleElavations)){
+    elevationBins <- append(elevationBins, max(elevationBins) + 300)
+  }
+  
+  abline(v=elevationBins)
+  
+  # Count total in each elevation bin for each ignition type. We will exclude
+  # the bins where there are not enough of each type
+  lightningBinCount <- hist(sampleElavations[lMask], 
+                            breaks=elevationBins, plot=F)$counts
+  
+  humanBinCount <- hist(sampleElavations[!lMask], 
+                            breaks=elevationBins, plot=F)$counts
+  
+  # Mask out the elevation bins that do not have enough data
+  fullBins <- humanBinCount > minSampleSize & lightningBinCount > minSampleSize
+  
+  # Take the difference of the means in each elevation bin
+  differenceOfMeans <- rep(NA, length(fullBins))
+  for (m in 1:(length(elevationBins)-1) ){
+    
+    elevMask <- sampleElavations >= elevationBins[m] & 
+      sampleElavations < elevationBins[m+1]
+    
+    # mean human Temperature sample  
+    meanHTs <- mean(df$t2m[elevMask & !lMask])
+    # mean lightning Temperature sample 
+    meanLTs <- mean(df$t2m[elevMask & lMask])
+    
+    differenceOfMeans[m] <- meanLTs - meanHTs
+    
+    # is SD interesting for anything but a significance test?
+    
+  }
+  
+  mean(differenceOfMeans[fullBins])
+  
+}
 
 
 
@@ -116,7 +212,6 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
 }
 
 quartz(width=15, height=5)
-
 
 png(filename=paste0("Figures/summary/ignitionTemperature_6_2_Fires>1000.png"),
     width=3000, height=1000, res=200)
