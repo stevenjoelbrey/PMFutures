@@ -65,15 +65,17 @@ lightningMask <- fireCause == "Lightning"
 ################################################################################
 
 # Time difference tolerance in JDays for fires to be comparable
-JDayTol       <- 10
+JDayTol       <- 5
 minSampleSize <- 50
+elevationBins <- seq(-300, 3900, by=300)
+nBins         <- length(elevationBins)
 
 # TODO: preset the elevation bins and store differences for these bins to see
 # TOOD: if differences in ignition temp occur at different elevations
 
-JDay <- FPA_FOD$DISCOVERY_DOY
+JDay       <- FPA_FOD$DISCOVERY_DOY
 JDaysArray <- sort(unique(JDay))
-nDays <- length(JDaysArray)
+nDays      <- length(JDaysArray)
 
 # Find the edges of the julain day experiment using a histogram of JDay counts
 # TODO: Do this by ignition type 
@@ -82,12 +84,31 @@ hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T)
 span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
 abline(v=span, col="red", lwd=3)
 
+# Define the range explicitly 
 minJDay <- span[1]
 maxJDay <- span[2]
 
 # Create expiment data storage arrays
 loopJDays <- minJDay:maxJDay
-JDayFireCount <- rep(NA, length(loopJDays))
+nLoop <- length(loopJDays)
+JDayFireCount <- rep(NA, nLoop)
+
+# dataframes
+nCol <- (nBins-1)
+a <- array(NA, dim= c(nLoop,  nCol) )
+df_mean <- data.frame(a)
+row.names(df_mean) <- loopJDays
+
+# Space for other will be stored here
+df_H_wilkes_p <- df_mean
+df_H_wilkes_W <- df_mean
+
+df_L_wilkes_p <- df_mean
+df_L_wilkes_W <- df_mean
+
+
+df_t_test <- df_mean
+
 
 # Loop through each day and perform experiment
 # TODO: Should I loop over every JDay or by the tolerance? Probably Tol.
@@ -107,6 +128,7 @@ for (i in 1:length(loopJDays)){
   # TODO: boxplot of these data by elevation bin! 
   # TODO: Also show the 
   plot(df$elevation, df$t2m, col=COL, pch=19, cex=0.5)
+  abline(v=elevationBins)
   
   # All elevations difference of means 
   meanLT <- mean(df$t2m[lMask])
@@ -121,51 +143,95 @@ for (i in 1:length(loopJDays)){
   # IDEA: Adjust temperature based on elevation using standard lapse rate?
   sampleElavations <- df$elevation
   
-  elevationBins <- seq(min(sampleElavations), 
-                       max(sampleElavations), 
-                       by = 300)
-  # Need to make sure that these bins span the range of eleavations in the data
-  # TODO: Maybe better to change existing limit to maximum elevation value? 
-  if(max(elevationBins) < max(sampleElavations)){
-    elevationBins <- append(elevationBins, max(elevationBins) + 300)
-  }
-  
-  abline(v=elevationBins)
-  
   # Count total in each elevation bin for each ignition type. We will exclude
   # the bins where there are not enough of each type
-  lightningBinCount <- hist(sampleElavations[lMask], 
-                            breaks=elevationBins, plot=F)$counts
+  lightningBinCount <- hist(sampleElavations[lMask], breaks=elevationBins, plot=F)$counts
   
-  humanBinCount <- hist(sampleElavations[!lMask], 
-                            breaks=elevationBins, plot=F)$counts
+  humanBinCount <- hist(sampleElavations[!lMask], breaks=elevationBins, plot=F)$counts
   
-  # Mask out the elevation bins that do not have enough data
-  fullBins <- humanBinCount > minSampleSize & lightningBinCount > minSampleSize
+  # Mask out (later) the elevation bins that do not have enough data
+  fullBins <- humanBinCount > minSampleSize & 
+              lightningBinCount > minSampleSize
   
-  # Take the difference of the means in each elevation bin
-  differenceOfMeans <- rep(NA, length(fullBins))
-  for (m in 1:(length(elevationBins)-1) ){
+  #################################################
+  # Stats for each elev bin calculated in this loop 
+  #################################################
+  for ( m in 1:(nBins-1) ){
     
     elevMask <- sampleElavations >= elevationBins[m] & 
-      sampleElavations < elevationBins[m+1]
+                sampleElavations < elevationBins[m+1]
+    
+    # Subset the data by elevation. Make these arrays ready to use
+    H <- df$t2m[elevMask & !lMask]
+    L <- df$t2m[elevMask & lMask]
     
     # mean human Temperature sample  
-    meanHTs <- mean(df$t2m[elevMask & !lMask])
+    meanHTs <- mean(H)
+    sdHTs   <- sd(H)
+    
     # mean lightning Temperature sample 
-    meanLTs <- mean(df$t2m[elevMask & lMask])
+    meanLTs <- mean(L)
+    sdLTs   <- sd(L)
     
-    differenceOfMeans[m] <- meanLTs - meanHTs
+    # Difference 
+    differenceOfElevationMeans[m] <- meanLTs - meanHTs
+    df_mean[i, m] <- differenceOfElevationMeans
     
-    # is SD interesting for anything but a significance test?
+    # Are the means different? 
+    # 1) Wilkes test to see if the distributions are normal. 
+    # 2) If they are normal, t-test for difference of sample means. 
+    df_H_wilkes_p[i, m] <- shapiro.test(H)$p.value
+    df_H_wilkes_W[i, m] <- shapiro.test(H)$statistic
+      
+    df_L_wilkes_p[i, m] <- shapiro.test(L)$p.value
+    df_L_wilkes_W[i, m] <- shapiro.test(L)$statistic
+    
+    df_t_test[i,m] <- t.test(H, L, alternative = "two.sided")$p.value
+    
     
   }
   
-  mean(differenceOfMeans[fullBins])
+  # Save these calculations
+  
+
   
 }
 
+################################################################################
+# Plot up these differences over Julain dates, one elevation curve at a time
+################################################################################
+png(filename = "JDay_diff_Series.png", width=3600, height=1500, res=250)
+par(mar=c(4,6,4,6))
 
+library(fields)
+maxValue <- max(abs(df_mean), na.rm=T)
+ylim <- c(maxValue * -1, maxValue)
+  
+plot(loopJDays, df_mean[,8], pch="", bty="n", ylim=ylim, 
+     ylab="Detla Temperature [C]",
+     xlab="Julain Day", 
+     cex.lab=2)
+title("(Mean Lightning Ignition Temperature) - (Mean Human Ignition Temperature)",
+      cex.main=2)
+
+# Place lines for different elevation bands on blank plot 
+nLines <- dim(df_mean)[2]
+lineColors <- terrain.colors(nLines)
+
+for (r in 1:nLines){
+  lines(loopJDays, df_mean[,r], col=lineColors[r], lwd=3)
+}
+
+abline(h=0, lwd=1, lty=2)
+
+# Legend to understand the colors relation to elevation
+image.plot( legend.only=TRUE, zlim= range(elevationBins), col=lineColors) 
+
+dev.off()
+
+################################################################################
+# Regular Distributions 
+################################################################################
 
 # Function for plotting two distributions
 plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
