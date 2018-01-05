@@ -65,7 +65,7 @@ lightningMask <- fireCause == "Lightning"
 ################################################################################
 
 # Time difference tolerance in JDays for fires to be comparable
-JDayTol       <- 5
+JDayTol       <- 10
 minSampleSize <- 50
 elevationBins <- seq(-300, 3900, by=300)
 nBins         <- length(elevationBins)
@@ -79,10 +79,12 @@ nDays      <- length(JDaysArray)
 
 # Find the edges of the julain day experiment using a histogram of JDay counts
 # TODO: Do this by ignition type 
-hist(JDay, breaks = JDaysArray)
+hist(JDay, breaks = JDaysArray, main="Daily Ignition Counts: 1992-2015", las=1)
 hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T)
 span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
 abline(v=span, col="red", lwd=3)
+legend("topleft", legend=c("Total Ignitions", "Human Ignitions"),
+       fill=c("white", "orange"), bty="n", cex=2)
 
 # Define the range explicitly 
 minJDay <- span[1]
@@ -93,22 +95,23 @@ loopJDays <- minJDay:maxJDay
 nLoop <- length(loopJDays)
 JDayFireCount <- rep(NA, nLoop)
 
-# dataframes
+# Empty storage dataframes creation
 nCol <- (nBins-1)
 a <- array(NA, dim= c(nLoop,  nCol) )
-df_mean <- data.frame(a)
-row.names(df_mean) <- loopJDays
+df_dummy <- data.frame(a)
+row.names(df_dummy) <- loopJDays
+
+df_difference_of_means <- df_dummy
 
 # Space for other will be stored here
-df_H_wilkes_p <- df_mean
-df_H_wilkes_W <- df_mean
+df_H_wilkes_p <- df_dummy
+df_H_wilkes_W <- df_dummy
 
-df_L_wilkes_p <- df_mean
-df_L_wilkes_W <- df_mean
+df_L_wilkes_p <- df_dummy
+df_L_wilkes_W <- df_dummy
 
-
-df_t_test <- df_mean
-
+# Difference of the means test. 
+df_t_test <- df_dummy
 
 # Loop through each day and perform experiment
 # TODO: Should I loop over every JDay or by the tolerance? Probably Tol.
@@ -127,8 +130,10 @@ for (i in 1:length(loopJDays)){
   
   # TODO: boxplot of these data by elevation bin! 
   # TODO: Also show the 
-  plot(df$elevation, df$t2m, col=COL, pch=19, cex=0.5)
-  abline(v=elevationBins)
+  plot(df$elevation, df$t2m, col=COL, pch=19, cex=0.5, 
+       ylim=c(0, 30))
+  abline(v=elevationBins, lty=2)
+  title(paste("Julain Day Center:", loopJDays[i]))
   
   # All elevations difference of means 
   meanLT <- mean(df$t2m[lMask])
@@ -158,44 +163,85 @@ for (i in 1:length(loopJDays)){
   #################################################
   for ( m in 1:(nBins-1) ){
     
-    elevMask <- sampleElavations >= elevationBins[m] & 
-                sampleElavations < elevationBins[m+1]
+    # Only bother with these calculations when there is enough data in each bin. 
+    if(fullBins[m]){
     
-    # Subset the data by elevation. Make these arrays ready to use
-    H <- df$t2m[elevMask & !lMask]
-    L <- df$t2m[elevMask & lMask]
-    
-    # mean human Temperature sample  
-    meanHTs <- mean(H)
-    sdHTs   <- sd(H)
-    
-    # mean lightning Temperature sample 
-    meanLTs <- mean(L)
-    sdLTs   <- sd(L)
-    
-    # Difference 
-    differenceOfElevationMeans[m] <- meanLTs - meanHTs
-    df_mean[i, m] <- differenceOfElevationMeans
-    
-    # Are the means different? 
-    # 1) Wilkes test to see if the distributions are normal. 
-    # 2) If they are normal, t-test for difference of sample means. 
-    df_H_wilkes_p[i, m] <- shapiro.test(H)$p.value
-    df_H_wilkes_W[i, m] <- shapiro.test(H)$statistic
+      elevMask <- sampleElavations >= elevationBins[m] & 
+                  sampleElavations < elevationBins[m+1]
       
-    df_L_wilkes_p[i, m] <- shapiro.test(L)$p.value
-    df_L_wilkes_W[i, m] <- shapiro.test(L)$statistic
+      # Subset the data by elevation. Make these arrays ready to use
+      H <- df$t2m[elevMask & !lMask]
+      L <- df$t2m[elevMask & lMask]
+      
+      # mean human Temperature sample  
+      meanHTs <- mean(H)
+      sdHTs   <- sd(H)
+      
+      # mean lightning Temperature sample 
+      meanLTs <- mean(L)
+      sdLTs   <- sd(L)
+      
+      # Difference in this elevation/time bin means 
+      df_difference_of_means[i, m] <- meanLTs - meanHTs
+      
+      # Are the means different? 
+      # 1) Wilkes test to see if the distributions are normal. 
+      # 2) If they are normal, t-test for difference of sample means. 
+      
+      # NOTE for wilkes test:
+      # Ho: The distribution is normal.
+      # h1: reject thre null, (evidense distribution is not normal)
+      
+      # Shapiro-Wilkes test requires sample size between 3-5000. If in
+      # this loop there are more than 3. If more than 5000, randomly draw 5000
+      # from the array. 
+      # TODO: Make into a function so that you do not have two ugly if statements
+      # TODO: back to back. 
+      if(length(L) > 5000){
+        L <- sample(L, size=5000)
+      }
+      if(length(H) > 5000){
+        H <- sample(H, size=5000)
+      }
+      
+      df_H_wilkes_p[i, m] <- shapiro.test(H)$p.value
+      df_H_wilkes_W[i, m] <- shapiro.test(H)$statistic
+        
+      df_L_wilkes_p[i, m] <- shapiro.test(L)$p.value
+      df_L_wilkes_W[i, m] <- shapiro.test(L)$statistic
+      
+      # Test the two distributions to see if the means are different. 
+      df_t_test[i,m] <- t.test(H, L, alternative = "two.sided")$p.value
+    }
     
-    df_t_test[i,m] <- t.test(H, L, alternative = "two.sided")$p.value
-    
-    
-  }
+  } # end of elvation bin looping 
   
-  # Save these calculations
-  
-
   
 }
+
+
+################################################################################
+# Histogram of differences chunked by Julain day and elevation
+################################################################################
+pdf(file="diffence_by_elevation_bin.pdf", width=3, height=20)
+par(mfrow=c(10,1))
+# TODO: Show the total number of fires that went into the calculation for
+# TODO: each elevation bin. Segregated by ignition type. 
+# columns 3:12
+for (i in 3:12){
+  
+  # Figure out the correct elevation bin associated with each row. 
+  binLabel <- paste(elevationBins[i], "-", elevationBins[i+1], "meters")
+  
+  # Show consistent size of hist 
+  hist(df_difference_of_means[, i], xlim=c(-5,5), ylim = c(0, 40),
+       main="", ylab="", xlab="Difference of sample means")
+  abline(v=0, lty=2)
+  title(binLabel)
+  
+}
+
+dev.off()
 
 ################################################################################
 # Plot up these differences over Julain dates, one elevation curve at a time
