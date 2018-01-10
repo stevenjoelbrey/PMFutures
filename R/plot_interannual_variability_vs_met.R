@@ -20,8 +20,8 @@ library(sfsmisc)
 
 year1 <- 1992
 year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
-ecoregion_select <- 6.2 
-month_select     <- 5:10
+ecoregion_select <- 10.1
+month_select     <- 1:12
 
 years  <- year1:year2
 nYears <- length(years)
@@ -114,8 +114,9 @@ for (i in 1:nYears){
 ################################################################################
 # Plot Monthly time series of burn area
 ################################################################################
-pdf(file=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",ecoregion_select,".pdf"),
-    height=10, width=15)
+png(filename=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",
+                ecoregion_select,".png"),
+    height=2000, width=3000, res=250)
 
 par(mar=c(4,8,4,4), lty=1, cex=2)
 
@@ -125,13 +126,13 @@ yMin <- min( c(FPA_BA_human_m, FPA_BA_lightning_m) )
 yMax <- max( c(FPA_BA_human_m, FPA_BA_lightning_m) )
 
 # Create the blank space (baby, I'll right your name)
-plot(monthlyTimeArray, FPA_BA_lightning_m, col="purple", 
+plot(monthlyTimeArray, FPA_BA_lightning_m, col="gray", 
      bty="n", yaxt="n", xaxt="n",
      ylab="", xlab="", cex=1,
      ylim = c(yMin, yMax),
      xlim = c(min(monthlyTimeArray), max(monthlyTimeArray)),
      pch="")
-lines(monthlyTimeArray, FPA_BA_lightning_m, col="purple")
+lines(monthlyTimeArray, FPA_BA_lightning_m, col="gray")
 
 # Label the x-axis
 BY <- seq(1, length(monthlyTimeArray), by = 12)
@@ -154,7 +155,7 @@ legend("topleft",
        bty="n",
        legend=c("Human", "Lightning"),
        pch= 19,
-       col=c("Orange", "Purple"),
+       col=c("Orange", "gray"),
        cex=1.3
        )
 
@@ -163,17 +164,21 @@ dev.off()
 ################################################################################
 # Plot Interannual variability over time for selected months 
 ################################################################################
-pdf(file=paste0("Figures/summary/FPA_FOD_interannual_variability_mapped_",
+png(filename=paste0("Figures/summary/FPA_FOD_interannual_variability_mapped_",
                 ecoregion_select,
-                ".pdf"),
-    height=10, width=24)
+                ".png"),
+    height=2000, width=4800, res=250)
 
 par(mfrow=c(1,2), xpd=T, mar=c(4,10,4,0))
 
-plot(years, FPA_BA_lightning/10^6, col="purple", 
+maxValue <- max(c(FPA_BA_lightning/10^6, FPA_BA_human/10^6))
+
+
+plot(years, FPA_BA_lightning/10^6, col="gray", 
      pch=19, bty="n", yaxt="n", xaxt="n",
-     ylab="", xlab="", cex=2) 
-lines(years, FPA_BA_lightning/10^6, col="purple", lty=2)
+     ylab="", xlab="", cex=2,
+     ylim=c(0, maxValue)) 
+lines(years, FPA_BA_lightning/10^6, col="gray", lty=2)
 
 # Add axis to the plot 
 eaxis(1, cex.axis=2)
@@ -188,7 +193,7 @@ legend("topleft",
        legend=c("Lightning", "Human"),
        pch=19,
        pt.cex=2,
-       col=c("purple", "orange"),
+       col=c("gray", "orange"),
        cex=2,
        bty = "n"
        )
@@ -217,14 +222,13 @@ lightningLocations <- monthMask & ecoRegionMask & !humanStart
 
 points(FPA_FOD$LONGITUDE[lightningLocations], FPA_FOD$LATITUDE[lightningLocations], 
      cex=sizeClass[lightningLocations],
-     col=adjustcolor("purple",0.5), pch=1,
+     col=adjustcolor("gray",0.5), pch=1,
      bty="n", xaxt="n", yaxt="n",
      ylab="",
      xlab="")
 
 # Show the ecoregion border 
 plot(ecoregion_polygon, add=T, lty=1, border="lightgray")
-
 
 legend("bottomleft", bty="n",
        #title="Acres",
@@ -239,108 +243,108 @@ legend("bottomleft", bty="n",
 dev.off()
 
 
-################################################################################
-# Get corrosponding environmental data 
-################################################################################
-
-# NOTE: This only works since all fires are treated as points, and only exist
-# NOTE: in the western hemisphere.
-fireLonAdjusted <- fireLon + 360
-
-# Location of local nc data batch
-ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
-
-# Get temperature
-# TODO: Consider making this a function, as it is getting used all over the place
-nc_file <- paste0(ncDir,"t2m_",year1,"_",2016,".nc")
-nc <- nc_open(nc_file)
-
-# Handle ecmwf time with origin 1900-01-01 00:00:0.0
-ecmwf_hours <- ncvar_get(nc, "time")
-ecmwf_seconds <- ecmwf_hours * 60^2
-
-# make time useful unit
-t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
-ecmwfDate <- t0 + ecmwf_seconds
-
-# We only want to load through 2013
-tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
-
-# Now actually load the data
-ecmwf_latitude <- ncvar_get(nc, "latitude")
-ecmwf_longitude <- ncvar_get(nc, "longitude")
-nLat <- length(ecmwf_latitude)
-nLon <- length(ecmwf_longitude)
-
-# Figure out the lon and lat subsets that cover North America, but not more. 
-lon1 <- which(ecmwf_longitude == 180)
-lon2 <- which(ecmwf_longitude == 310.5)
-lonCount <- (lon2 - lon1) + 1
-
-lat1 <- which(ecmwf_latitude == 87)
-lat2 <- which(ecmwf_latitude == 15)
-latCount <- (lat2 - lat1) + 1
-
-# Get the spatial dims again using the new lonCount and latCount variables 
-ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
-ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
-
-t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
-
-nc_close(nc)
-
-# To keep things as clear as possible, subset the time array so that they ALL
-# match in terms of dimensions. 
-ecmwfDate <- ecmwfDate[1:tf]
-
-# Get time is useful subsets and masks 
-timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
-mon <- timeLT$mon + 1
-yr  <- timeLT$year + 1900
-
-# Make sure these coordinates match! 
-flipper <- length(ecmwf_latitude):1
-quartz(width=8, height=5)
-image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
-# Add fire
-points(fireLonAdjusted, fireLat, pch=".")
-map("state", add=T)
-
+# ################################################################################
+# # Get corrosponding environmental data 
+# ################################################################################
+# 
+# # NOTE: This only works since all fires are treated as points, and only exist
+# # NOTE: in the western hemisphere.
+# fireLonAdjusted <- fireLon + 360
+# 
+# # Location of local nc data batch
+# ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
+# 
+# # Get temperature
+# # TODO: Consider making this a function, as it is getting used all over the place
+# nc_file <- paste0(ncDir,"t2m_",year1,"_",2016,".nc")
+# nc <- nc_open(nc_file)
+# 
+# # Handle ecmwf time with origin 1900-01-01 00:00:0.0
+# ecmwf_hours <- ncvar_get(nc, "time")
+# ecmwf_seconds <- ecmwf_hours * 60^2
+# 
+# # make time useful unit
+# t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
+# ecmwfDate <- t0 + ecmwf_seconds
+# 
+# # We only want to load through 2013
+# tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
+# 
+# # Now actually load the data
+# ecmwf_latitude <- ncvar_get(nc, "latitude")
+# ecmwf_longitude <- ncvar_get(nc, "longitude")
+# nLat <- length(ecmwf_latitude)
+# nLon <- length(ecmwf_longitude)
+# 
+# # Figure out the lon and lat subsets that cover North America, but not more. 
+# lon1 <- which(ecmwf_longitude == 180)
+# lon2 <- which(ecmwf_longitude == 310.5)
+# lonCount <- (lon2 - lon1) + 1
+# 
+# lat1 <- which(ecmwf_latitude == 87)
+# lat2 <- which(ecmwf_latitude == 15)
+# latCount <- (lat2 - lat1) + 1
+# 
+# # Get the spatial dims again using the new lonCount and latCount variables 
+# ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
+# ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
+# 
+# t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
+# 
+# nc_close(nc)
+# 
+# # To keep things as clear as possible, subset the time array so that they ALL
+# # match in terms of dimensions. 
+# ecmwfDate <- ecmwfDate[1:tf]
+# 
+# # Get time is useful subsets and masks 
+# timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
+# mon <- timeLT$mon + 1
+# yr  <- timeLT$year + 1900
+# 
+# # Make sure these coordinates match! 
+# flipper <- length(ecmwf_latitude):1
+# quartz(width=8, height=5)
+# image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
+# # Add fire
+# points(fireLonAdjusted, fireLat, pch=".")
+# map("state", add=T)
+# 
+# # 
+# # 
+# # 
+# # # TODO: make function to apply to any met variable!
+# # latMask <- ecmwf_latitude >= minLat & ecmwf_latitude <= maxLat
+# # lonMask <- ecmwf_longitude >= minLon & ecmwf_longitude <= maxLon
+# # 
+# # mean_temperature <- rep(NA, nYears)
+# # for (i in 1:nYears){
+# #  
+# #   yearMask <- years[i] == yr
+# #   monthMask <- mon %in% 5:10
+# #   
+# #   # Spatial First
+# #   spatialSubset <- t2m[lonMask, latMask, ]
+# #   
+# #   mean_temperature[i] <- mean(spatialSubset[,, yearMask & monthMask])
+# #   
+# # }
+# # 
+# # 
+# # plot(mean_temperature, FPA_summer_BA, yaxt="n", bty="n", col="black", pch=19, 
+# #      ylab="", xlab="mean summer temperature")
+# # points(mean_temperature, FPA_human_summer_BA, yaxt="n", bty="n", col="orange", pch=19)
+# # 
+# # points(mean_temperature, GFED_summer_BA, col="green", pch=19)
+# # 
+# # cor(mean_temperature, FPA_summer_BA)
+# # cor(mean_temperature, FPA_human_summer_BA)
+# # 
+# # 
+# # eaxis(2)
+# # 
 # 
 # 
 # 
-# # TODO: make function to apply to any met variable!
-# latMask <- ecmwf_latitude >= minLat & ecmwf_latitude <= maxLat
-# lonMask <- ecmwf_longitude >= minLon & ecmwf_longitude <= maxLon
-# 
-# mean_temperature <- rep(NA, nYears)
-# for (i in 1:nYears){
-#  
-#   yearMask <- years[i] == yr
-#   monthMask <- mon %in% 5:10
-#   
-#   # Spatial First
-#   spatialSubset <- t2m[lonMask, latMask, ]
-#   
-#   mean_temperature[i] <- mean(spatialSubset[,, yearMask & monthMask])
-#   
-# }
 # 
 # 
-# plot(mean_temperature, FPA_summer_BA, yaxt="n", bty="n", col="black", pch=19, 
-#      ylab="", xlab="mean summer temperature")
-# points(mean_temperature, FPA_human_summer_BA, yaxt="n", bty="n", col="orange", pch=19)
-# 
-# points(mean_temperature, GFED_summer_BA, col="green", pch=19)
-# 
-# cor(mean_temperature, FPA_summer_BA)
-# cor(mean_temperature, FPA_human_summer_BA)
-# 
-# 
-# eaxis(2)
-# 
-
-
-
-
-
