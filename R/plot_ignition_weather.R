@@ -4,8 +4,6 @@
 # This script will be used to determine if the weather on ignition days is 
 # different for different ignition types. 
 
-# TODO: eliminate small fires. (e.g. less than 1 acre). What do we learn?
-
 # Load the required libraries
 library(maps)
 library(sfsmisc)
@@ -39,10 +37,12 @@ experimentVARS <- paste0("ecoregion=", ecoregion,"_",
 
 experimentDir <- paste0("Figures/ignitionCompare_", experimentVARS, "/")
 dailyDir <- paste0(experimentDir, "JDayIgnitionTvsElevation/")
+binnedDir <- paste0(experimentDir, "binnedElevationDistributions/")
 if(!dir.exists(experimentDir)){
 
   dir.create(experimentDir)
   dir.create(dailyDir)
+  dir.create(binnedDir)
   
 } else{
   
@@ -50,7 +50,7 @@ if(!dir.exists(experimentDir)){
   
 }
 
-
+# Load the fire occurence data 
 dataFile <- paste0("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
 load(dataFile)
 
@@ -129,32 +129,46 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
 
 # Show the distribution of environmental variables for two ignition types
 # for all elevations and days to motivated subset comparison
-
 png(filename=paste0(experimentDir, "t2m_distribution_all.png"),
     width=2500, height=2200, res=250)
 par(mar=c(5,5,5,5))
 plot_ignition_weather_distribution("t2m", "Temperature [C]", !lightningMask)
 dev.off()
+
 ################################################################################
 # Sample mean differences vs. Julain day
 ################################################################################
 
+# Select which environmental variable assigned to fires will be subset by
+# elevation and compared between ignition types
+weatherVAR <- "t2m"
+
 # Time difference tolerance in JDays for fires to be comparable
-JDayTol       <- 10
-minSampleSize <- 50
-elevationBins <- seq(-300, 3900, by=300)
-nBins         <- length(elevationBins)
+# Sets the size for a batch of days where I consider season to be accounted for 
+JDayTol       <- 10 
+
+# How many fires of each ignition type are required for us to compare them at a 
+# given JDay window and elevation bin.
+minSampleSize <- 50 
+
+# The elevation bins. We make the assumption that locations within these bins
+# will not have different temperatures that can be entirely explained by 
+# differences in elevation
+elevationBins <- seq(-300, 3900, by=100)
+nBins         <- length(elevationBins) - 1 # bins are values between these
 
 # Get the fire occurence day of year for ignitions information 
 JDay       <- FPA_FOD$DISCOVERY_DOY
-JDaysArray <- sort(unique(JDay))
+JDaysArray <- sort(unique(JDay)) # limited by selected months
 nDays      <- length(JDaysArray)
 
-# Find the edges of the julain day experiment using a histogram of JDay counts
-# TODO: Do this by ignition type 
-png(filename=paste0(experimentDir,"JDayIgnitionCounts.png"),
+# Find the edges of the julain day experiment using a histogram of ignition counts
+# by JDay 
+png(filename=paste0(experimentDir, "JDayIgnitionCounts.png"),
     res=250, height=2000, width=3700)
+# All
 hist(JDay, breaks = JDaysArray, main="Julian Day Ignition Counts: 1992-2015", las=1)
+# Non-lightning only 
 hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T, xlim=c(0, 370))
 span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
 abline(v=span, col="red", lwd=3)
@@ -171,20 +185,22 @@ minJDay <- span[1]
 maxJDay <- span[2]
 
 # Create expiment data storage arrays
-loopJDays <- minJDay:maxJDay
+loopJDays <- seq(minJDay, maxJDay, by = JDayTol) # This is what we loop. These datys and tol gets inbetween 
 nLoop <- length(loopJDays)
 JDayFireCount <- rep(NA, nLoop)
 
-# Empty storage dataframes creation
-nCol <- (nBins-1)
+# Empty storage dataframes creation. Lots of calculations per Julain day chunk
+# needs to be saved for plotting. 
+nCol <- nBins
 a <- array(NA, dim= c(nLoop,  nCol) )
 df_dummy <- data.frame(a)
 row.names(df_dummy) <- loopJDays
 
+# For samples
 df_difference_of_means <- df_dummy
 df_sd <- df_dummy
 
-# Space for other will be stored here
+# Shapiro-wilks tests a distribution for normality
 df_H_wilkes_p <- df_dummy
 df_H_wilkes_W <- df_dummy
 
@@ -192,41 +208,43 @@ df_L_wilkes_p <- df_dummy
 df_L_wilkes_W <- df_dummy
 
 # Difference of the means test. 
-df_t_test <- df_dummy
+df_t_test  <- df_dummy
+df_t_upper <- df_dummy
+df_t_lower <- df_dummy
+# TODO: Create array to store 95% confidense level values. 
 
-# Loop through each day and perform experiment
-# TODO: Should I loop over every JDay or by the tolerance? Probably Tol.
-# TODO: otherwise we are reusing a lot of data. 
+# Loop through each day and perform experiment. Loop by JDayTol so no data is 
+# used more than once.  
 for (i in 1:nLoop){ 
   
   # Subset fires to a given julain day (or maybe range of +-10 or something?)
-  JDayMask <- abs(JDay - loopJDays[i]) < JDayTol
+  JDayMask <- abs(JDay - loopJDays[i]) <= JDayTol
   JDayFireCount[i] <- sum(JDayMask)
   
   # Subset the dataframe by those that are within the JDay tolerance
   df <- FPA_FOD[JDayMask,]
   lMask <- df$STAT_CAUSE_DESCR == "Lightning"
   
-  # Default cover is orange until seen that it is lightning 
+  # Default color is orange until seen that it is lightning 
   COL <- rep("orange", sum(JDayMask))
   COL[lMask] <- "gray"
   
   # TODO: boxplot of these data by elevation bin! 
   # TODO: Also show the 
-  jDayFilename <- paste0(dailyDir, "JDay_",
-                         loopJDays[i],".png")
+  jDayFilename <- paste0(dailyDir, "JDay_", loopJDays[i],
+                         "_elevation_vs_",weatherVAR,".png")
   png(filename=jDayFilename, res=250, height=2000, width=4000)
   
-  plot(df$elevation, df$t2m, 
-       xlab="Elevation [m]", ylab="Temperature [C]",
+  plot(df$elevation, df[[weatherVAR]], 
+       xlab="Elevation [m]", ylab=weatherVAR,
        col=COL, pch=19, cex=0.5, 
        ylim=c(0, 30))
   abline(v=elevationBins, lty=2)
   title(paste("Julain Day Center:", loopJDays[i], "+-", JDayTol))
-  
+
   # All elevations difference of means 
-  meanLT <- mean(df$t2m[lMask])
-  meanHT <- mean(df$t2m[!lMask])
+  meanLT <- mean(df[[weatherVAR]][lMask])
+  meanHT <- mean(df[[weatherVAR]][!lMask])
   
   abline(h=meanLT, col="gray", lwd=3)
   abline(h=meanHT, col="orange", lwd=3)
@@ -235,9 +253,17 @@ for (i in 1:nLoop){
   
   dev.off()
   
-  # Now account for elevation 
+  # Now account for elevation by separating data by the chosen elevation bins. 
   # IDEA: Adjust temperature based on elevation using standard lapse rate?
   sampleElavations <- df$elevation
+  
+  png(filename = paste0(dailyDir, "JDay_", loopJDays[i],"_sample_elevations.png"),
+      width=1000, height=1000, res=200)
+  # TODO: change this to a density curve and make it easier to read
+  hist(sampleElavations[lMask], col=adjustcolor("gray", 0.4) )
+  hist(sampleElavations[!lMask], col=adjustcolor("orange", 0.4), add=T)
+  
+  dev.off()
   
   # Count total in each elevation bin for each ignition type. We will exclude
   # the bins where there are not enough of each type
@@ -252,7 +278,7 @@ for (i in 1:nLoop){
   #################################################
   # Stats for each elev bin calculated in this loop 
   #################################################
-  for ( m in 1:(nBins-1) ){
+  for ( m in 1:nBins ){
     
     # Only bother with these calculations when there is enough data in each bin. 
     if(fullBins[m]){
@@ -260,9 +286,25 @@ for (i in 1:nLoop){
       elevMask <- sampleElavations >= elevationBins[m] & 
                   sampleElavations < elevationBins[m+1]
       
-      # Subset the data by elevation. Make these arrays ready to use
-      H <- df$t2m[elevMask & !lMask]
-      L <- df$t2m[elevMask & lMask]
+      # We need to know if the eleation distributions within this bin look 
+      # alike. Elevation differences could still explain small differences
+      # in temperature or other variable. 
+      png(filename=paste0(binnedDir, "JDay_",loopJDays[i], "_",
+                          elevationBins[m],"-", elevationBins[m],".png"),
+          res=250, height=1000, width=1000)
+      
+      hist(sampleElavations[elevMask & lMask], col=adjustcolor("gray", 0.4),
+           xlab="Ignition Elevations")
+      hist(sampleElavations[elevMask & !lMask], add=T, col=adjustcolor("orange", 0.4))
+      
+      dev.off()
+      
+      # Subset the data by elevation. Make these arrays ready to use. From here
+      # forward in JDayLoop:
+      # H = Human
+      # L = Lightning
+      H <- df[[weatherVAR]][elevMask & !lMask]
+      L <- df[[weatherVAR]][elevMask & lMask]
       
       # mean human Temperature sample  
       meanHTs <- mean(H)
@@ -301,8 +343,15 @@ for (i in 1:nLoop){
       df_L_wilkes_p[i, m] <- shapiro.test(L)$p.value
       df_L_wilkes_W[i, m] <- shapiro.test(L)$statistic
       
-      # Test the two distributions to see if the means are different. 
-      df_t_test[i,m] <- t.test(H, L, alternative = "two.sided")$p.value
+      # Test the two distributions to see if the means are different. Two sided. 
+      # no strong a-priori for what value should be larger. 
+      t_test_results <- t.test(L, H, alternative = "two.sided")
+      df_t_test[i,m] <- t_test_results$p.value
+      
+      # store the 95% confidense bounds 
+      df_t_lower[i,m] <- t_test_results$conf.int[1]
+      df_t_upper[i,m] <- t_test_results$conf.int[2]
+      
     }
     
   } # end of elvation bin looping 
@@ -328,7 +377,7 @@ plot(loopJDays, df[,8], pch="", bty="n", ylim=ylim,
      ylab="Detla Temperature [C]",
      xlab="Julain Day", 
      cex.lab=2)
-title("(Mean Lightning Ignition Temperature) - (Mean Human Ignition Temperature)",
+title(paste("(Mean Lightning Ignition", weatherVAR, ") - (Mean Human Ignition Temperature)"),
       cex.main=2)
 
 # # Add a nice date axis
@@ -339,8 +388,20 @@ title("(Mean Lightning Ignition Temperature) - (Mean Human Ignition Temperature)
 nLines <- dim(df)[2]
 lineColors <- terrain.colors(nLines)
 
-for (r in 1:nLines){
+for (r in 1:nLines){ # 
+  
   lines(loopJDays, df[,r], col=lineColors[r], lwd=3)
+  
+  # Place points where significantly different from zero 
+  sigMask <- df_t_test[,r] < 0.05
+  points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=1)
+  
+  # # Add points with errorbars 
+  # arrows(x0=loopJDays, y0= df_t_lower[,r], 
+  #        x1=loopJDays, y1= df_t_upper[,r],
+  #        length=0.05, angle=90, code=3,
+  #        col=lineColors[r])
+  
 }
 
 abline(h=0, lwd=1, lty=2)
