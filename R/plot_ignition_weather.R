@@ -27,8 +27,9 @@ ecoregion <- 6.2
 # Min fire size. Recal, even though fire managers view every small fire as a 
 # potentially large fire, in terms on when real emissions occur, there is a 
 # good reason to ignore lots of really small fires. 
-minFireSize <- 0 
+minFireSize <- 0
 
+# ----------------------- setup figure dirs ------------------------------------
 # THESE ARGUMENTS SET UP A UNIQUE EXPERIMENT. MAKE A DIRECTORUY TO STORE EACH
 # EXISTING EXPERIMENT. 
 experimentVARS <- paste0("ecoregion=", ecoregion,"_",
@@ -37,8 +38,16 @@ experimentVARS <- paste0("ecoregion=", ecoregion,"_",
                          )
 
 experimentDir <- paste0("Figures/ignitionCompare_", experimentVARS, "/")
+dailyDir <- paste0(experimentDir, "JDayIgnitionTvsElevation/")
 if(!dir.exists(experimentDir)){
+
   dir.create(experimentDir)
+  dir.create(dailyDir)
+  
+} else{
+  
+  print("The Direcory exists. Overwriting files within")
+  
 }
 
 
@@ -143,7 +152,7 @@ nDays      <- length(JDaysArray)
 
 # Find the edges of the julain day experiment using a histogram of JDay counts
 # TODO: Do this by ignition type 
-png(filename="Figures/summary/JDayIgnitionCounts.png",
+png(filename=paste0(experimentDir,"JDayIgnitionCounts.png"),
     res=250, height=2000, width=3700)
 hist(JDay, breaks = JDaysArray, main="Julian Day Ignition Counts: 1992-2015", las=1)
 hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T, xlim=c(0, 370))
@@ -153,6 +162,9 @@ legend("topleft", legend=c("Total Ignitions", "Human Ignitions"),
        fill=c("white", "orange"), bty="n", cex=2)
 
 dev.off()
+
+print(paste("80% of data is between JDays", span[1], "-", span[2]))
+
 
 # Define the range explicitly 
 minJDay <- span[1]
@@ -170,6 +182,7 @@ df_dummy <- data.frame(a)
 row.names(df_dummy) <- loopJDays
 
 df_difference_of_means <- df_dummy
+df_sd <- df_dummy
 
 # Space for other will be stored here
 df_H_wilkes_p <- df_dummy
@@ -200,7 +213,7 @@ for (i in 1:nLoop){
   
   # TODO: boxplot of these data by elevation bin! 
   # TODO: Also show the 
-  jDayFilename <- paste0("Figures/JDayIgnitionTvsElevation/JDay_",
+  jDayFilename <- paste0(dailyDir, "JDay_",
                          loopJDays[i],".png")
   png(filename=jDayFilename, res=250, height=2000, width=4000)
   
@@ -297,54 +310,37 @@ for (i in 1:nLoop){
   
 }
 
-
-################################################################################
-# Histogram of differences chunked by Julain day and elevation
-################################################################################
-pdf(file="Figures/summary/diffence_of_means_by_elevation_bin.pdf", 
-    width=12, height=20)
-par(mfrow=c(5,2))
-# TODO: Show the total number of fires that went into the calculation for
-# TODO: each elevation bin. Segregated by ignition type. 
-# columns 3:12
-for (i in 3:12){
-  
-  # Figure out the correct elevation bin associated with each row. 
-  binLabel <- paste(elevationBins[i], "-", elevationBins[i+1], "meters")
-  
-  # Show consistent size of hist 
-  hist(df_difference_of_means[, i], xlim=c(-5,5), ylim = c(0, 40),
-       main="", ylab="", xlab="Difference of sample means")
-  abline(v=0, lty=2)
-  title(binLabel)
-  
-}
-
-dev.off()
-
 ################################################################################
 # Plot up these differences over Julain dates, one elevation curve at a time
 ################################################################################
-png(filename = "JDay_diff_Series.png", width=3600, height=1500, res=250)
+library(fields)
+df <- df_difference_of_means
+
+png(filename = paste0(experimentDir, "JDay_diff_Series.png"), 
+    width=3600, height=1500, res=250)
 par(mar=c(4,6,4,6))
 
-library(fields)
-maxValue <- max(abs(df_mean), na.rm=T)
+# Absolute biggest value in data
+maxValue <- max(abs(range(df, na.rm = T)))
 ylim <- c(maxValue * -1, maxValue)
   
-plot(loopJDays, df_mean[,8], pch="", bty="n", ylim=ylim, 
+plot(loopJDays, df[,8], pch="", bty="n", ylim=ylim, 
      ylab="Detla Temperature [C]",
      xlab="Julain Day", 
      cex.lab=2)
 title("(Mean Lightning Ignition Temperature) - (Mean Human Ignition Temperature)",
       cex.main=2)
 
+# # Add a nice date axis
+# DATES <- as.Date( (loopJDays-1), origin = "2014-01-01")
+# axis(1, at=loopJDays, labels=DATES, lines=4)
+
 # Place lines for different elevation bands on blank plot 
-nLines <- dim(df_mean)[2]
+nLines <- dim(df)[2]
 lineColors <- terrain.colors(nLines)
 
 for (r in 1:nLines){
-  lines(loopJDays, df_mean[,r], col=lineColors[r], lwd=3)
+  lines(loopJDays, df[,r], col=lineColors[r], lwd=3)
 }
 
 abline(h=0, lwd=1, lty=2)
@@ -355,49 +351,96 @@ image.plot( legend.only=TRUE, zlim= range(elevationBins), col=lineColors)
 dev.off()
 
 ################################################################################
-# Regular Distributions 
+# Histogram of differences chunked by Julain day and elevation
 ################################################################################
 
+# # Skip columns (height bins) that are all NA, i.e. sample sizes were never 50
+# # for each type of ignition on each day. 
+nCol   <- dim(df_difference_of_means)[2]
+# useCol <- rep(TRUE, nCol)
+# for (x in 1:nCol){
+#   is.na(unique(df_difference_of_means[, 1]))
+# }
 
-quartz(width=15, height=5)
+# TODO: Show the total number of fires that went into the calculation for
+# TODO: each elevation bin. Segregated by ignition type. 
+# TODO: Need objective way to determine which columns (height bins) are to be
+# TODO: looped and plotted. 
 
-png(filename=paste0("Figures/summary/ignitionTemperature_6_2_Fires>1000.png"),
-    width=3000, height=1000, res=200)
-par(mfrow=c(1,3), mar=c(4,5,4,4))
-plot_ignition_weather_distribution("t2m", "Temperature [K]", humanMask)
-
-# Show the locations of the fires
-# TODO: Dot size is size of fire!
-map("state", xlim=c(-125,-102), ylim=c(33,50))
-points(FPA_FOD$LONGITUDE[humanMask], FPA_FOD$LATITUDE[humanMask], 
-       col="orange", pch=".")
-points(FPA_FOD$LONGITUDE[!humanMask], FPA_FOD$LATITUDE[!humanMask], 
-       col="darkgray", pch=".")
-title(paste("Fires locations"), cex.main=2)
-
-
-# TODO: histogram of the JDay that these fires are occuring on. 
-minDay <- min(FPA_FOD_subset$DISCOVERY_DOY)
-maxDay <- max(FPA_FOD_subset$DISCOVERY_DOY)
-
-hist(FPA_FOD$DISCOVERY_DOY[humanMask], 
-     col=adjustcolor("orange",0.5),
-     breaks=c(minDay:maxDay), las=1, xlab="Day of Year",
-     ylim=c(0,30),
-     border="transparent",
-     main="Day of year ignition counts",
-     cex.main=2)
-hist(FPA_FOD$DISCOVERY_DOY[!humanMask], 
-     col=adjustcolor("darkgray", 0.5), breaks=c(minDay:maxDay), add=T,
-     border="transparent")
-dev.off()
-
-plot_ignition_weather_distribution("tp_lastMonth", "Total Precip", humanMask)
-
+# What elevation bins have enough values to plot? 
+for (i in 1:nCol){
+  
+  DT <- df_difference_of_means[, i]
+  
+  if (sum(is.na(DT)) < nLoop){
+    
+    # Figure out the correct elevation bin associated with each row. 
+    binLabel <- paste(elevationBins[i], "-", elevationBins[i+1], "meters")
+    
+    # There is non NA data to make the histogram 
+    png(filename=paste0(experimentDir,"diffence_of_means_elevation_bin=",
+                        binLabel,".png"), 
+        width=1000, height=1000, res=250)
+    par(mfrow=c(1,1), las=1)
+    
+    # Show consistent size of hist 
+    hist(DT, xlim=c(-5,5), ylim = c(0, 40),
+         main="", ylab="", xlab="(T_lightning - T_human) [C]", 
+         col=lineColors[i])
+    abline(v=0, lty=2)
+    title(binLabel)
+    
+    dev.off()
+    
+  }
+  
+}
 
 
-quartz()
-plot(FPA_FOD_subset$windSpeed_MonthAfter, FPA_FOD_subset$FIRE_SIZE)
+# ################################################################################
+# # Regular Distributions 
+# ################################################################################
+# 
+# 
+# quartz(width=15, height=5)
+# 
+# png(filename=paste0("Figures/summary/ignitionTemperature_6_2_Fires>1000.png"),
+#     width=3000, height=1000, res=200)
+# par(mfrow=c(1,3), mar=c(4,5,4,4))
+# plot_ignition_weather_distribution("t2m", "Temperature [K]", humanMask)
+# 
+# # Show the locations of the fires
+# # TODO: Dot size is size of fire!
+# map("state", xlim=c(-125,-102), ylim=c(33,50))
+# points(FPA_FOD$LONGITUDE[humanMask], FPA_FOD$LATITUDE[humanMask], 
+#        col="orange", pch=".")
+# points(FPA_FOD$LONGITUDE[!humanMask], FPA_FOD$LATITUDE[!humanMask], 
+#        col="darkgray", pch=".")
+# title(paste("Fires locations"), cex.main=2)
+# 
+# 
+# # TODO: histogram of the JDay that these fires are occuring on. 
+# minDay <- min(FPA_FOD_subset$DISCOVERY_DOY)
+# maxDay <- max(FPA_FOD_subset$DISCOVERY_DOY)
+# 
+# hist(FPA_FOD$DISCOVERY_DOY[humanMask], 
+#      col=adjustcolor("orange",0.5),
+#      breaks=c(minDay:maxDay), las=1, xlab="Day of Year",
+#      ylim=c(0,30),
+#      border="transparent",
+#      main="Day of year ignition counts",
+#      cex.main=2)
+# hist(FPA_FOD$DISCOVERY_DOY[!humanMask], 
+#      col=adjustcolor("darkgray", 0.5), breaks=c(minDay:maxDay), add=T,
+#      border="transparent")
+# dev.off()
+# 
+# plot_ignition_weather_distribution("tp_lastMonth", "Total Precip", humanMask)
+# 
+# 
+# 
+# quartz()
+# plot(FPA_FOD_subset$windSpeed_MonthAfter, FPA_FOD_subset$FIRE_SIZE)
 
 #windSpeed_MonthAfter
 
