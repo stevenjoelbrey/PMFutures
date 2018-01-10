@@ -374,10 +374,11 @@ maxValue <- max(abs(range(df, na.rm = T)))
 ylim <- c(maxValue * -1, maxValue)
   
 plot(loopJDays, df[,8], pch="", bty="n", ylim=ylim, 
-     ylab="Detla Temperature [C]",
+     ylab=paste("Detla", weatherVAR),
      xlab="Julain Day", 
      cex.lab=2)
-title(paste("(Mean Lightning Ignition", weatherVAR, ") - (Mean Human Ignition Temperature)"),
+title(paste("(Mean Lightning Ignition", weatherVAR, 
+            ") - (Mean Human Ignition", weatherVAR,")"),
       cex.main=2)
 
 # # Add a nice date axis
@@ -390,11 +391,11 @@ lineColors <- terrain.colors(nLines)
 
 for (r in 1:nLines){ # 
   
-  lines(loopJDays, df[,r], col=lineColors[r], lwd=3)
+  lines(loopJDays, df[,r], col=lineColors[r], lwd=2, lty=2)
   
   # Place points where significantly different from zero 
   sigMask <- df_t_test[,r] < 0.05
-  points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=1)
+  points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=19)
   
   # # Add points with errorbars 
   # arrows(x0=loopJDays, y0= df_t_lower[,r], 
