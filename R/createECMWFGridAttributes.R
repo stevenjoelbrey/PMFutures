@@ -17,6 +17,7 @@ library(rgeos)
 library(raster)
 library(ncdf4)
 library(geosphere)
+library(fields)
 
 # # Get the elevation grid
 fgrid <- "Data/GIS/elev.0.75-deg.nc"
@@ -25,6 +26,11 @@ elevation <- ncvar_get(nc, "data")
 longitude <- ncvar_get(nc, "lon")
 latitude  <- ncvar_get(nc, "lat")
 nc_close(nc)
+
+flipper <- length(latitude):1
+quartz()
+image.plot(longitude, latitude[flipper], elevation[,flipper])
+title("Elevation, not transformed")
 
 # Make sure these dimensions match ecmwf file exactly
 externalFile <- "/Volumes/Brey_external/era_interim_nc_daily/u10_2011.nc"
@@ -63,19 +69,26 @@ areaMax <- max(area)
 mathAreaMax <- (0.75*111*1e3)^2
 
 PercentDifferent <- abs(mathAreaMax - areaMax)/areaMax * 100
-print(paste("Difference in max grid cell area calculated from assumed 111km/deg at equator=", PercentDifferent))
+print(paste("% Difference in max grid cell area calculated from assumed 111km/deg at equator=", PercentDifferent))
 
-# Assign to each longitude, does not change in longitude
+# Assign to each latitude, does not change in longitude
 grid_area <- elevation
 grid_area[] <- NA
 for (j in 1:length(lon_rad)){
   grid_area[j,] <- area
 }
+# alternatively
+#grid_area <- t(replicate(length(lon_rad), area))
 
 ################################################################################
 # Now overlap calculations for state and ecoregions
 ################################################################################
-lon <- longitude - 180
+lon <- longitude - 180 # not shifting data, just the labeling of this dimension 
+psudeoLon <- rep(NA, length(longitude))
+psudeoLon[1:(sum(lon>=0))] <- lon[lon >=0]
+psudeoLon[(sum(lon>=0)+1):length(lon)] <- lon[lon < 0]
+
+lon <- psudeoLon
 lat <- latitude
 
 # point over polygon calculations. Now we need to assign ecoregions as well as
@@ -83,6 +96,11 @@ lat <- latitude
 # Speed this up by only looping through North America coordinates 
 lon_index <- which(lon >= -168 & lon <= -52) # needs to be the shifted grid
 lat_index <- which(latitude >= 25 & latitude <= 80)
+
+quartz()
+f <- length(lat_index):1
+image.plot(longitude[lon_index], latitude[lat_index][f], elevation[lon_index, lat_index[f]])
+title("This map needs to look like the united states")
 
 # Load ecoregions "SPDF". Use this CRS for all spatial objects
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
