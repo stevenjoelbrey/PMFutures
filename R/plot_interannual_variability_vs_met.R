@@ -1,16 +1,15 @@
 # plot_interannual_variability_vs_met.R
 
-# Description: 
+# ------------------------- Description ---------------------------------------
 # This script will be used to plot regional interannual variability in burn area
 # segregated by ecoregion and other grid attributes. 
 
-# goal, show if weather variables explain variance in interannual variability 
-# and if relationships differ between different emission inventories. 
+# The main goal is to show if weather variables explain variance in interannual 
+# variability and if relationships differ between ignition types. This is done 
+# using ecmwf reanalysis fields and FPA-FOD fire occurance data.
+# Timescales of interest include season (e.g. 5-10), monthly, and lagged monthly. 
 
-# This is done using ecmwf reanalysis fields and FPA-FOD fire occurance data 
-
-# TODO: Mean seasonal relationships between burn area and mean conditions. 
-################################################################################
+# TODO: Download ecmwf reanalysis on monthly scale, or average what I have already
 
 library(stringr)
 library(maps)
@@ -20,15 +19,16 @@ library(sfsmisc)
 
 year1 <- 1992
 year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
-ecoregion_select <- 10.1
-month_select     <- 1:12
+ecoregion_select <- 6.2
+month_select     <- 5:10
 
 years  <- year1:year2
 nYears <- length(years)
 
 # Load FPA-FOD data, the one with all attributes (ecoregions) assgined.
 # TODO: load the one with weather and make sure they match! 
-load(paste0("Data/FPA_FOD/FPA_FOD_", year1,"_", year2,".RData"))
+load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,".RData"))
+
 fireDate      <- FPA_FOD$DISCOVERY_DATE
 fireLat       <- FPA_FOD$LATITUDE
 fireLon       <- FPA_FOD$LONGITUDE
@@ -42,19 +42,22 @@ fireSize      <- FPA_FOD$FIRE_SIZE
 humanStart <- fireCause != "Lightning"
 nFires     <- length(fireSize)
 
-# Load ecoregion borders
-load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
+# Load ecoregion borders, for plotting, analysis etc. 
+load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData") # <- SPDF
 ecoregion_polygon <- SPDF[SPDF@data$NA_L2CODE==ecoregion_select,]
+
 #################################################################
 # create a fire size attribute bin that will be used for plotting 
 #################################################################
-sizeBins <- c(0, 10^c(1:6))
+sizeBins <- c(0, 10^c(1:6)) # a clean span of 6 orders of magnitude 
 cexBins  <- c(0, 0.1, 0.4, 1, 2, 3.8)
 nBins <- length(sizeBins)
 sizeClass <- rep(NA, nFires)
-# assign the fires to size bins
+
+# Assign the fires to size bins
 for (b in 1:(nBins-1)){
   
+  # Mask them 
   m <- fireSize >= sizeBins[b] & fireSize < sizeBins[b+1]
   sizeClass[m] <- cexBins[b]
   
@@ -62,20 +65,20 @@ for (b in 1:(nBins-1)){
 
 # TODO: Make this less terrible... Use scientific notation
 legendText <- c("(10 - 99]", "(100 - 1,000]", 
-                "(1,000 - 10,000]", "(10,000 - 100,000]", "(100,000 - 1,100,000]")
+                "(1,000 - 10,000]", "(10,000 - 100,000]", 
+                "(100,000 - 1,100,000]")
 
 # Create annual totals for specified ecoregion and months 
-
 FPA_BA_lightning <- rep(NA, nYears)
 FPA_BA_human     <- rep(NA, nYears)
 
-# Keep track of monthly totals too. 
-nMonths <- nYears * 12
+# Keep track of monthly totals too. ( "_m" indicates monthly variable )
+nMonths <- nYears * length(month_select)
 monthlyTimeArray   <- rep(as.POSIXct("1750-04-26", tz="UTC"), nMonths)
 FPA_BA_lightning_m <- rep(NA, nMonths)
 FPA_BA_human_m     <- rep(NA, nMonths)
 
-monthCount <- 0
+monthCount <- 0 # Advance the month counter 
 for (i in 1:nYears){
   
   yearMask <- years[i] == fireYear
@@ -83,11 +86,12 @@ for (i in 1:nYears){
   ecoRegionMask <- fireEcoregion == ecoregion_select
   m <- yearMask & monthMask & ecoRegionMask
   
+  # Sum to burn area for the mask made above! 
   FPA_BA_human[i]     <- sum(fireSize[m & humanStart])
   FPA_BA_lightning[i] <- sum(fireSize[m & !humanStart])
   
-  # keep track of monthly totals too. 
-  for (m in 1:12){
+  # Keep track of monthly totals too. Go within the year
+  for (m in month_select){
 
     # Advance the month index 
     monthCount <- monthCount + 1
@@ -109,11 +113,13 @@ for (i in 1:nYears){
     FPA_BA_lightning_m[monthCount] <- sum(fireSize[m2 & !humanStart])
     
   }
+  
 }
 
 ################################################################################
 # Plot Monthly time series of burn area
 ################################################################################
+if(FALSE){
 png(filename=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",
                 ecoregion_select,".png"),
     height=2000, width=3000, res=250)
@@ -160,6 +166,7 @@ legend("topleft",
        )
 
 dev.off()
+}
 
 ################################################################################
 # Plot Interannual variability over time for selected months 
@@ -243,108 +250,134 @@ legend("bottomleft", bty="n",
 dev.off()
 
 
-# ################################################################################
-# # Get corrosponding environmental data 
-# ################################################################################
-# 
-# # NOTE: This only works since all fires are treated as points, and only exist
-# # NOTE: in the western hemisphere.
-# fireLonAdjusted <- fireLon + 360
-# 
-# # Location of local nc data batch
-# ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
-# 
-# # Get temperature
-# # TODO: Consider making this a function, as it is getting used all over the place
-# nc_file <- paste0(ncDir,"t2m_",year1,"_",2016,".nc")
-# nc <- nc_open(nc_file)
-# 
-# # Handle ecmwf time with origin 1900-01-01 00:00:0.0
-# ecmwf_hours <- ncvar_get(nc, "time")
-# ecmwf_seconds <- ecmwf_hours * 60^2
-# 
-# # make time useful unit
-# t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
-# ecmwfDate <- t0 + ecmwf_seconds
-# 
-# # We only want to load through 2013
-# tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
-# 
-# # Now actually load the data
-# ecmwf_latitude <- ncvar_get(nc, "latitude")
-# ecmwf_longitude <- ncvar_get(nc, "longitude")
-# nLat <- length(ecmwf_latitude)
-# nLon <- length(ecmwf_longitude)
-# 
-# # Figure out the lon and lat subsets that cover North America, but not more. 
-# lon1 <- which(ecmwf_longitude == 180)
-# lon2 <- which(ecmwf_longitude == 310.5)
-# lonCount <- (lon2 - lon1) + 1
-# 
-# lat1 <- which(ecmwf_latitude == 87)
-# lat2 <- which(ecmwf_latitude == 15)
-# latCount <- (lat2 - lat1) + 1
-# 
-# # Get the spatial dims again using the new lonCount and latCount variables 
-# ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
-# ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
-# 
-# t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
-# 
-# nc_close(nc)
-# 
-# # To keep things as clear as possible, subset the time array so that they ALL
-# # match in terms of dimensions. 
-# ecmwfDate <- ecmwfDate[1:tf]
-# 
-# # Get time is useful subsets and masks 
-# timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
-# mon <- timeLT$mon + 1
-# yr  <- timeLT$year + 1900
-# 
-# # Make sure these coordinates match! 
-# flipper <- length(ecmwf_latitude):1
-# quartz(width=8, height=5)
-# image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
-# # Add fire
-# points(fireLonAdjusted, fireLat, pch=".")
-# map("state", add=T)
-# 
-# # 
-# # 
-# # 
-# # # TODO: make function to apply to any met variable!
-# # latMask <- ecmwf_latitude >= minLat & ecmwf_latitude <= maxLat
-# # lonMask <- ecmwf_longitude >= minLon & ecmwf_longitude <= maxLon
-# # 
-# # mean_temperature <- rep(NA, nYears)
-# # for (i in 1:nYears){
-# #  
-# #   yearMask <- years[i] == yr
-# #   monthMask <- mon %in% 5:10
-# #   
-# #   # Spatial First
-# #   spatialSubset <- t2m[lonMask, latMask, ]
-# #   
-# #   mean_temperature[i] <- mean(spatialSubset[,, yearMask & monthMask])
-# #   
-# # }
-# # 
-# # 
-# # plot(mean_temperature, FPA_summer_BA, yaxt="n", bty="n", col="black", pch=19, 
-# #      ylab="", xlab="mean summer temperature")
-# # points(mean_temperature, FPA_human_summer_BA, yaxt="n", bty="n", col="orange", pch=19)
-# # 
-# # points(mean_temperature, GFED_summer_BA, col="green", pch=19)
-# # 
-# # cor(mean_temperature, FPA_summer_BA)
-# # cor(mean_temperature, FPA_human_summer_BA)
-# # 
-# # 
-# # eaxis(2)
-# # 
-# 
-# 
-# 
-# 
-# 
+################################################################################
+# Get corrosponding environmental data to make seasonal comparisons for
+# specific variables.
+# ERA-interim ecmwf averaging definitions can be found at the link below:
+# https://software.ecmwf.int/wiki/display/CKB/ERA-Interim%3A+monthly+means
+################################################################################
+
+# Apply ecmwf gridded ecoregion mask. Want to only look at meteorology in 
+# locations where we are looking at fire! 
+
+gridAttributesFile <- "Data/grid_attributes/grid_attributes_75x75.nc"
+grid_attributes    <- nc_open(gridAttributesFile)
+
+# Spatial first
+grid_latitude <- grid_attributes$dim$latitude$vals
+grid_longitude <- grid_attributes$dim$longitude$vals
+
+# Actual attributes next 
+grid_ecoregion     <- round(ncvar_get(grid_attributes, "ecoregion"),2)
+grid_state         <- ncvar_get(grid_attributes, "state")
+nc_close(grid_attributes)
+
+# Get rid of pesky NA values, they make it hard to make masks 
+grid_ecoregion[is.na(grid_ecoregion)] <- -1
+grid_ecoRegionMask <- grid_ecoregion == ecoregion_select
+grid_latMask <- t(replicate(length(grid_longitude), grid_latitude < 50))
+
+# ecoregion mask where Canada is excluded
+grid_mask <- grid_ecoRegionMask & grid_latMask
+
+# NOTE: This only works since all fires are treated as points, and only exist
+# NOTE: in the western hemisphere.
+fireLonAdjusted <- fireLon + 360
+
+# Location of local nc data batch
+ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
+
+# Get temperature
+# TODO: Consider making this a function, as it is getting used all over the place
+nc_file <- paste0(ncDir, "t2m_", year1, "_", 2016, ".nc")
+nc <- nc_open(nc_file)
+
+# Handle ecmwf time with origin 1900-01-01 00:00:0.0
+ecmwf_hours <- ncvar_get(nc, "time")
+ecmwf_seconds <- ecmwf_hours * 60^2
+
+# make time useful unit
+t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
+ecmwfDate <- t0 + ecmwf_seconds
+
+# We only want to load through 2013
+tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
+
+# Now actually load the data
+ecmwf_latitude <- ncvar_get(nc, "latitude")
+ecmwf_longitude <- ncvar_get(nc, "longitude")
+nLat <- length(ecmwf_latitude)
+nLon <- length(ecmwf_longitude)
+
+# Figure out the lon and lat subsets that cover North America, but not more.
+lon1 <- which(ecmwf_longitude == 180)
+lon2 <- which(ecmwf_longitude == 310.5)
+lonCount <- (lon2 - lon1) + 1
+
+lat1 <- which(ecmwf_latitude == 87)
+lat2 <- which(ecmwf_latitude == 15)
+latCount <- (lat2 - lat1) + 1
+
+# Get the spatial dims again using the new lonCount and latCount variables
+ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
+ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
+
+t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
+
+nc_close(nc)
+
+# To keep things as clear as possible, subset the time array so that they ALL
+# match in terms of dimensions.
+ecmwfDate <- ecmwfDate[1:tf]
+
+# Get time is useful subsets and masks
+timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
+mon <- timeLT$mon + 1
+yr  <- timeLT$year + 1900
+
+# Make sure these coordinates match!
+flipper <- length(ecmwf_latitude):1
+quartz(width=8, height=5)
+image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
+# Add fire
+points(fireLonAdjusted, fireLat, pch=".")
+map("state", add=T)
+
+#
+#
+#
+# # TODO: make function to apply to any met variable!
+# latMask <- ecmwf_latitude >= minLat & ecmwf_latitude <= maxLat
+# lonMask <- ecmwf_longitude >= minLon & ecmwf_longitude <= maxLon
+#
+# mean_temperature <- rep(NA, nYears)
+# for (i in 1:nYears){
+#
+#   yearMask <- years[i] == yr
+#   monthMask <- mon %in% 5:10
+#
+#   # Spatial First
+#   spatialSubset <- t2m[lonMask, latMask, ]
+#
+#   mean_temperature[i] <- mean(spatialSubset[,, yearMask & monthMask])
+#
+# }
+#
+#
+# plot(mean_temperature, FPA_summer_BA, yaxt="n", bty="n", col="black", pch=19,
+#      ylab="", xlab="mean summer temperature")
+# points(mean_temperature, FPA_human_summer_BA, yaxt="n", bty="n", col="orange", pch=19)
+#
+# points(mean_temperature, GFED_summer_BA, col="green", pch=19)
+#
+# cor(mean_temperature, FPA_summer_BA)
+# cor(mean_temperature, FPA_human_summer_BA)
+#
+#
+# eaxis(2)
+#
+
+
+
+
+
