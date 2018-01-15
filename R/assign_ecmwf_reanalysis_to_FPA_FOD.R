@@ -8,14 +8,19 @@ if(length(args)==0){
   year2 <- args[2]
 }
 
+print("-----------------------------------------------------------------------")
+print("This script assigns ecmwf reanalysis data to FPA-FOD fires.")
+print(args)
+print("-----------------------------------------------------------------------")
+
 # TODO: wind gusts
-# TODO: early years
 
-# TODO: could subset lat lon domain loaded from ecmwf
+# The base of the FPA_FOD fires that are getting weather assigned here are from
+# the script:
+#   readFPAFODFireFeatures.R
 
-# readFPAFODFireFeatures.R
-# execute via command line, e.g. below  
-# Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003 2015
+# execute via command line, this takes about 3 hours, e.g. below  
+# Rscript --vanilla R/assign_ecmwf_reanalysis_to_FPA_FOD.R 1992 2015
 ################################################################################
 # assign_ecmwf_reanalysis_to_FPA_FOD.R
 
@@ -33,6 +38,7 @@ library(stringr)
 library(maps)
 library(ncdf4)
 library(fields)
+library(geosphere)
 
 # Load FPA-FOD data, the one with all attributes (ecoregions) assgined.
 FPAFOD_file <- paste0("Data/FPA_FOD/FPA_FOD_", year1, "_", year2, ".RData")
@@ -42,13 +48,18 @@ fireDate <- FPA_FOD$DISCOVERY_DATE
 fireLat  <- FPA_FOD$LATITUDE
 fireLon  <- FPA_FOD$LONGITUDE
 
+print("unique Months in the data START_MONTH column")
+print(sort(unique(FPA_FOD$START_MONTH)))
+
+print("unique years in the data FIRE_YEAR column")
+print(sort(unique(FPA_FOD$FIRE_YEAR)))
+
 # NOTE: This only works since all fires are treated as points, and only exist
 # NOTE: in the western hemisphere. 
 fireLonAdjusted <- fireLon + 360
 
-# Get GFED4s monthly burn area from DM file
+# Set path to ecmwf era-interim data 
 ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
-#ncDir <- "/Volumes/Brey_external/era_interim_nc_daily/"
 
 print("Loading lots of large nc data")
 
@@ -97,6 +108,14 @@ if(length(ecmwfDate) != dim(t2m)[3]){
   stop("The ecmwfDate date array and variable array do not match in length")
 }
 
+################################################################################
+# Plot a single time slice of t2m to make sure that you are getting the land
+# area you think you are...
+quartz()
+f <- length(ecmwf_latitude):1
+image.plot(ecmwf_longitude, ecmwf_latitude[f], t2m[,f,180])
+title(paste("This map should show T over North America for", ecmwfDate[180]))
+
 # RH% 
 nc_file <- paste0(ncDir,"rh2m_",year1,"_",2016,".nc")
 nc <- nc_open(nc_file)
@@ -142,7 +161,16 @@ windSpeed <- sqrt(u10^2 + v10^2)
 # save workspace memory 
 rm(v10, u10)
 
-# Get the nc grid attributes
+################################################################################
+# Plot a time slice of wind. 
+quartz()
+f <- length(ecmwf_latitude):1
+image.plot(ecmwf_longitude, ecmwf_latitude[f], windSpeed[,f,180])
+title(paste("This map should show windspeed over North America for", ecmwfDate[180]))
+
+# Get the nc grid attributes. Might as well get eleation from a higher resolution
+# dataset 
+# NOTE: The elevation grid being loaded is on a lon -180:180 grid!!! 
 nc_file <- "Data/grid_attributes/grid_attributes_25x25.nc"
 nc <- nc_open(nc_file)
 elev  <- ncvar_get(nc, "elevation")
@@ -150,7 +178,12 @@ elev_lat <- ncvar_get(nc, "latitude")
 elev_lon <- ncvar_get(nc, "longitude")
 nc_close(nc)
 
+quartz()
+f <- length(elev_lat):1
+image.plot(elev_lon, elev_lat[f], elev[,f])
+title(paste("This is the levation to be assigned. GRID IS DIFFERENT"))
 
+# Make sure the fireLon and elev_lon can be paired by ploting together. 
 # Plot the grids and data together to make sure the grids are the same
 # Sanity check the placement of everything by visualized ecmwf and fire locations
 quartz(width=8, height=5)
@@ -159,54 +192,75 @@ image.plot(elev_lon, elev_lat[elev_flipper], elev[,elev_flipper])
 points(fireLon, fireLat, pch=".", col="black")
 title("The fire locations (black dots, should be over thge U.S. )")
 
-
+# Make sure the fireLonAdjusted and ecmwf_longitude can be paired by ploting 
+# together. 
 quartz(width=8, height=5)
-
-flipper        <- length(ecmwf_latitude):1
+flipper                <- length(ecmwf_latitude):1
 ecmwf_latitude_flipped <- ecmwf_latitude[flipper]
-t2m_flipped    <- t2m[,flipper,]
+t2m_flipped            <- t2m[,flipper, 180] # and time sliced 
 
-image.plot(ecmwf_longitude, ecmwf_latitude_flipped, t2m_flipped[,,100])
+image.plot(ecmwf_longitude, ecmwf_latitude_flipped, t2m_flipped)
 points(fireLonAdjusted, fireLat, pch=".", col="black")
-title("The fire locations (black dots, should be over thge U.S. )")
-#dev.off()
+title("The fire locations (black dots, should be over the U.S. )")
+
+# NOTE: If the previous two images show fires and data agreeing of spatial coords
+# NOTE: then we are good to go with these long coord pairs. 
 
 # Get the assignment loop working, first just for temperature
-t2m_assigned           <- rep(NA, nRow)
-rh2m_assigned          <- rep(NA, nRow)
-daysSinceRain_assigned <- rep(NA, nRow)
-tp_assigned            <- rep(NA, nRow)
-d2m_assigned           <- rep(NA, nRow)
-elev_assigned          <- rep(NA, nRow)
+v <- rep(NA, nRow)
+t2m_assigned           <- v
+rh2m_assigned          <- v
+daysSinceRain_assigned <- v
+tp_assigned            <- v
+d2m_assigned           <- v
+elev_assigned          <- v
 
 # Long term predictive measures
-tm2_lastMonth  <- rep(NA, nRow)
-rh2m_lastMonth <- rep(NA, nRow)
-tp_lastMonth   <- rep(NA, nRow)
-evap_lastMonth <- rep(NA, nRow)
+tm2_lastMonth  <- v
+rh2m_lastMonth <- v
+tp_lastMonth   <- v
+evap_lastMonth <- v
 
 # After fire start days metric. Namely I am going to look at precip and wind
-windSpeed_MonthAfter <- rep(NA, nRow)
-tp_MonthAfter        <- rep(NA, nRow)
-t2m_monthAfter       <- rep(NA, nRow)
+windSpeed_MonthAfter <- v
+tp_MonthAfter        <- v
+t2m_monthAfter       <- v
 
 # Loop through every single fire and assign its past current and future weather
 nECMWFTime <- length(ecmwfDate)
-for (i in 1:nRow){
+for (i in 1:nRow){ 
   
   # Find the fire match in space and time in the reanalysis data 
   xi <- which.min(abs(fireLonAdjusted[i] - ecmwf_longitude))
   yi <- which.min(abs(fireLat[i] - ecmwf_latitude))
   ti <- which(fireDate[i] == ecmwfDate)
   
-  # Assign each environmental variable
+  # Check the distance on the assigned grid points
+  dist_meters <- distHaversine(c(fireLonAdjusted[i]-180, fireLat[i]), 
+                               c(ecmwf_longitude[xi]-180, ecmwf_latitude[yi]))
+  dist_km <- dist_meters/1000.0
+  if(dist_km > 60){
+    
+    # Plot the error
+    quartz()
+    f <- length(ecmwf_latitude):1
+    image.plot(ecmwf_longitude, ecmwf_latitude[f], t2m[,f,ti])
+    points(fireLonAdjusted[i], fireLat[i], pch=3, cex=2, col="black")
+    points(ecmwf_longitude[xi], ecmwf_latitude[yi])
+    title("Fire Point and lat point are too far apart.")
+    # Stop the code
+    stop(paste("At row:", i, "distance=", dist_km, "km. Exceeds 60 km tolerance."))
+
+  }
+  
+  # Assign each environmental variable that lives on the adjusted lon grid
   t2m_assigned[i] <- t2m[xi, yi, ti]
   rh2m_assigned[i] <- rh2m[xi, yi, ti]
   daysSinceRain_assigned[i] <- daysSinceRain[xi, yi, ti]
   tp_assigned[i] <- tp[xi, yi, ti]
   d2m_assigned[i] <- d2m[xi, yi, ti]
   
-  # Assign environmental variables with a timescale greater than say of. 
+  # Assign environmental variables with a timescale greater than say 
   pastIndicies <- (ti-29):ti # length == 30
   if(pastIndicies[1] > 0){
     
@@ -231,6 +285,18 @@ for (i in 1:nRow){
   # NOTE: non adjusted lon
   xxi <- which.min(abs(fireLon[i] - elev_lon))
   yyi <- which.min(abs(fireLat[i] - elev_lat))
+  
+  # Check the distance on the assigned grid points
+  dist_meters <- distHaversine(c(fireLon[i], fireLat[i]), 
+                               c(elev_lon[xxi], elev_lat[yyi]))
+  dist_km <- dist_meters/1000.0
+
+  # Different grid different tolerance (27.82987 between centers). length of 
+  # hypotenuse is then 19.67869 km 
+  if(dist_km > 20){
+    stop(paste("Elevation assignent for i =", i, "is not within error tolerance."))
+  }
+  
   elev_assigned[i] <- elev[xxi, yyi]
   
   # Output progress to the screen
@@ -261,5 +327,5 @@ FPA_FOD$t2m_monthAfter       <- t2m_monthAfter
 # static in time 
 FPA_FOD$elevation <- elev_assigned
 
-save(FPA_FOD, file = paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,".RData"))
+save(FPA_FOD, file = paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,"_new.RData"))
 # The end. 
