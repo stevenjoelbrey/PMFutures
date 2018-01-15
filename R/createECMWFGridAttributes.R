@@ -7,7 +7,6 @@
 # 3) ecoregion
 # 4) elevation 
 
-
 library(stringr)
 library(maps)
 library(sp)
