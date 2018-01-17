@@ -17,6 +17,9 @@ if(length(args)==0){
 # and ArcMap. ESRI really does not want anyone to look at this data without 
 # thier software...
 
+# NOTE: All fire (1.88 million) burn area should be about 140 million acres.
+# NOTE: When I sum quantity here I get 139.7639 million. Yay! 
+
 # DataSource: https://www.fs.usda.gov/rds/archive/Product/RDS-2013-0009.3/
 
 # Data Citation:
