@@ -29,8 +29,8 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables by manually here.
-	hourlyVAR =  'v10'
-	startYear = 2003
+	hourlyVAR =  'fg10'
+	startYear = 1992
 	endYear   = 2016
 
 
@@ -137,10 +137,13 @@ for year in years:
 	# NOTE: Accumulation parameters (total precip (tp) and e) represent
 	# NOTE: accumulated values from intitialization time. For these data those
 	# NOTE: times are 00:00:00 and 12:00:00. I downloaded the data in 12 hour steps.
-	# NOTE: So for tehse parameters, each time in the data represents a total for the
+	# NOTE: So for these parameters, each time in the data represents a total for the
 	# NOTE: previous 12 hours. This is why time series start at 12:00:00 for
 	# NOTE: these fields and 00:00:00 for analysis fields.
 
+	# NOTE: For maximum in time period quantity, e.g. wind gust (fg10), the time step 
+	# NOTE: is three hourly and starts at 03:00:00. The units of wind gusts are
+	# NOTE: "10 meter wind gusts since previous post processing".
 
 
 
@@ -152,7 +155,7 @@ for year in years:
 
 	print 'Working on the large loop averaging 6-hourly values for each day'
 
-	if (hourlyVAR != 'tp') & (hourlyVAR != 'e'): # Try checking first time hour?
+	if (hourlyVAR != 'tp') & (hourlyVAR != 'e') & (hourlyVAR != 'fg10'): 
 		# these are the analysis variables that always require averages for a
 		# given calendar date.
 
@@ -190,18 +193,41 @@ for year in years:
 
 			else:
 
-				# Non-precip variables of this size need an average.
+				# Non-precip variables of this size need an average. These are analysis variables 
 				VAR_array_subset = VAR_array[indexMask, :, :]
 				day_time_mean    = np.mean(VAR_array_subset, 0)
 				dailyVAR[i, :, : ] = day_time_mean
 
-	# TODO: elif statement for wind gust goes here! 
-	# elif (hourlyVAR == 'fg10'):
+	
+	elif (hourlyVAR == 'fg10'):
+
+		print "Handling precip. Going to follow ecmwf guidelines for getting daily max value. "	
+
+	    # Create structure to save daily data and do the max value finding
+		unique_dates = np.unique(dates)
+		nDays = len(unique_dates) - 1 # last day (3 hour chunk) goes into next year. Discard that data
+		nLon  = len(lon)
+		nLat  = len(lat)
+
+		dailyVAR  = np.zeros((nDays, nLat, nLon))
+
+		for i in range(nDays): 
+
+			indexMask = np.where(dates == unique_dates[i])[0]
+			VAR_array_subset = VAR_array[indexMask, :, :]
+
+			# find 0:6 index of maximum value in each lat lon coordinate position array 
+			dailyMaxValArray = np.amax(VAR_array_subset, axis=0)
+
+			# TODO: ensure that this is the max value for each coord!
+			dailyVAR[i,:,:] = dailyMaxValArray
+
+		
 
 	elif (dateHours[0] == 12) & (dateHours[-1]) == 0 & (dateYears[-1] > int(year)):
 
 		print '---------------------------------------------------------------------'
-		print 'Working with an accumulation parameter with start time hour == 12. '
+		print 'Working with an accumulation parameter with start time hour == 12.   '
 		print '---------------------------------------------------------------------'
 
 		# These strange time conditions are all true when we are working with
@@ -366,8 +392,15 @@ for year in years:
 	# NOTE: day so this needs to be handled seperately. Because tp and e fields
 	# NOTE: time were adjusted by minus 12 hours, all daily mean or sum fields
 	# NOTE: have a time stamp of the 0Z for the date of the data.
+
+	# NOTE: fg  divides days into 3 hour analysis periods and they start at 03:00:00Z 
+	# NOTE: for a given date. I save the largest wind gust of those 8 3 hour analysis
+	# NOTE: periods. So I need to subtract 3 from time for fg in order to get date
+	# NOTE: for a day to be saved as a consistent 00:00:00Z time for a given date. 
 	if (hourlyVAR == 'tp') | (hourlyVAR == 'e'):
 		time = time[:] - 12
+	elif (hourlyVAR == 'fg10'):
+		time = time[:] - 3
 
 	tstep = len(time) / nDays
 	time_[:] = time[0::tstep]
