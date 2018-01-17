@@ -16,19 +16,43 @@ library(maps)
 library(ncdf4)
 library(fields)
 library(sfsmisc)
+library(lubridate) # for month()
+
+# What region are you investigating? 
+minLat <- 31
+maxLat <- 49
+minLon <- -125
+maxLon <- -100
 
 year1 <- 1992
 year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
 ecoregion_select <- 6.2
-month_select     <- 5:10
+state_select <- 7 #c("Washington", "Oregon", "Montana") # coming soon
+month_select  <- 5:10
 
 years  <- year1:year2
 nYears <- length(years)
 
+################################################################################
+# Save figures in directory specific to how the data are subset
+################################################################################
+experimentDir <- paste0("eco=", ecoregion_select, "_", 
+                        "months=", min(month_select),"_", max(month_select), 
+                        "/" )
+figureDir     <- paste0("Figures/regional_met_relations/", experimentDir)
+
+if(!dir.exists(figureDir)){
+  dir.create(figureDir)
+} else{
+  print("Saving figures into an already existing directory")
+}
+
+
 # Load FPA-FOD data, the one with all attributes (ecoregions) assgined.
 # TODO: load the one with weather and make sure they match! 
-load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,".RData"))
+load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_", year1,"_", year2,".RData"))
 
+# Get fire parameters too be used in subsetting the data 
 fireDate      <- FPA_FOD$DISCOVERY_DATE
 fireLat       <- FPA_FOD$LATITUDE
 fireLon       <- FPA_FOD$LONGITUDE
@@ -83,7 +107,8 @@ for (i in 1:nYears){
   
   yearMask <- years[i] == fireYear
   monthMask <- fireMonth %in% month_select
-  ecoRegionMask <- fireEcoregion == ecoregion_select
+  ecoRegionMask <-  fireEcoregion %in% ecoregion_select
+  #stateMask <- fire_state
   m <- yearMask & monthMask & ecoRegionMask
   
   # Sum to burn area for the mask made above! 
@@ -120,7 +145,7 @@ for (i in 1:nYears){
 # Plot Monthly time series of burn area
 ################################################################################
 if(FALSE){
-png(filename=paste0("Figures/summary/FPA_FOD_monthly_timeSeries_",
+png(filename=paste0(figureDir,"FPA_FOD_monthly_timeSeries_",
                 ecoregion_select,".png"),
     height=2000, width=3000, res=250)
 
@@ -171,9 +196,9 @@ dev.off()
 ################################################################################
 # Plot Interannual variability over time for selected months 
 ################################################################################
-png(filename=paste0("Figures/summary/FPA_FOD_interannual_variability_mapped_",
-                ecoregion_select,
-                ".png"),
+png(filename=paste0(figureDir,"FPA_FOD_interannual_variability_mapped_",
+                    ecoregion_select,
+                    ".png"),
     height=2000, width=4800, res=250)
 
 par(mfrow=c(1,2), xpd=T, mar=c(4,10,4,0))
@@ -249,6 +274,9 @@ legend("bottomleft", bty="n",
 
 dev.off()
 
+# NOTE: This only works since all fires are treated as points, and only exist
+# NOTE: in the western hemisphere.
+fireLonAdjusted <- fireLon + 360
 
 ################################################################################
 # Get corrosponding environmental data to make seasonal comparisons for
@@ -257,9 +285,15 @@ dev.off()
 # https://software.ecmwf.int/wiki/display/CKB/ERA-Interim%3A+monthly+means
 ################################################################################
 
+# These are nice 0:360 lon bounds that include what we need from North America 
+# when loading ecmwf data 
+minLon     <- 230.0
+maxLon     <- 263
+
+################################################################################
 # Apply ecmwf gridded ecoregion mask. Want to only look at meteorology in 
 # locations where we are looking at fire! 
-
+################################################################################
 gridAttributesFile <- "Data/grid_attributes/grid_attributes_75x75.nc"
 grid_attributes    <- nc_open(gridAttributesFile)
 
@@ -270,72 +304,56 @@ grid_longitude <- grid_attributes$dim$longitude$vals
 # Actual attributes next 
 grid_ecoregion     <- round(ncvar_get(grid_attributes, "ecoregion"),2)
 grid_state         <- ncvar_get(grid_attributes, "state")
+grid_ecoregion[is.na(grid_ecoregion)] <- -1
 nc_close(grid_attributes)
 
 # Get rid of pesky NA values, they make it hard to make masks 
-grid_ecoregion[is.na(grid_ecoregion)] <- -1
-grid_ecoRegionMask <- grid_ecoregion == ecoregion_select
-grid_latMask <- t(replicate(length(grid_longitude), grid_latitude < 50))
 
-# ecoregion mask where Canada is excluded
-grid_mask <- grid_ecoRegionMask & grid_latMask
+grid_latMask       <- grid_latitude > minLat & grid_latitude < maxLat
+grid_lonMask       <- grid_longitude > minLon & grid_longitude < maxLon
 
-# NOTE: This only works since all fires are treated as points, and only exist
-# NOTE: in the western hemisphere.
-fireLonAdjusted <- fireLon + 360
+lati <- min(which(grid_latMask)); 
+lat_count <- max(which(grid_latMask)) - lati
+
+loni <- min(which(grid_lonMask));
+lon_count <- max(which(grid_lonMask)) - loni
 
 # Location of local nc data batch
 ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
 
-# Get temperature
-# TODO: Consider making this a function, as it is getting used all over the place
+# The gridded array are very large. So we only want to extact exactly what
+# we need. This needs to be done for time, lat, and lon. 
 nc_file <- paste0(ncDir, "t2m_", year1, "_", 2016, ".nc")
-nc <- nc_open(nc_file)
-
-# Handle ecmwf time with origin 1900-01-01 00:00:0.0
-ecmwf_hours <- ncvar_get(nc, "time")
-ecmwf_seconds <- ecmwf_hours * 60^2
-
-# make time useful unit
-t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
-ecmwfDate <- t0 + ecmwf_seconds
-
-# We only want to load through 2013
-tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
-
-# Now actually load the data
-ecmwf_latitude <- ncvar_get(nc, "latitude")
-ecmwf_longitude <- ncvar_get(nc, "longitude")
-nLat <- length(ecmwf_latitude)
-nLon <- length(ecmwf_longitude)
-
-# Figure out the lon and lat subsets that cover North America, but not more.
-lon1 <- which(ecmwf_longitude == 180)
-lon2 <- which(ecmwf_longitude == 310.5)
-lonCount <- (lon2 - lon1) + 1
-
-lat1 <- which(ecmwf_latitude == 87)
-lat2 <- which(ecmwf_latitude == 15)
-latCount <- (lat2 - lat1) + 1
-
-# Get the spatial dims again using the new lonCount and latCount variables
-ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lat1, count=latCount)
-ecmwf_longitude <- ncvar_get(nc, "longitude", start=lon1, count=lonCount)
-
-t2m <- ncvar_get(nc, "t2m", start=c(lon1,lat1, 1), count=c(lonCount, latCount, tf))
-
+nc      <- nc_open(nc_file)
+nc_time <- ncvar_get(nc, "time") # hours since 1900-01-01 00:00:0.0
 nc_close(nc)
 
-# To keep things as clear as possible, subset the time array so that they ALL
-# match in terms of dimensions.
-ecmwfDate <- ecmwfDate[1:tf]
+# create time extraction array
+t <- as.POSIXct(nc_time*60^2, origin="1900-01-01 00:00:0.0", tz="utc")
+tMask <- year(t) <= 2015
+ti <- 1 # first extact index
+tf <- max(which(tMask==1))
 
-# Get time is useful subsets and masks
-timeLT <- as.POSIXlt(ecmwfDate)[1:tf]
-mon <- timeLT$mon + 1
-yr  <- timeLT$year + 1900
+# Get month and year arrays from ecmwf grid. Also subset t such that it only 
+# goes through the desired year 
+t <- t[tMask]
+tMon <- month(t)
+tYear<- year(t)
 
-# Make sure these coordinates match!
+# Now actually load the data
+nc_file <- paste0(ncDir, "t2m_", year1, "_", 2016, ".nc")
+nc      <- nc_open(nc_file)
+t2m <- ncvar_get(nc, "t2m", start=c(loni, lati, ti), count=c(lon_count, lat_count, tf))
+ecmwf_latitude  <- ncvar_get(nc, "latitude", start=lati, count=lat_count)
+ecmwf_longitude <- ncvar_get(nc, "longitude", start=loni, count=lon_count)
+
+# t2m <- ncvar_get(nc, "t2m", start=c(1, 1, 180), count=c(length(grid_longitude), length(grid_latitude), 1))
+# ecmwf_latitude  <- ncvar_get(nc, "latitude")
+# ecmwf_longitude <- ncvar_get(nc, "longitude")
+nc_close(nc)
+
+# Make sure these coordinates match the fire coordinates by ensuring that
+# fires are plotted over this western US snapshot
 flipper <- length(ecmwf_latitude):1
 quartz(width=8, height=5)
 image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
@@ -343,41 +361,120 @@ image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
 points(fireLonAdjusted, fireLat, pch=".")
 map("state", add=T)
 
-#
-#
-#
-# # TODO: make function to apply to any met variable!
-# latMask <- ecmwf_latitude >= minLat & ecmwf_latitude <= maxLat
-# lonMask <- ecmwf_longitude >= minLon & ecmwf_longitude <= maxLon
-#
-# mean_temperature <- rep(NA, nYears)
-# for (i in 1:nYears){
-#
-#   yearMask <- years[i] == yr
-#   monthMask <- mon %in% 5:10
-#
-#   # Spatial First
-#   spatialSubset <- t2m[lonMask, latMask, ]
-#
-#   mean_temperature[i] <- mean(spatialSubset[,, yearMask & monthMask])
-#
-# }
-#
-#
-# plot(mean_temperature, FPA_summer_BA, yaxt="n", bty="n", col="black", pch=19,
-#      ylab="", xlab="mean summer temperature")
-# points(mean_temperature, FPA_human_summer_BA, yaxt="n", bty="n", col="orange", pch=19)
-#
-# points(mean_temperature, GFED_summer_BA, col="green", pch=19)
-#
-# cor(mean_temperature, FPA_summer_BA)
-# cor(mean_temperature, FPA_human_summer_BA)
-#
-#
-# eaxis(2)
-#
+#Function for loading files
+getMetVar <- function(VAR,loni, lati, ti, lon_count, lat_count, tf){
+  nc      <- nc_open(paste0(ncDir, VAR, "_", year1, "_", 2016, ".nc"))
+  VAR_ <- ncvar_get(nc, VAR, start=c(loni, lati, ti), count=c(lon_count, lat_count, tf))
+  nc_close(nc)
+  return(VAR_)
+}
+
+print("Loading really big met files into workspace")
+tp <- getMetVar("tp", loni, lati, ti, lon_count, lat_count, tf)
+rh2m <- getMetVar("rh2m", loni, lati, ti, lon_count, lat_count, tf)
+e <- getMetVar("e", loni, lati, ti, lon_count, lat_count, tf)
+d2m <- getMetVar("d2m", loni, lati, ti, lon_count, lat_count, tf)
+  
+# wind speed
+u10 <- getMetVar("u10", loni, lati, ti, lon_count, lat_count, tf)
+v10 <- getMetVar("v10", loni, lati, ti, lon_count, lat_count, tf)
+ws <- sqrt(u10*u10 + v10*v10)
+rm(v10, u10)
+
+# Now we need the attributes to be subset the same way spatially
+grid_lat_keeps <- grid_latitude %in% ecmwf_latitude
+grid_lon_keeps <- grid_longitude %in% ecmwf_longitude
+
+grid_state_subset     <- grid_state[grid_lon_keeps, grid_lat_keeps]
+grid_ecoregion_subset <- grid_ecoregion[grid_lon_keeps, grid_lat_keeps]
+
+grid_ecoregion_mask <- grid_ecoregion_subset == ecoregion_select
+
+# Make summer totals / means depending on the paramter
+v <- rep(NA, nYears)
+t2m_mean <- v
+tp_total <- v
+e_total  <- v
+rh2m_mean<- v 
+d2m_mean <- v
+ws_mean  <- v
+
+# This fuction handles the multi-step hasle of subsetting in both time and
+# a non regular grid space 
+spaceTimeStat <- function(x, tMask, FUN="mean"){
+  
+  # Time subset first 
+  spatialSubset <- x[,, tMask]
+  # stats on time (called mean but could be "sum")
+  gridMeans <- apply(spatialSubset, 1:2, FUN)
+  # Spatial subset
+  # TODO: Think about weather mean of precip grid box totals in more valueble
+  # TODO: than the total precip of all grid boxes. For now going with mean. 
+  spatialMean <- mean(gridMeans[grid_ecoregion_mask])
+  
+  return(spatialMean)
+  
+}
+
+# TODO: Make a spatial correlation version to be plotted! Make correlations
+# TODO: on the domain grid, then plot white over non-ecoregion or states 
+# TODO: desired later. 
+
+# TODO: Save out monthly relationships 
+for (i in 1:nYears){
+
+  # Time masks 
+  yearMask  <- years[i] == tYear
+  monthMask <- tMon %in% month_select
+  tMask     <- yearMask & monthMask 
+  
+  # Take the spatial temporal subset average or sum and store 
+  t2m_mean[i] <- spaceTimeStat(t2m, tMask, FUN="mean")
+  tp_total[i] <- spaceTimeStat(tp, tMask, FUN="sum")
+  e_total[i]  <- spaceTimeStat(e, tMask, FUN="sum")
+  rh2m_mean[i]<- spaceTimeStat(rh2m, tMask, FUN="mean")  
+  d2m_mean[i] <- spaceTimeStat(d2m, tMask, FUN="mean")  
+  ws_mean[i]  <- spaceTimeStat(ws, tMask, FUN="mean") 
+  
+}
+
+################################################################################
+# Plot the relationships 
+################################################################################
+# TODO: Save "experiment" directories that document time and spatial extent 
+# TODO: correlations being plotted. 
+scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
+                         xLab="", yLab=""){
+
+  f <- paste0(figureDir, xLab, "_vs_", yLab, ".png")
+
+  yLab <- str_replace(yLab, " ", "\n")
+  
+  png(filename=f, width=1700, height=1400, res=300)
+  par(mar=c(4,8,4,4))
+  
+  plot(x, y1, pch=19, cex=1.8,
+       col="gray", bty="n", yaxt="n",
+       ylab="", xlab="")
+  mtext(xLab, side=1, line = 2)
+  mtext(yLab, side=2, line = 4.5, las=1)
+  
+  minVal <- min(c(y1,y2)); maxVal <- max(c(y1,y2))
+  ylabValues <- seq(minVal, maxVal, length.out = 5)
+  Labels <- pretty10exp(ylabValues, digits=2)
+  eaxis(side=2, at=ylabValues, labels=Labels)
+  
+  
+  points(x, y2, col="orange", pch=19, cex=1.4)
+  
+  dev.off()
+
+}
 
 
-
-
+scatter_plot(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature", yLab="Acres Burned")
+scatter_plot(x=tp_total, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="precip", yLab="Acres Burned")
+scatter_plot(x=rh2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Relative Humidity", yLab="Acres Burned")
+scatter_plot(x=d2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Dew Point Temperature", yLab="Acres Burned")
+scatter_plot(x=ws_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Wind Speed",  yLab="Acres Burned")
 
