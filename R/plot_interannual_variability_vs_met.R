@@ -26,9 +26,9 @@ maxLon <- -100
 
 year1 <- 1992
 year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
-ecoregion_select <- 6.2
+ecoregion_select <- 11.1
 state_select <- 7 #c("Washington", "Oregon", "Montana") # coming soon
-month_select  <- 5:10
+month_select  <- 5:12
 
 years  <- year1:year2
 nYears <- length(years)
@@ -381,6 +381,10 @@ v10 <- getMetVar("v10", loni, lati, ti, lon_count, lat_count, tf)
 ws <- sqrt(u10*u10 + v10*v10)
 rm(v10, u10)
 
+# wind gust 
+wg <- getMetVar("fg10", loni, lati, ti, lon_count, lat_count, tf)
+
+
 # Now we need the attributes to be subset the same way spatially
 grid_lat_keeps <- grid_latitude %in% ecmwf_latitude
 grid_lon_keeps <- grid_longitude %in% ecmwf_longitude
@@ -398,6 +402,7 @@ e_total  <- v
 rh2m_mean<- v 
 d2m_mean <- v
 ws_mean  <- v
+wg_mean  <- v
 
 # This fuction handles the multi-step hasle of subsetting in both time and
 # a non regular grid space 
@@ -435,6 +440,7 @@ for (i in 1:nYears){
   rh2m_mean[i]<- spaceTimeStat(rh2m, tMask, FUN="mean")  
   d2m_mean[i] <- spaceTimeStat(d2m, tMask, FUN="mean")  
   ws_mean[i]  <- spaceTimeStat(ws, tMask, FUN="mean") 
+  wg_mean[i]  <- spaceTimeStat(wg, tMask, FUN="mean")
   
 }
 
@@ -473,8 +479,93 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
 
 
 scatter_plot(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature", yLab="Acres Burned")
-scatter_plot(x=tp_total, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="precip", yLab="Acres Burned")
+scatter_plot(x=tp_total, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Precip", yLab="Acres Burned")
 scatter_plot(x=rh2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Relative Humidity", yLab="Acres Burned")
 scatter_plot(x=d2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Dew Point Temperature", yLab="Acres Burned")
 scatter_plot(x=ws_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Wind Speed",  yLab="Acres Burned")
+scatter_plot(x=wg_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Wind Gust",  yLab="Acres Burned")
+
+
+################################################################################
+# These relationships should happen on a grid by grid basis. Show correlations
+# between these grid boxes burn area. Call upon monthly gridded burn area
+# created by grid_FPA_FOD_burn_area.R
+################################################################################
+
+# Here is where you throw out all of the spatially subsetting you previously
+# did! Just plot your desired spatial domain. 
+
+ncFile <- "Data/FPA_FOD/burn_area_monthly_75x75_1992_2015.nc"
+nc <- nc_open(ncFile)
+grid_area <- ncvar_get(nc, "grid_area")
+longitude <- ncvar_get(nc, "longitude")
+latitude  <- ncvar_get(nc, "latitude")
+burn_area <- ncvar_get(nc, "burn_area")
+t_hours   <- ncvar_get(nc, "time")
+nc_close(nc)
+
+# Time in hours from origin to POSIXct
+t_mon <- as.POSIXct(t_hours*60^2, origin="1900-01-01 00:00:0.0", tz="utc")
+
+# Spatially subset the data to match the loaded ecmwf data
+burn_area <- burn_area[, longitude %in% ecmwf_longitude, latitude %in% ecmwf_latitude]
+
+# Plot the spatial total as a sanity check
+burn_area_total <- apply(burn_area, 2:3, sum)
+
+# NOTE: Note the shifted coordinates so I can plot the U.S. map in this sanity
+# NOTE: check plot 
+quartz()
+f <- length(ecmwf_latitude):1
+image.plot(ecmwf_longitude-360, ecmwf_latitude[f], burn_area_total[,f])
+map("state", add=T)
+
+################################################################################
+# Create Monthly ecmwf means and totals. Remember, pearson correlations in case
+# the relations are not linear. 
+################################################################################
+
+# t2m subset by t made up of tMon and tYear
+# TODO: 
+nMonths <- length(unique(tYear)) * length(unique(tMon))
+monthly <- array(NA, dim = c(length(ecmwf_longitude), 
+                             length(ecmwf_latitude), 
+                             nMonths))
+
+# Give monthly array dimensions to all variables 
+t2m_monthly <- monthly
+tp_monthly <- monthly
+e_monthly  <- monthly
+rh2m_monthly<- monthly 
+d2m_monthly <- monthly
+ws_monthly  <- monthly
+wg_monthly  <- monthly
+
+i <- 0
+for (y in sort(unique(tYear))) {
+  
+  for (m in sort(unique(tMon))){
+    i <- i + 1
+    tMask <- y == tYear & m == tMon
+    
+    #print(paste( min(t[tMask]) ,"-", max(t[tMask])))
+    
+    t2m_monthly[,,i] <- apply(t2m[,,tMask], 1:2, mean)
+    tp_monthly[,,i] <- apply(tp[,,tMask], 1:2, sum)
+    e_monthly[,,i] <- apply(e[,,tMask], 1:2, sum)
+    rh2m_monthly[,,i] <- apply(rh2m[,,tMask], 1:2, mean)
+    d2m_monthly[,,i] <- apply(d2m[,,tMask], 1:2, mean)
+    ws_monthly[,,i] <- apply(ws[,,tMask], 1:2, mean)
+    wg_monthly[,,i] <- apply(wg[,,tMask], 1:2, mean)
+    
+  }
+  
+}
+
+# Make spatial correlations with gridded burn area and display as sketched in 
+# notebook. 
+
+
+
+
 
