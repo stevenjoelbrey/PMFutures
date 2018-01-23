@@ -498,30 +498,81 @@ scatter_plot(x=wg_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Wind Gust", 
 ncFile <- "Data/FPA_FOD/burn_area_monthly_75x75_1992_2015.nc"
 nc <- nc_open(ncFile)
 grid_area <- ncvar_get(nc, "grid_area")
-longitude <- ncvar_get(nc, "longitude")
-latitude  <- ncvar_get(nc, "latitude")
+BA_longitude <- ncvar_get(nc, "longitude") # "BA" for burn_area. to make sure coordinates align with ecmwf
+BA_latitude  <- ncvar_get(nc, "latitude")
 burn_area <- ncvar_get(nc, "burn_area")
+human_burn_area <- ncvar_get(nc, "human_burn_area")
+lightning_burn_area <- ncvar_get(nc, "lightning_burn_area")
+unknown_burn_area <- ncvar_get(nc, "unknown_burn_area")
 t_hours   <- ncvar_get(nc, "time")
 nc_close(nc)
+
 
 # Time in hours from origin to POSIXct
 t_mon <- as.POSIXct(t_hours*60^2, origin="1900-01-01 00:00:0.0", tz="utc")
 
 # Spatially subset the data to match the loaded ecmwf data
-burn_area <- burn_area[, longitude %in% ecmwf_longitude, latitude %in% ecmwf_latitude]
+lonMask <- BA_longitude %in% ecmwf_longitude
+latMask <- BA_latitude %in% ecmwf_latitude
+
+if(unique(BA_longitude[lonMask] - ecmwf_longitude) != 0 |
+   unique(BA_longitude[lonMask] - ecmwf_longitude) != 0){
+  stop("Weather dimensions and burn area dimensions do not match.")
+} else{
+  BA_longitude <- BA_longitude[lonMask]
+  BA_latitude  <- BA_latitude[latMask]
+}
+
+# If the code is still running then the following subset of the data works! 
+burn_area <- burn_area[, lonMask, latMask]
+human_burn_area <- human_burn_area[, lonMask, latMask]
+lightning_burn_area <- lightning_burn_area[, lonMask, latMask]
+unknown_burn_area <- unknown_burn_area[, lonMask, latMask]
+
+# Make sure the three types of burn area add up to the "burn_area" quantity, 
+# which is supposed to be the sum of the three.
+total <- human_burn_area + lightning_burn_area + unknown_burn_area
+dArea <- burn_area - total
 
 # Plot the spatial total as a sanity check
 burn_area_total <- apply(burn_area, 2:3, sum)
+dArea_total <- apply(dArea, 2:3, sum)
+
+# Makes plotting clearer by removing locations == 0 
+burn_area_total[burn_area_total==0] <- NA 
+dArea_total[dArea_total==0] <- NA
 
 # NOTE: Note the shifted coordinates so I can plot the U.S. map in this sanity
 # NOTE: check plot 
-quartz()
+pdf(file="Figures/gridded_fires_test_grid.pdf", width=24, height=20)
+par(mfrow=c(1,1))
 f <- length(ecmwf_latitude):1
 image.plot(ecmwf_longitude-360, ecmwf_latitude[f], burn_area_total[,f])
 map("state", add=T)
+title("Total burn area in dataset. No time subsetting.")
+
+# Now add the fires that were gridded to the plot 
+points(FPA_FOD$LONGITUDE, FPA_FOD$LATITUDE, pch=".", col="black")
+
+dev.off()
+
+# image.plot(ecmwf_longitude-360, ecmwf_latitude[f], dArea_total[,f])
+# map("state", add=T)
+# title("difference from variable saved as burn area and sum of its parts")
+
+# NOTE: R/grid_FPA_FOD_burn_area.R grids burn area of three types of ignitions
+# NOTE: human, lightning, and unknown. At the end these three are added to create
+# NOTE: the "burn_area" i.e. total burn area variable. Any differenes between
+# NOTE: this variable and the sum of its parts is due to floating point inprecision
+# NOTE: in saving. 
+
+# Thus far I have made the chioce that "unknown" fire start cuases are human, so
+# I am going to merge these two totals. 
+human_burn_area <- human_burn_area + unknown_burn_area
+rm(unknown_burn_area)
 
 ################################################################################
-# Create Monthly ecmwf means and totals. Remember, pearson correlations in case
+# Create Monthly ecmwf means and totals. Remember, spearman correlations in case
 # the relations are not linear. 
 ################################################################################
 
@@ -534,8 +585,8 @@ monthly <- array(NA, dim = c(length(ecmwf_longitude),
 
 # Give monthly array dimensions to all variables 
 t2m_monthly <- monthly
-tp_monthly <- monthly
-e_monthly  <- monthly
+tp_monthly  <- monthly
+e_monthly   <- monthly
 rh2m_monthly<- monthly 
 d2m_monthly <- monthly
 ws_monthly  <- monthly
@@ -562,10 +613,74 @@ for (y in sort(unique(tYear))) {
   
 }
 
+print(paste("The dimension of e.g. t2m_montly is:", 
+            dim(t2m_monthly)[1],
+            dim(t2m_monthly)[2], 
+            dim(t2m_monthly)[3]))
+
 # Make spatial correlations with gridded burn area and display as sketched in 
-# notebook. 
+# notebook. Plot the indivisual grid correlations to see what these correlation
+# values really mean. Make sure to label with r value, lon, and lat. 
+# TODO: Make function dynamically for any variable. 
+
+# Time the loop 
+t0 <- Sys.time()
+
+nLat <- length(BA_latitude)
+nLon <- length(BA_longitude)
+corMat <- array(NA, dim=c(nLon,nLat))
+for(i in 1:nLat){
+  for(j in 1:nLon){
+    
+    x <- t2m_monthly[ j, i,] # time last for met
+    y_lightning <- burn_area[, j, i] # time first for  burn area... annoying. 
+    
+    # sometimes there is zero burn area all the time. That means the sd = 0 
+    # and that means you cannot take a spearman correlation. So check the data
+    # for some variation. If no variation, well NA says it all. 
+    if(sd(y) != 0 & sd(x) != 0){
+      
+      r <- cor(x, y_lightning, method="spearman")
+      
+      # Save the value
+      lightning_corMat[j,i] <- r
+      
+      r_lab <- round(r,3)
+      # Plot the correlations 
+      # TODOL: make var_ passed argument so this works for more than t2m
+      lat <- BA_latitude[i]; lon <- BA_longitude[j]
+      fileName <- paste0("Figures/var_correlation/",lat,"_", lon,"_r=",r_lab,".png")
+      png(filename=fileName, res=250, width=1500, height=1500)
+      plot(x, y)
+      title(paste("t2m burn area correlation =",r_lab ,"coords:(", lat, lon,")"))
+      dev.off()
+      
+    }
+
+  }
+}
 
 
+minCor <- min(corMat, na.rm=T)
+maxCor <- max(corMat, na.rm=T)
+
+# Set the breaks and colorbar. 49 unique colors should be plenty for these data
+# and correlations. 
+colorpallete <- rev(heat.colors(49))
+breaks       <- seq(-0.1,1, length.out=50) 
+
+dt <- Sys.time() - t0
+print(paste("It took ", dt/60, "minutes to run the loop"))
+
+# Plot the correlation
+plotLon <- ecmwf_longitude - 360
+f <- nLat:1
+plotLat <- ecmwf_latitude[nLat:1]
+quartz()
+image.plot(plotLon, plotLat, corMat[, f], col=colorpallete, breaks=breaks)
+map("state", col="white", add=T)
+plot(SPDF, add=T, border="white", lwd=2)
 
 
+# Next, plot the correlation with human ignited fires. 
 
