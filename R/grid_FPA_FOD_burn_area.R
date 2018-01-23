@@ -193,9 +193,12 @@ for (i in 1:nFires){# nFires
 # Add these three types together for fast access to a total burn_area variable.
 burn_area <- lightning_burn_area + unknown_burn_area + human_burn_area
 
+# Make a sanity plot to investigate
 quartz()
 f <- length(latitude):1
 burn_area_total <- apply(burn_area, 2:3, sum)
+# do not plot where equal zero
+burn_area_total[burn_area_total==0] <- NA
 image.plot(longitude, latitude[f], burn_area_total[, f])
 title("Total burn area as gridded by this script")
 
