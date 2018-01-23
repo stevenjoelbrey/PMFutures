@@ -625,96 +625,129 @@ print(paste("The dimension of e.g. t2m_montly is:",
 
 # TODO: make var_ passed argument so this works for more than t2m
 
-# Time the loop 
-t0 <- Sys.time()
+spatialCorrelationMap <- function(varName="2-meter temperature", 
+                                  varValues=t2m_monthly,
+                                  colorScheme="heat"){
 
-nLat <- length(BA_latitude)
-nLon <- length(BA_longitude)
-lightning_corMat <- array(NA, dim=c(nLon,nLat))
-human_corMat     <- array(NA, dim=c(nLon,nLat))
-for(i in 1:nLat){
-  for(j in 1:nLon){
-    
-    x <- t2m_monthly[ j, i,] # time last for met
-    # NOTE: the time dimension in burn area and weather arrays are in different
-    # NOTE: places, and this is annoying...
-    y_lightning <- lightning_burn_area[, j, i] 
-    y_human     <- human_burn_area[, j, i]
-    
-    # sometimes there is zero burn area all the time. That means the sd = 0 
-    # and that means you cannot take a spearman correlation. So check the data
-    # for some variation. If no variation, well NA says it all. 
-    if(sd(y_lightning) != 0 & sd(x) != 0){
-      r_lightning <- cor(x, y_lightning, method="spearman")
-      lightning_corMat[j,i] <- r_lightning
+  # Time the loop 
+  t0 <- Sys.time()
+  
+  nLat <- length(BA_latitude)
+  nLon <- length(BA_longitude)
+  lightning_corMat <- array(NA, dim=c(nLon,nLat))
+  human_corMat     <- array(NA, dim=c(nLon,nLat))
+  for(i in 1:nLat){
+    print(i/nLat*100)
+    for(j in 1:nLon){
+      
+      x <- varValues[ j, i,] # time last for met
+      # NOTE: the time dimension in burn area and weather arrays are in different
+      # NOTE: places, and this is annoying...
+      y_lightning <- lightning_burn_area[, j, i] 
+      y_human     <- human_burn_area[, j, i]
+      
+      # sometimes there is zero burn area all the time. That means the sd = 0 
+      # and that means you cannot take a spearman correlation. So check the data
+      # for some variation. If no variation, well NA says it all. 
+      if(sd(y_lightning) != 0 & sd(x) != 0){
+        r_lightning <- cor(x, y_lightning, method="spearman")
+        lightning_corMat[j,i] <- r_lightning
+      }
+      if(sd(y_human) != 0 & sd(x) != 0){
+        r_human <- cor(x, y_human, method="spearman")
+        human_corMat[j,i] <- r_human
+      }
+      
+      # Only plot the raw data that make the corrrelation when there is 
+      # variability for both
+      # NOTE: DO NOT MAKE THESE EVERY TIME. IT IS VERY SLOW
+      if(sd(y_lightning) != 0 & sd(y_human) != 0 & FALSE){  
+        
+        lat <- BA_latitude[i]; lon <- BA_longitude[j]
+        fileName <- paste0("Figures/var_correlation_by_grid_box/",lat,"_", lon,".png")
+        png(filename=fileName, res=250, width=1500, height=1500)
+        plot(x, y_lightning, col="gray")
+        points(x, y_human, col="orange")
+        
+        title(paste("var human burn area correlation =",r_human ,"coords:(", lat, lon,")"),
+              sub=paste("Area correlation = ", r_lightning))
+        dev.off()
+        
+      }  
+      
     }
-    if(sd(y_human) != 0 & sd(x) != 0){
-      r_human <- cor(x, y_human, method="spearman")
-      human_corMat[j,i] <- r_human
-    }
+  }
+  
+  dt <- Sys.time() - t0
+  print(paste("It took ", dt/60, "minutes to run the loop"))
+  
+  ################################################################################
+  # Plot the correlation maps side by side 
+  ################################################################################
+  
+  # Get max and min values present in these correlation matrixs 
+  minCor <- min( c(min(lightning_corMat, na.rm=T), min(human_corMat, na.rm=T)) )
+  maxCor <- max( c(max(lightning_corMat, na.rm=T), max(human_corMat, na.rm=T)) )
+  
+  # Set the breaks and colorbar. 49 unique colors should be plenty for these data
+  # and correlations. 
+  if(colorScheme == "heat"){
     
-    # Only plot the raw data that make the corrrelation when there is 
-    # variability for both
-    if(sd(y_lightning) != 0 & sd(y_human) != 0){  
-      
-      lat <- BA_latitude[i]; lon <- BA_longitude[j]
-      fileName <- paste0("Figures/var_correlation_by_grid_box/",lat,"_", lon,".png")
-      png(filename=fileName, res=250, width=1500, height=1500)
-      plot(x, y_lightning, col="gray")
-      points(x, y_human, col="orange")
-      
-      title(paste("var human burn area correlation =",r_human ,"coords:(", lat, lon,")"),
-            sub=paste("Area correlation = ", r_lightning))
-      dev.off()
-      
-    }  
+    colorpallete <- rev(heat.colors(99))
+    breaks       <- seq(minCor, maxCor, length.out=100)
+    
+  }else if(colorScheme == "diverging"){
+    
+    # Set up diverging colorbar with center at zero
+    rwb <- colorRampPalette(colors = c("blue", "white", "red"))
+    colorpallete <- rwb(99)
+    
+    # This now needs to be symetric
+    maxAbs <- max(abs( c( (minCor), abs(maxCor) ) ))
+    breaks       <- seq(maxAbs*-1, maxAbs, length.out=100)
     
   }
+   
+  
+  # Plot the correlation maps side by side 
+  plotLon <- ecmwf_longitude - 360
+  f <- nLat:1
+  plotLat <- ecmwf_latitude[nLat:1]
+  
+  png(filename=paste0("Figures/spatial_correlation_maps/",varName,".png"), 
+      res=250, width=2350, height=1000)
+  par(mfrow=c(1,2))
+  
+  par(mar=c(1,5.1,2,1))
+  image(plotLon, plotLat, lightning_corMat[, f], 
+        col=colorpallete, breaks=breaks,
+        xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
+        xlim=c(-125, -100))
+  map("state", col="black", add=T)
+  plot(SPDF, add=T, border="white")
+  title("Lightning ignited")
+  
+  par(mar=c(1,1,2,5.1))
+  image.plot(plotLon, plotLat, human_corMat[, f], 
+             col=colorpallete, breaks=breaks,
+             xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
+             xlim=c(-125, -100),
+             legend.width=2)
+  map("state", col="black", add=T)
+  plot(SPDF, add=T, border="white")
+  title("Human ignited")
+  
+  dev.off()
+
 }
 
-dt <- Sys.time() - t0
-print(paste("It took ", dt/60, "minutes to run the loop"))
-
-################################################################################
-# Plot the correlation maps side by side 
-################################################################################
-minCor <- -0.1
-maxCor <- 1
-
-# Set the breaks and colorbar. 49 unique colors should be plenty for these data
-# and correlations. 
-colorpallete <- rev(heat.colors(99))
-breaks       <- seq(-0.1,1, length.out=100) 
-
-# Plot the correlation maps side by side 
-plotLon <- ecmwf_longitude - 360
-f <- nLat:1
-plotLat <- ecmwf_latitude[nLat:1]
-
-png(filename="test_cor_map.png", res=250, width=2350, height=1000)
-par(mfrow=c(1,2))
-
-par(mar=c(1,5.1,2,1))
-image(plotLon, plotLat, lightning_corMat[, f], 
-      col=colorpallete, breaks=breaks,
-      xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
-      xlim=c(-125, -100))
-map("state", col="black", add=T)
-plot(SPDF, add=T, border="white", lty=2)
-title("Lightning ignited fires")
-
-par(mar=c(1,1,2,5.1))
-image.plot(plotLon, plotLat, human_corMat[, f], 
-           col=colorpallete, breaks=breaks,
-           xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
-           xlim=c(-125, -100),
-           legend.width=1.6)
-map("state", col="black", add=T)
-plot(SPDF, add=T, border="white", lty=2)
-title("Lightning ignited fires")
-
-dev.off()
+spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, colorScheme="heat")
+spatialCorrelationMap(varName="total precip",  varValues=tp_monthly, colorScheme = "diverging")
+spatialCorrelationMap(varName="2-meter RH",  varValues=rh2m_monthly, colorScheme = "diverging")
+spatialCorrelationMap(varName="2-meter dew point",  varValues=d2m_monthly, colorScheme = "diverging")
+spatialCorrelationMap(varName="total evaporation",  varValues=e_monthly, colorScheme = "diverging")
+spatialCorrelationMap(varName="2-meter wind gusts",  varValues=wg_monthly, colorScheme = "wg_monthly")
 
 
-# Next, plot the correlation with human ignited fires. 
+
 
