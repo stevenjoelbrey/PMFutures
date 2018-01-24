@@ -9,7 +9,8 @@
 # using ecmwf reanalysis fields and FPA-FOD fire occurance data.
 # Timescales of interest include season (e.g. 5-10), monthly, and lagged monthly. 
 
-# TODO: Download ecmwf reanalysis on monthly scale, or average what I have already
+# TODO: This script probably needs to be broken into two or three scripts with a
+# TODO: utility script to call upon where common codes are used. 
 
 library(stringr)
 library(maps)
@@ -205,6 +206,10 @@ par(mfrow=c(1,2), xpd=T, mar=c(4,10,4,0))
 
 maxValue <- max(c(FPA_BA_lightning/10^6, FPA_BA_human/10^6))
 
+# What is the correlation between the two time series? (this is the point of the
+# figure)
+
+r_annual <- cor(FPA_BA_lightning, FPA_BA_human, method="spearman")
 
 plot(years, FPA_BA_lightning/10^6, col="gray", 
      pch=19, bty="n", yaxt="n", xaxt="n",
@@ -230,6 +235,8 @@ legend("topleft",
        bty = "n"
        )
 
+title(paste("r = ", r_annual), line=-2)
+
 # Map the fires in the time series
 # TODO: make sure to plot the fires in ascending size! That way we can see small
 # TODO: fires next to big fires. 
@@ -253,11 +260,11 @@ map("state", add=T)
 lightningLocations <- monthMask & ecoRegionMask & !humanStart
 
 points(FPA_FOD$LONGITUDE[lightningLocations], FPA_FOD$LATITUDE[lightningLocations], 
-     cex=sizeClass[lightningLocations],
-     col=adjustcolor("gray",0.5), pch=1,
-     bty="n", xaxt="n", yaxt="n",
-     ylab="",
-     xlab="")
+       cex=sizeClass[lightningLocations],
+       col=adjustcolor("gray",0.5), pch=1,
+       bty="n", xaxt="n", yaxt="n",
+       ylab="",
+       xlab="")
 
 # Show the ecoregion border 
 plot(ecoregion_polygon, add=T, lty=1, border="lightgray")
@@ -357,7 +364,7 @@ nc_close(nc)
 flipper <- length(ecmwf_latitude):1
 quartz(width=8, height=5)
 image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
-# Add fire
+# Add fires
 points(fireLonAdjusted, fireLat, pch=".")
 map("state", add=T)
 
@@ -421,9 +428,6 @@ spaceTimeStat <- function(x, tMask, FUN="mean"){
   
 }
 
-# TODO: Make a spatial correlation version to be plotted! Make correlations
-# TODO: on the domain grid, then plot white over non-ecoregion or states 
-# TODO: desired later. 
 
 # TODO: Save out monthly relationships 
 for (i in 1:nYears){
@@ -627,7 +631,8 @@ print(paste("The dimension of e.g. t2m_montly is:",
 
 spatialCorrelationMap <- function(varName="2-meter temperature", 
                                   varValues=t2m_monthly,
-                                  colorScheme="heat"){
+                                  colorScheme="heat",
+                                  makePlot=FALSE){
 
   # Time the loop 
   t0 <- Sys.time()
@@ -637,7 +642,9 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
   lightning_corMat <- array(NA, dim=c(nLon,nLat))
   human_corMat     <- array(NA, dim=c(nLon,nLat))
   for(i in 1:nLat){
-    print(i/nLat*100)
+    
+    print(paste("Correlation calculation:",i/nLat*100))
+    
     for(j in 1:nLon){
       
       x <- varValues[ j, i,] # time last for met
@@ -659,21 +666,40 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
       }
       
       # Only plot the raw data that make the corrrelation when there is 
-      # variability for both
-      # NOTE: DO NOT MAKE THESE EVERY TIME. IT IS VERY SLOW
-      if(sd(y_lightning) != 0 & sd(y_human) != 0 & FALSE){  
+      # variability for both and we have said, yes plase plot. 
+      if(sd(y_lightning) != 0 & sd(y_human) != 0 & makePlot){  
         
-        lat <- BA_latitude[i]; lon <- BA_longitude[j]
-        fileName <- paste0("Figures/var_correlation_by_grid_box/",lat,"_", lon,".png")
-        png(filename=fileName, res=250, width=1500, height=1500)
-        plot(x, y_lightning, col="gray")
+        # Get lat lon for labeling
+        lat <- BA_latitude[i] 
+        lon <- BA_longitude[j]
+        
+        # Round the correlation coef for labeling purposes
+        r_lightning_pretty <- round(r_lightning, 3)
+        r_human_pretty     <- round(r_human, 3)
+        
+        fileName <- paste0("Figures/var_correlation_by_grid_box/",
+                           varName, "_", lat, "_", lon, 
+                           "rh=",r_human_pretty,"_rl=", r_lightning_pretty, 
+                           ".png")
+        
+        # Create the figure 
+        png(filename=fileName, res=100, width=500, height=500)
+        
+        yMax <- max(c(y_lightning, y_human))
+        
+        plot(x, y_lightning, col="gray", ylim=c(0, yMax))
         points(x, y_human, col="orange")
         
-        title(paste("var human burn area correlation =",r_human ,"coords:(", lat, lon,")"),
-              sub=paste("Area correlation = ", r_lightning))
+        legend("topleft",
+               legend=c(r_lightning, r_human),
+               fill=c("gray", "orange"), 
+               bty="n")
+        
+        title(paste(varName, "coords:(", lat, lon,")"))
+        
         dev.off()
         
-      }  
+      } # End of plotting if statement
       
     }
   }
@@ -698,11 +724,11 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
     
   }else if(colorScheme == "diverging"){
     
-    # Set up diverging colorbar with center at zero
+    # Set up diverging colorbar with center at zero (white)
     rwb <- colorRampPalette(colors = c("blue", "white", "red"))
     colorpallete <- rwb(99)
     
-    # This now needs to be symetric
+    # This now needs to be symetric for fair assessment 
     maxAbs <- max(abs( c( (minCor), abs(maxCor) ) ))
     breaks       <- seq(maxAbs*-1, maxAbs, length.out=100)
     
@@ -724,7 +750,7 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
         xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
         xlim=c(-125, -100))
   map("state", col="black", add=T)
-  plot(SPDF, add=T, border="white")
+  plot(SPDF, add=T, border="black", lty=3)
   title("Lightning ignited")
   
   par(mar=c(1,1,2,5.1))
@@ -734,19 +760,21 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
              xlim=c(-125, -100),
              legend.width=2)
   map("state", col="black", add=T)
-  plot(SPDF, add=T, border="white")
+  plot(SPDF, add=T, border="black", lty=3)
   title("Human ignited")
   
   dev.off()
 
 }
 
-spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, colorScheme="heat")
+spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, colorScheme="heat", makePlot=TRUE)
 spatialCorrelationMap(varName="total precip",  varValues=tp_monthly, colorScheme = "diverging")
 spatialCorrelationMap(varName="2-meter RH",  varValues=rh2m_monthly, colorScheme = "diverging")
 spatialCorrelationMap(varName="2-meter dew point",  varValues=d2m_monthly, colorScheme = "diverging")
 spatialCorrelationMap(varName="total evaporation",  varValues=e_monthly, colorScheme = "diverging")
-spatialCorrelationMap(varName="2-meter wind gusts",  varValues=wg_monthly, colorScheme = "wg_monthly")
+spatialCorrelationMap(varName="2-meter wind gusts",  varValues=wg_monthly, colorScheme = "diverging")
+spatialCorrelationMap(varName="2-meter wind speed",  varValues=ws_monthly, colorScheme = "diverging")
+
 
 
 
