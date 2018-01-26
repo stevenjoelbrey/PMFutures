@@ -3,7 +3,15 @@
 # ------------------------- Description ---------------------------------------
 # This script is meant to make a plot that shows that states (or eco-regions) 
 # with large burn area are dominated by lightning ignitions. The script creates
-# a bar plot and a map. Together they make the point. 
+# a bar plot and a map. Together they make the point. We are also going to show
+# GFED4s emission estimate totals for each ecoregion. This will demonstrate that
+# not all burn_area is equal. 
+# NOTE: When comparing GFED4s emissions and FPA-Burn area can only go back to
+# NOTE: 1997 for GFED. 
+
+# TODO: rerun GFED4s ecoregion totals when createECMWFGridAttributes.R has been
+# TODO: re-created such that assignments are made for all interior grid cells
+# TODO: and coastal grid cells. 
 
 library(rgdal)
 library(ggplot2)
@@ -12,6 +20,10 @@ library(maptools)
 library(grid)
 library(gridExtra)
 library(sfsmisc)
+library(ncdf4)
+
+startYear <- 1997
+endYear   <- 2015
 
 # What region are you investigating? 
 minLat <- 31
@@ -39,7 +51,7 @@ regionMask <- FPA_FOD$NA_L2CODE %in% keepRegions
 FPA_FOD <- FPA_FOD[latMask & lonMask & regionMask, ]
 lightningMask <- FPA_FOD$STAT_CAUSE_DESCR == "Lightning"
 
-# Count ecoregion totals
+# Count ecoregion total burn area from FPA-FOD. 
 for (i in 1:nRegions){
   
   # Create region Mask
@@ -50,6 +62,111 @@ for (i in 1:nRegions){
   
 }
 
+################################################################################
+# Now sum the total GFED4s emissions by ecoregion for the same spatial and 
+# temporal domain. 
+################################################################################
+if(startYear == 1997 & endYear == 2015){
+  
+  gfedDir <- "/Volumes/Brey_external/GFED4s/"
+  ncFile <- paste0(gfedDir, "GFED4.1s_ecmwf_monthly_DM_1997.nc")
+  
+  nc <- nc_open(ncFile)
+  grid_lat <- ncvar_get(nc, "latitude") 
+  grid_lon <- ncvar_get(nc, "longitude")
+  time <- ncvar_get(nc, "time")
+  monthly_DM <- ncvar_get(nc, "monthly_DM")
+  nc_close(nc)
+  
+  # Sum the first years 12 months of data
+  yearSum <- apply(monthly_DM, 1:2, sum)
+ 
+  
+  # Add each year sum to yearSum
+  for(y in (startYear + 1):endYear){
+    
+    ncFile <- paste0(gfedDir, "GFED4.1s_ecmwf_monthly_DM_1997.nc")
+    nc <- nc_open(ncFile)
+    monthly_DM <- ncvar_get(nc, "monthly_DM")
+    nc_close(nc)
+    
+    # append the total burn area on this grid. Take all months. 
+    yearSum <- yearSum + apply(monthly_DM, 1:2, sum)
+    
+  }
+  
+  # Plot the totals to make sure it looks normal 
+  quartz() 
+  f <- length(grid_lat):1
+  yearSumPlot <- yearSum
+  yearSumPlot[yearSum==0] <- NA
+  image.plot(grid_lon, grid_lat[f], yearSumPlot[,f])
+  title("Sum of DM")
+  
+  # Now we need to subset by the western US coords and then load grid attributes
+  # to subset. 
+  ncFile <- "Data/grid_attributes/grid_attributes_75x75.nc"
+  nc <- nc_open(ncFile)
+  ecoregion <- round(ncvar_get(nc, "ecoregion"),1)
+  elevation <- ncvar_get(nc, "elevation")
+  nc_close(nc)
+  
+  # For finding North America CONUS
+  psuedo_lon <- grid_lon - 360
+  
+  quartz()
+  image.plot(psuedo_lon, grid_lat[f], elevation[,f])
+  title("elevation")
+    
+  quartz()
+  image.plot(psuedo_lon, grid_lat[f], ecoregion[,f])
+  title("ecoregions")
+  
+  # Create the spatial mask subset
+  lonMask <- psuedo_lon >= minLon & psuedo_lon <= maxLon
+  latMask <- grid_lat >= minLat & grid_lat <= maxLat
+  
+  # subset all the variables that these of these coords
+  yearSum_subset <- yearSum[lonMask, latMask]
+  ecoregion_subset <- ecoregion[lonMask, latMask]
+  elevation_subset <- elevation[lonMask, latMask]
+  grid_lat_subset <- grid_lat[latMask]
+  grid_lon_subset <- grid_lon[lonMask]
+  psuedo_lon_subset <- psuedo_lon[lonMask]
+  
+  quartz()
+  f <- length(grid_lat_subset):1
+  image.plot(psuedo_lon_subset, grid_lat_subset[f], yearSum_subset[,f])
+  title("Total DM subset")
+  map("state", add=T)
+  
+  quartz()
+  f <- length(grid_lat_subset):1
+  image.plot(psuedo_lon_subset, grid_lat_subset[f], elevation_subset[,f])
+  title("And now elevation it has been subset")
+  map("state", add=T)
+  
+  quartz()
+  f <- length(grid_lat_subset):1
+  image.plot(psuedo_lon_subset, grid_lat_subset[f], ecoregion_subset[,f])
+  title("And now ecoregion has been subset. Make sure no white space in middle of country")
+  map("state", add=T)
+  
+  # Count keeper ecoregion total burn area from GFED4s. 
+  regionDM <- rep(NA, nRegions) # lightning & human. GFED does not know difference 
+  for (i in 1:nRegions){
+    
+    # Create region Mask
+    rMask_2D <- keepRegions[i] == ecoregion_subset
+    rMask_2D[is.na(rMask_2D)] <- FALSE
+    
+    regionDM[i] <- sum(yearSum_subset[rMask_2D])
+
+  }
+  
+  
+  
+}
 ################################################################################
 # Bar plot of the area burned totals! 
 # For nice labels 
@@ -66,11 +183,12 @@ regionBA_H  <- regionBA_H[ORDER]
 regionColors <- regionColors[ORDER]
 
 png(filename="Figures/summary/ecoregio_burn_area_bar.png", 
-    res=250, height=1600, width=3000)
-par(las=1, mar=c(4,14,4,2))
+    res=250, height=1600, width=3300)
+par(las=1, mar=c(4,14,4,8))
 
-bp <- barplot(height=BA, names.arg=keepRegions, yaxt="n", col="gray", 
-        cex.names = 1.8)
+bp <- barplot(height=BA, 
+              names.arg=keepRegions, yaxt="n", col="gray", 
+              cex.names = 1.8)
 #axis(side=1, at = bp, labels=keepRegions, col=)
 
 barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
@@ -78,6 +196,24 @@ barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
 # Nice axis label 
 aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=1.5)
 mtext("Acres \n Burned", side=2, line=7, cex=2)
+
+x = par("usr")
+
+oldPar <- par()
+
+
+# Add emissions from GFED4s if we are looking at the right years 
+if(startYear == 1997 & endYear == 2015){
+  par(new = TRUE)
+
+  bp_new <- barplot(height=regionDM, pch="*", border="transparent", col="transparent",
+                    axes = FALSE, bty = "n", xlab = "", ylab = "")
+  text(bp_new, regionDM[ORDER], "*", col="red", cex=4)
+  eaxis(side=4, at = pretty(range(regionDM)), col="red")
+  axis(side=4, at = pretty(range(regionDM)), col="red", labels=rep("",7) )
+  
+  mtext("", side=4, line=3)
+}
 
 dev.off()
 
