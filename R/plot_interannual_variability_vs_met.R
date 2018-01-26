@@ -315,7 +315,6 @@ grid_ecoregion[is.na(grid_ecoregion)] <- -1
 nc_close(grid_attributes)
 
 # Get rid of pesky NA values, they make it hard to make masks 
-
 grid_latMask       <- grid_latitude > minLat & grid_latitude < maxLat
 grid_lonMask       <- grid_longitude > minLon & grid_longitude < maxLon
 
@@ -436,7 +435,7 @@ for (i in 1:nYears){
   yearMask  <- years[i] == tYear
   monthMask <- tMon %in% month_select
   tMask     <- yearMask & monthMask 
-  
+
   # Take the spatial temporal subset average or sum and store 
   t2m_mean[i] <- spaceTimeStat(t2m, tMask, FUN="mean")
   tp_total[i] <- spaceTimeStat(tp, tMask, FUN="sum")
@@ -513,7 +512,7 @@ nc_close(nc)
 
 
 # Time in hours from origin to POSIXct
-t_mon <- as.POSIXct(t_hours*60^2, origin="1900-01-01 00:00:0.0", tz="utc")
+t_mon_FPA <- as.POSIXct(t_hours*60^2, origin="1900-01-01 00:00:0.0", tz="utc")
 
 # Spatially subset the data to match the loaded ecmwf data
 lonMask <- BA_longitude %in% ecmwf_longitude
@@ -625,15 +624,21 @@ print(paste("The dimension of e.g. t2m_montly is:",
 # Make spatial correlations with gridded burn area and display as sketched in 
 # notebook. Plot the indivisual grid correlations to see what these correlation
 # values really mean. Make sure to label with r value, lon, and lat. 
-# TODO: Make function dynamically for any variable. 
-
-# TODO: make var_ passed argument so this works for more than t2m
-
+# TODO: make month subsetting an option as well as summing or averaging values
+# TODO: across those desired months. Interannual variability of this relation
+# TODO: is interesting. 
 spatialCorrelationMap <- function(varName="2-meter temperature", 
                                   varValues=t2m_monthly,
                                   colorScheme="heat",
                                   makePlot=FALSE){
 
+  
+  # Subset varValues, lightning_burn_area, and human_burn_area by months_select
+  # thats t_mon_FPA (length=288) for gridded burn area. That should match the
+  # time dimension of varValues or this already does nt make sense. Sum or 
+  # average the variables in the month_select per year. Add a _interannual_months
+  # for the save name of these correlation plots. 
+  
   # Time the loop 
   t0 <- Sys.time()
   
@@ -722,6 +727,12 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
     colorpallete <- rev(heat.colors(99))
     breaks       <- seq(minCor, maxCor, length.out=100)
     
+  }else if(colorScheme == "cool"){
+    
+    rwb <- colorRampPalette(colors = c("white", "blue"))
+    colorpallete <-rwb(99)
+    breaks       <- seq(minCor, maxCor, length.out=100)    
+    
   }else if(colorScheme == "diverging"){
     
     # Set up diverging colorbar with center at zero (white)
@@ -740,20 +751,23 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
   f <- nLat:1
   plotLat <- ecmwf_latitude[nLat:1]
   
-  png(filename=paste0("Figures/spatial_correlation_maps/",varName,".png"), 
+  png(filename=paste0("Figures/spatial_correlation_maps/",varName,"_burned_area_cor_",
+                      "months=", 1, "-", 12,
+                      ".png"), 
       res=250, width=2350, height=1000)
+  
   par(mfrow=c(1,2))
   
-  par(mar=c(1,5.1,2,1))
+  par(mar=c(2,5.2,2,1))
   image(plotLon, plotLat, lightning_corMat[, f], 
         col=colorpallete, breaks=breaks,
         xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
         xlim=c(-125, -100))
   map("state", col="black", add=T)
   plot(SPDF, add=T, border="black", lty=3)
-  title("Lightning ignited")
+  mtext("Lightning ignited fires", side=1, cex=1.5, font=2, line=0.5)
   
-  par(mar=c(1,1,2,5.1))
+  par(mar=c(2,1,2,5.2))
   image.plot(plotLon, plotLat, human_corMat[, f], 
              col=colorpallete, breaks=breaks,
              xlab="", ylab="", bty="n", xaxt="n", yaxt="n",
@@ -761,13 +775,17 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
              legend.width=2)
   map("state", col="black", add=T)
   plot(SPDF, add=T, border="black", lty=3)
-  title("Human ignited")
+  mtext("Human ignited fires", side=1, cex=1.5, font=2, line=0.5)
+  
+  # plot over the center of both 
+  mtext( paste(varName, "& area burned |", "monthly correlation"), 
+         outer = TRUE , line=-1.8, cex=1.6, font=2)
   
   dev.off()
 
 }
 
-spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, colorScheme="heat", makePlot=TRUE)
+spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, colorScheme="heat")
 spatialCorrelationMap(varName="total precip",  varValues=tp_monthly, colorScheme = "diverging")
 spatialCorrelationMap(varName="2-meter RH",  varValues=rh2m_monthly, colorScheme = "diverging")
 spatialCorrelationMap(varName="2-meter dew point",  varValues=d2m_monthly, colorScheme = "diverging")
