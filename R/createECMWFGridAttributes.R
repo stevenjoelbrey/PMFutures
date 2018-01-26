@@ -147,10 +147,15 @@ for (xi in lon_index){
     ############################################################################
     # Eliminate points that are far away
     centriodDist <- distHaversine(pt, ecoregion_centriods)
-    cuttoffDistance <- sort(centriodDist)[7] # ecoregions have wierd shapes so keep many around
+    cuttoffDistance <- sort(centriodDist)[25] # ecoregions have wierd shapes so keep many around
     SPDFMask <- centriodDist <= cuttoffDistance
     # Perform calculation on the remaining, close points
     ecoregion[xi,yi] <- over(pt, SPDF[SPDFMask,])$NA_L2CODE
+    
+    # TODO: If ecoregion is NA and elevation is not super negative (over ocean)
+    # TODO: then apply distance to nearist polygon to assign ecoregion. Could 
+    # TODO: set a max distance equal to one half the width of a grid cell for
+    # TODO: this assignment. 
 
     # Keep track of our progress
     count <- count + 1
