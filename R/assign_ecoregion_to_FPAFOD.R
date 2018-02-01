@@ -4,26 +4,17 @@ if(length(args)==0){
   args=2003
 }
 
-# readFPAFODFireFeatures.R
+# assign_ecoregion_to_FPAFOD.R 
 # execute via command line 
 # cd GoogleDrive/sharedProjects/PMFutures/
 # Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003
 
-# NOTE:
-# Rscript --vanilla R/assign_ecoregion_to_border_points.R 2003 
-# Should be run after to fix the points that do not get original assignment
-# TODO: integrate the functionality. 
-# NOTE: THIS HAS BEEN ATTEMPTED BUT NOT TESTED
-################################################################################
-# readUSFSFireOccurance.R
+#------------------------------- Desscription ---------------------------------_
 
-# This script is used to convert spatial wildfire occurance data into a R 
-# friendly easy to load dataframe and csv. This script will laod a text file of this
-# data. In truth, this script hides some of the ugly work that had to be done
-# to get this data into a workable format. I downloaded a .dbf file from the 
-# link listed below, I then had to convert that to a text file using ArcCatalog
-# and ArcMap. ESRI really does not want anyone to look at this data without 
-# thier software...
+# The purpose of this script is to assign ecoregions to FPA FOD fires. 
+# It should be run after all FPA data have been formatted and times are stored as
+# POSIXct objects. That work is performed by readUSFSFireOccurance.R
+
 
 # DataSource: https://www.fs.usda.gov/rds/archive/Product/RDS-2013-0009.3/
 
@@ -57,8 +48,10 @@ drive <- "Data/FPA_FOD/"
 # UPDATED SEE read2017FPAFOD.R for details
 dataFile <- paste0(drive, "FPA_FOD_1992_2015.RData") 
 df <- get(load(dataFile))
+rm(FPA_FOD)
 
-# Temporal subset of the FPA-FOD
+# Temporal subset of the FPA-FOD so that many of these can run at once. This 
+# is only done for speed, so different years can run at the same time. 
 timeMask <- df$FIRE_YEAR == year
 df <- df[timeMask,]
 
@@ -72,39 +65,7 @@ df <- df[timeMask,]
 # [25] "STAT_CAUSE_DESCR"           "CONT_DATE"                  "CONT_DOY"                  "CONT_TIME"                 
 # [29] "FIRE_SIZE"                  "FIRE_SIZE_CLASS"            "LATITUDE"                  "LONGITUDE"                 
 # [33] "OWNER_CODE"                 "OWNER_DESCR"                "STATE"                     "COUNTY"                    
-# [37] "FIPS_CODE"                  "FIPS_NAME"                 
-
-
-# Get start time, containment time, and out time into POSIXct format
-disc_mmddyy_TIME    <- df$DISCOVERY_DATE
-spaceLocation  <- str_locate(disc_mmddyy_TIME, " ")
-
-# The time of these incidents is not needed. Just the date. These data are not 
-# that precise. 
-disc_mmddyy    <- str_sub(disc_mmddyy_TIME, 1, spaceLocation[,1])
-
-# Get rid of the space that sometimes shows up at the end 
-disc_mmddyy_noSpace    <- str_replace(disc_mmddyy, " ", "")
-discoverd_date <- as.POSIXct(disc_mmddyy_noSpace, format="%m/%d/%y", tz="UTC")
-
-# Add to dataframe
-df$DISCOVERY_DATE <- discoverd_date
-
-# Repeat this method for the containment date
-con_mmddyy_TIME <- df$CONT_DATE
-spaceLocation <- str_locate(con_mmddyy_TIME, " ")
-con_mmddyy <- str_sub(con_mmddyy_TIME, 1, spaceLocation[,1])
-con_mmddyy_noSpace  <- str_replace(con_mmddyy, " ", "")
-con_date <- as.POSIXct(con_mmddyy_noSpace, format="%m/%d/%y", tz="UTC")
-
-df$CONT_DATE <- con_date
-
-# Make an array of the month of the start date 
-t_LT <- as.POSIXlt(discoverd_date)
-month <- t_LT$mon + 1
-
-# Add it to the dataframe
-df$START_MONTH <- month
+# [37] "FIPS_CODE"                  "FIPS_NAME"                               
 
 # Now we need to assign the eco-region of each individual fire. This maintains
 # highest level of precision before gridding to 0.25 degree grid. 
@@ -123,7 +84,7 @@ SPDF <- get(load(paste0(layerDir, layername)))
 # The class of the NA_L2CODE column is wierd, making better
 SPDF@data$NA_L2CODE <- as.numeric(as.character(SPDF@data$NA_L2CODE))
 
-# We want to assign the NA_L2CODE and NA_L2NAME to each fire (row) in the fpafod
+# We want to assign the NA_L2CODE and NA_L2NAME to each fire (row) in the FPA FOD.
 # This will require overlap analysis. 
 nRow <- dim(df)[1]
 NA_L2CODE <- rep(NA, nRow)
@@ -145,6 +106,10 @@ for (i in 1:nRow){
   # Assign level 2 identification
   assignment <- p_ecoregion$NA_L2CODE
   
+  # If the fire does not overlap an ecoregion polygon the result will be NA. We
+  # need to know where this occurs. Because the borders of polygons are not 
+  # perfect there are gaps. We now want to assign the ecoregion with a border
+  # that is closest to the fire. 
   if(is.na(assignment)){
     
     print(paste("Using distances Matrix for: ", i))
@@ -157,6 +122,7 @@ for (i in 1:nRow){
     
   } else{
     
+    # The point fell within a polygon and we are already set! 
     NA_L2CODE[i] <- assignment
     
   }
@@ -174,10 +140,17 @@ print(paste("It took", tf - t1, "to complete loop"))
 # Assign all overlap analysis information to the df and save it! 
 df$NA_L2CODE <- NA_L2CODE
 
-# Save the data as .RData
-FPA_FOD <- df
-save(FPA_FOD, file=paste0(drive, "FPA_FOD_", year, ".RData"))
+# Save the data as .RData, but only do that if you have preserved the number of
+# fires in this year. 
+if(dim(df)[1] == nRow & i == nRow){
 
-print(paste("Complete:", year))
-
+  FPA_FOD <- df
+  save(FPA_FOD, file=paste0(drive, "FPA_FOD_", year, ".RData"))
+  
+  print(paste("Complete:", year))
+} else{
+  
+  stop("The number of fires in this year is not the same after processing.")
+  
+}
 
