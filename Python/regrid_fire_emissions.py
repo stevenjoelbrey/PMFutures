@@ -34,10 +34,10 @@ if len(sys.argv) != 1:
 
 else:
 	# Development environment. Set variables manually here.
-	year      = str(2003)
+	year      = str(2002)
 	inventory = 'GFED4s'  # FINN | GFED4s | HMS
 	METGrid   = 'ecmwf'   #
-	species   = 'burned_area'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
+	species   = 'monthly_DM'   # Either CO2 or a specific vegetation type or C for GFED, SPDH
 	getBurnArea = True    # Only works for monthly data...Will get burn area from C or DM monthly files
 
 # When this is true extra plots are made to ensure that the grids are being
