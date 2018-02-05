@@ -5,6 +5,11 @@
 # area by ignition type. This plot will use burn area from FPA_FOD dataframe
 # for all available years. 
 
+# TODO: combine ignition_size_histogram_western_US.png and 
+# TODO: cumulativeBurnAreaBySize_western_US.png by making the later a second
+# TODO: y-axis of the former. Use the former x-axis as it shows the log scale
+# TODO: much more nicely. 
+
 # ----------------- User selected data subset parameters  ----------------------
 
 # TODO: Figure out why colorado subset does not add up to 100% for both types
@@ -143,14 +148,6 @@ legend("topright",
 dev.off()
 
 
-
-
-
-
-
-
-
-
 ################################################################################
 # Create cumulative sum distribution figure (Requires additional quality vetting)
 ################################################################################
@@ -218,11 +215,4 @@ eaxis(1, cex.axis=1.6)
 mtext("Fire Size (acres)", 1 , line=3, cex=2)
 
 dev.off()
-
-#abline(v=257280)
-
-
-# TODO: Make the same plot but instead of % of total burn area on x-axis make it
-# TODO: total burn area in acres.
-
 
