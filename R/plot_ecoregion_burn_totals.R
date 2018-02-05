@@ -22,8 +22,8 @@ library(gridExtra)
 library(sfsmisc)
 library(ncdf4)
 
-startYear <- 1997
-endYear   <- 2015
+startYear <- 1992 # When this is 1992 all the data are used.
+endYear   <- 2015 # When this is 2015 all the data are used. 
 
 # What region are you investigating? 
 minLat <- 31
@@ -46,9 +46,12 @@ latMask <- FPA_FOD$LATITUDE > minLat & FPA_FOD$LATITUDE < maxLat
 lonMask <- FPA_FOD$LONGITUDE > minLon & FPA_FOD$LONGITUDE < maxLon
 regionMask <- FPA_FOD$NA_L2CODE %in% keepRegions
 
+# Temporal Subset
+yearMask <- FPA_FOD$FIRE_YEAR >= startYear & FPA_FOD$FIRE_YEAR <= endYear
+
 # spatially subset the data and get a mask for the fires that are started by
 # lightning 
-FPA_FOD <- FPA_FOD[latMask & lonMask & regionMask, ]
+FPA_FOD <- FPA_FOD[latMask & lonMask & regionMask & yearMask, ]
 lightningMask <- FPA_FOD$STAT_CAUSE_DESCR == "Lightning"
 
 # Count ecoregion total burn area from FPA-FOD. 
@@ -181,10 +184,14 @@ keepRegions <- keepRegions[ORDER]
 regionBA_L  <- regionBA_L[ORDER]
 regionBA_H  <- regionBA_H[ORDER]
 regionColors <- regionColors[ORDER]
+regionDM     <- regionDM[ORDER]
 
-png(filename="Figures/summary/ecoregio_burn_area_bar.png", 
-    res=250, height=1600, width=3300)
-par(las=1, mar=c(4,14,4,8))
+# Create the bar plot that shows total burn area and emissions in the selected
+# date range. 
+png(filename=paste0("Figures/summary/ecoregio_burn_area_emission_bar",
+                    startYear, "_", endYear, ".png"), 
+    res=250, height=1600, width=3700)
+par(las=1, mar=c(4,14,4,16))
 
 bp <- barplot(height=BA, 
               names.arg=keepRegions, yaxt="n", col="gray", 
@@ -197,22 +204,19 @@ barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
 aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=1.5)
 mtext("Acres \n Burned", side=2, line=7, cex=2)
 
-x = par("usr")
-
-oldPar <- par()
-
-
 # Add emissions from GFED4s if we are looking at the right years 
 if(startYear == 1997 & endYear == 2015){
-  par(new = TRUE)
+ 
+   par(new = TRUE)
 
   bp_new <- barplot(height=regionDM, pch="*", border="transparent", col="transparent",
                     axes = FALSE, bty = "n", xlab = "", ylab = "")
-  text(bp_new, regionDM[ORDER], "*", col="red", cex=4)
-  eaxis(side=4, at = pretty(range(regionDM)), col="red")
+  text(bp_new, regionDM, "*", col=regionColors, cex=5, xpd=T)
+  eaxis(side=4, at = pretty(range(regionDM)), col="red", cex.axis=1.5)
   axis(side=4, at = pretty(range(regionDM)), col="red", labels=rep("",7) )
   
-  mtext("", side=4, line=3)
+  mtext("*kg Dry Fuel \n Consumed", side=4, line=6.5, cex=1.8)
+  
 }
 
 dev.off()
