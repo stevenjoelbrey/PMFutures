@@ -43,9 +43,6 @@ print(paste("Working on year: ", year))
 print("-----------------------------------------------------------------------")
 
 drive <- "Data/FPA_FOD/"
-# #dataFile <- paste0(drive,"fire_featureclass.RData")
-
-# UPDATED SEE read2017FPAFOD.R for details
 dataFile <- paste0(drive, "FPA_FOD_1992_2015.RData") 
 df <- get(load(dataFile))
 rm(FPA_FOD)
@@ -53,6 +50,9 @@ rm(FPA_FOD)
 # Temporal subset of the FPA-FOD so that many of these can run at once. This 
 # is only done for speed, so different years can run at the same time. 
 timeMask <- df$FIRE_YEAR == year
+if(sum(is.na(timeMask))>0){
+  stop("There should be no NA values in timeMask.")
+}
 df <- df[timeMask,]
 
 # Names of the df
