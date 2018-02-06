@@ -10,7 +10,7 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-# Lat lon extent
+# Lat lon extent for FPA FOD data
 minLat <- 30
 maxLat <- 50
 minLon <- -125
@@ -27,7 +27,7 @@ ecoregion <- 6.2
 # good reason to ignore lots of really small fires. 
 minFireSize <- 0
 
-# ----------------------- setup figure dirs ------------------------------------
+# ----------------------- Setup Figure Dirs ------------------------------------
 # THESE ARGUMENTS SET UP A UNIQUE EXPERIMENT. MAKE A DIRECTORUY TO STORE EACH
 # EXISTING EXPERIMENT. 
 experimentVARS <- paste0("ecoregion=", ecoregion,"_",
