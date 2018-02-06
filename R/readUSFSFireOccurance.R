@@ -78,9 +78,12 @@ CONT_DATE <- as.character(df$CONT_DATE)
 cont_date <- as.POSIXct(CONT_DATE, format="%m/%d/%Y %H:%M:%S", tz="UTC")
 df$CONT_DATE <- cont_date
 
+print("Dates assigned with no wierdness.")
+
 # Make an array of the month of the start date 
 library(lubridate) # for month()
-start_month <- lubridate::month(DISCOVERY_DATE)
+start_month <- lubridate::month(discovery_date)
+print("Start month value assigned")
 
 # Add it to the dataframe
 df$START_MONTH <- start_month
@@ -93,7 +96,9 @@ maxYear <- max(df$FIRE_YEAR)
 
 # Make sure the name is descrptive of the years in these data. 
 print("The data have been formatted yay!")
-FPA_FOD <- df
-save(FPA_FOD, file=paste0(drive, "FPA_FOD_", minYear,"_",maxYear, ".RData"))
+FPA_FOD <- df; rm(df)
+f <- paste0(drive, "FPA_FOD_", minYear,"_",maxYear, ".RData")
+print("file savename f created with no wierdness.")
+save(FPA_FOD, file=f)
 
 print("script executed, output saved without error")
