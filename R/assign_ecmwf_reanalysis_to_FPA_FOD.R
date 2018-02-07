@@ -11,9 +11,6 @@ if(length(args)==0){
 #------------------------------- Description ---------------------------------_
 # This script takes the merged FPA FOD fire data created by 
 # R/merge_ecoregion_year_Data.R and assigns reanalysis and elevation data. 
-#
-# TODO: Consider using historical MACA product or dataset that estimates 
-# TODO: aridity. That would make for the best comparison. 
 
 
 print("-----------------------------------------------------------------------")
