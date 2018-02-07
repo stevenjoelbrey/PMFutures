@@ -9,7 +9,7 @@ if(length(args)==0){
 # cd GoogleDrive/sharedProjects/PMFutures/
 # Rscript --vanilla R/assign_ecoregion_to_FPAFOD.R 2003
 
-#------------------------------- Desscription ---------------------------------_
+#------------------------------- Desscription ----------------------------------
 
 # The purpose of this script is to assign ecoregions to FPA FOD fires. 
 # It should be run after all FPA data have been formatted and times are stored as
