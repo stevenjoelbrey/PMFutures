@@ -12,6 +12,13 @@
 # 2) create a "START_MONTH" column. 
 # 3) save as a csv and .RData format. 
 
+# NOTE: There are 4 fires where the column "FIRE_YEAR" and year of the given 
+# NOTE: "DISCOVERY_DATE" do not match. These are for rows (fires)
+# NOTE: 1145577, 1145580, 1145589, 1146543. These fires account for 1.12 acres
+# NOTE: of burn area. This data inconsistency was discovered when I wrote
+# NOTE: R/assign_gridMET_to_FPAFOD.R 
+# NOTE: All of these fires were reported by "ST/C&L". 
+
 # NOTE: All fire (1.88 million) burn area should be about 140 million acres.
 # NOTE: When I sum quantity here I get 139.7639 million. Yay! 
 
