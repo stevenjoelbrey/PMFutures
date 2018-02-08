@@ -595,6 +595,7 @@ d2m_monthly <- monthly
 ws_monthly  <- monthly
 wg_monthly  <- monthly
 
+# CHECK ME
 i <- 0
 for (y in sort(unique(tYear))) {
   
@@ -633,26 +634,59 @@ print(paste("The dimension of e.g. t2m_montly is:",
 spatialCorrelationMap <- function(varName="2-meter temperature", 
                                   varValues=t2m_monthly,
                                   includedMonths=1:12,
+                                  annual=FALSE, 
                                   colorScheme="heat",
                                   makePlot=FALSE){
-
-  # Mask out months we do not want to include in temporal correlation 
-  month_mask <- lubridate::month(t_mon_FPA) %in% includedMonths
   
-  # Subset burn area
-  l_BA <- lightning_burn_area[month_mask,,]
-  h_BA <- human_burn_area[month_mask,,]
+  # If we are interested in burn area correlation for select months, year totals
+  if(annual){
+    
+    nYear <- length(years)
+    l_BA  <- array(data=NA, dim=c(nYear, nLon, nLat))
+    h_BA  <- array(data=NA, dim=c(nYear, nLon, nLat))
+    varValuesAnnual <- array(data=NA, dim=c(nLon, nLat, nYear))
+    
+    # Month mask does not change within year loop 
+    month_mask <- lubridate::month(t_mon_FPA) %in% includedMonths
+    for (i in 1:nYears){
+      
+      # Mask out desired months for this year only 
+      seasonMask <- years[i] == lubridate::year(t_mon_FPA) & month_mask
+      
+      # Sum the burn area in these months for this year, per spatial dim  
+      l_BA[i,,] <- apply(lightning_burn_area[seasonMask,,], 2:3, sum)
+      h_BA[i,,] <- apply(human_burn_area[seasonMask,,], 2:3, sum)
+      
+      # For the met variable now too. 
+      # TODO: Think about if mean vs. sum matters for variables like precip. For
+      # TODO: a spearnman correlation I do not think it does, as mean is simple
+      # TODO: sum scaled by N. 
+      varValuesAnnual[,,i] <- apply(varValues[,,seasonMask], 1:2, sum)
+      
+    }
+    # Now change the name to be consistent with the rest of this function. 
+    varValues <- varValuesAnnual
+    
+  } else{
+    
+    # Perform correlations for the subset monthly time array, not summing the 
+    # yearly values. 
+    
+    # Mask out months we do not want to include in temporal correlation 
+    month_mask <- lubridate::month(t_mon_FPA) %in% includedMonths
+    print(paste("The number of months used per box is:", sum(month_mask)))
+    
+    # Subset burn area only by the months
+    l_BA <- lightning_burn_area[month_mask,,]
+    h_BA <- human_burn_area[month_mask,,]
+    
+    # Subset varValues
+    varValues <- varValues[,,month_mask]
+    
+  }
   
-  # Subset varValues
-  varValues <- varValues[,,month_mask]
-  
-  # Subset varValues, lightning_burn_area, and human_burn_area by months_select
-  # thats t_mon_FPA (length=288) for gridded burn area. That should match the
-  # time dimension of varValues or this already does nt make sense. Sum or 
-  # average the variables in the month_select per year. Add a _interannual_months
-  # for the save name of these correlation plots. 
-  
-  # Time the loop 
+  # Time the correlation loop, which can be slop when making scatterplots for
+  # each grid point. 
   t0 <- Sys.time()
   
   nLat <- length(BA_latitude)
@@ -665,7 +699,7 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
     
     for(j in 1:nLon){
       
-      x <- varValues[ j, i,] # time last for met
+      x <- varValues[ j, i,] # time last for met var
       # NOTE: the time dimension in burn area and weather arrays are in different
       # NOTE: places, and this is annoying...
       y_lightning <- l_BA[, j, i] 
@@ -696,24 +730,34 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
         r_human_pretty     <- round(r_human, 3)
         
         fileName <- paste0("Figures/var_correlation_by_grid_box/",
-                           varName, "_", lat, "_", lon, 
-                           "rh=",r_human_pretty,"_rl=", r_lightning_pretty, 
+                           varName, "_", lat, "_", lon, "_annual=",annual,"_",
+                           "months=", min(includedMonths), "-", max(includedMonths),
+                           "_rh=",r_human_pretty,"_rl=", r_lightning_pretty, 
                            ".png")
         
         # Create the figure 
-        png(filename=fileName, res=100, width=500, height=500)
+        png(filename=fileName, res=100, width=1200, height=500)
+        
+        par(mar=c(4,7,4,4), mfrow=c(1,2))
         
         yMax <- max(c(y_lightning, y_human))
         
-        plot(x, y_lightning, col="gray", ylim=c(0, yMax))
+        plot(x, y_lightning, col="gray", ylim=c(0, yMax),
+             xlab="", ylab="", yaxt="n")
+        eaxis(2)
         points(x, y_human, col="orange")
+        mtext(varName, side=1, line=3)
+        mtext("Burn Area", side=2, line=4.5)
         
         legend("topleft",
-               legend=c(r_lightning, r_human),
+               legend=c(r_lightning_pretty, r_human_pretty),
                fill=c("gray", "orange"), 
                bty="n")
         
-        title(paste(varName, "coords:(", lat, lon,")"))
+        title(paste(varName, "coords:(", lat, ",", lon,")"))
+        
+        map("state", xlim=c(-125, -98))
+        points(lon-360, lat, pch=3, col="red")
         
         dev.off()
         
@@ -754,7 +798,7 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
     
     # This now needs to be symetric for fair assessment 
     maxAbs <- max(abs( c( (minCor), abs(maxCor) ) ))
-    #maxAbs <- 1
+    #maxAbs <- 1 # would make colorbar consistent across all diverging. 
     breaks       <- seq(maxAbs*-1, maxAbs, length.out=100)
     
   }
@@ -765,12 +809,25 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
   f <- nLat:1
   plotLat <- ecmwf_latitude[nLat:1]
   
-  png(filename=paste0("Figures/spatial_correlation_maps/",
-                      varName,
-                      "_burned_area_cor_",
-                      "months=", min(includedMonths), "-", max(includedMonths),
-                      ".png"), 
-      res=250, width=2350, height=1000)
+  # Name of the saved correlation map needs to indicate what temporal information
+  # was used to create it
+  if(annual){
+    saveName <- paste0("Figures/spatial_correlation_maps/",
+                       varName, "_burned_area_cor_",
+                       "months=", min(includedMonths), "-", max(includedMonths),
+                       "_annual_sums.png")
+                       
+  }else{
+    # Show included months in monthly time series 
+    saveName <- paste0("Figures/spatial_correlation_maps/",
+                       varName,
+                       "_burned_area_cor_",
+                       "months=", min(includedMonths), "-", max(includedMonths),
+                       ".png")
+  }
+  
+  
+  png(filename=saveName, res=250, width=2350, height=1000)
   
   par(mfrow=c(1,2))
   
@@ -794,20 +851,27 @@ spatialCorrelationMap <- function(varName="2-meter temperature",
   mtext("Human ignited fires", side=1, cex=1.5, font=2, line=0.5)
   
   # plot over the center of both 
-  mtext( paste(varName, "& area burned |", "monthly correlation"), 
+  if(annual){
+    timeText <- "yearly correlation"
+  }else{
+    timeText <- "monthly correlation"
+  }
+   
+  mtext( paste(varName, "& area burned |", timeText), 
          outer = TRUE , line=-1.8, cex=1.6, font=2)
   
   dev.off()
 
 }
-includedMonths <- 5:10
-spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, includedMonths, colorScheme="diverging")
-spatialCorrelationMap(varName="total precip",  varValues=tp_monthly, includedMonths, colorScheme = "diverging")
-spatialCorrelationMap(varName="2-meter RH",  varValues=rh2m_monthly, includedMonths, colorScheme = "diverging")
-spatialCorrelationMap(varName="2-meter dew point",  varValues=d2m_monthly, includedMonths, colorScheme = "diverging")
-spatialCorrelationMap(varName="total evaporation",  varValues=e_monthly, includedMonths, colorScheme = "diverging")
-spatialCorrelationMap(varName="2-meter wind gusts",  varValues=wg_monthly, includedMonths, colorScheme = "diverging")
-spatialCorrelationMap(varName="2-meter wind speed",  varValues=ws_monthly, includedMonths, colorScheme = "diverging")
+includedMonths <- 6:9
+annual <- F
+spatialCorrelationMap(varName="2-meter temperature",  varValues=t2m_monthly, includedMonths, annual, colorScheme="diverging", makePlot=F)
+spatialCorrelationMap(varName="total precip", varValues=tp_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
+spatialCorrelationMap(varName="2-meter RH",  varValues=rh2m_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
+spatialCorrelationMap(varName="2-meter dew point",  varValues=d2m_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
+spatialCorrelationMap(varName="total evaporation",  varValues=e_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
+spatialCorrelationMap(varName="2-meter wind gusts",  varValues=wg_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
+spatialCorrelationMap(varName="2-meter wind speed",  varValues=ws_monthly, includedMonths, annual, colorScheme = "diverging", makePlot=F)
 
 
 
