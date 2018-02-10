@@ -392,7 +392,7 @@ FPA_FOD$t2m_monthAfter       <- t2m_monthAfter
 # static in time 
 FPA_FOD$elevation <- elev_assigned
 
-save(FPA_FOD, file = paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,"_new.RData"))
+save(FPA_FOD, file = paste0("Data/FPA_FOD/FPA_FOD_ecmwf_",year1,"_",year2,".RData"))
 # The end of assignments. Plot the locations of different elevation bins of 
 # FPA FOD fires. Make sure high is high low is low. 
 
