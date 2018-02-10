@@ -1,4 +1,4 @@
-# assign_ignition_weather.R 
+# plot_ignition_weather.R 
 
 # ------------------------- Description ---------------------------------------
 # This script will be used to determine if the weather on ignition days is 
@@ -10,17 +10,24 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-# Lat lon extent for FPA FOD data
-minLat <- 30
+# Lat lon extent for FPA FOD data in the western US
+# minLat <- 30
+# maxLat <- 50
+# minLon <- -125
+# maxLon <- -100
+
+# Lat lon extent for FPA FOD data in contiguous US
+minLat <- 25
 maxLat <- 50
 minLon <- -125
-maxLon <- -100
+maxLon <- -60
 
 # Season
-includeMonths <- c(5:10)
+includeMonths <- c(1:12)
 
 # ecoregion 
-ecoregion <- 6.2
+#ecoregion <- 6.2 
+ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
 
 # Min fire size. Recal, even though fire managers view every small fire as a 
 # potentially large fire, in terms on when real emissions occur, there is a 
@@ -30,7 +37,12 @@ minFireSize <- 0
 # ----------------------- Setup Figure Dirs ------------------------------------
 # THESE ARGUMENTS SET UP A UNIQUE EXPERIMENT. MAKE A DIRECTORUY TO STORE EACH
 # EXISTING EXPERIMENT. 
-experimentVARS <- paste0("ecoregion=", ecoregion,"_",
+if(length(ecoregion)>1){
+  ecoName <- "all"
+}else{
+  ecoName <- ecoregion
+}
+experimentVARS <- paste0("ecoregion=", ecoName,"_",
                          "months=", min(includeMonths), "-", max(includeMonths), "_",
                          "sizeMin=", minFireSize
                          )
@@ -50,8 +62,9 @@ if(!dir.exists(experimentDir)){
   
 }
 
-# Load the fire occurence data 
-dataFile <- paste0("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
+# Load the fire occurence data, "FPA_FOD" dataframe
+#dataFile <- paste0("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
+dataFile <- paste0("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
 load(dataFile)
 
 # C is much nicer than K. What am I a chemist?
@@ -75,19 +88,32 @@ ecoregionMask <- FPA_FOD$NA_L2CODE %in% ecoregion
 # Fire size mask 
 sizeMask <- FPA_FOD$FIRE_SIZE >= minFireSize
 
+# Mask out the fires that do not have a known cause (NEW)
+causeMask <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
+
+# Elevation Mask
+# NOTE: Because the data are not always precise for location of fire, I have at
+# NOTE: at least one fire that is just off coast of San Bern CA in the ocean and 
+# NOTE: was assigned an elevation of -557m (FOD_ID: 1276313). For fires less than
+# NOTE: 100m I will assume something similar happenned, the data are suspect,
+# NOTE: and throw them out in this analysis where elevation are used. I know
+# NOTE: that Death Valley is lowest point, at about -85m.
+ELEV_MASK <- FPA_FOD$elevation <= -100 # meters
+
 # Subset the data, one mask to rule them all. 
-m <- timeMask & latMask & lonMask & ecoregionMask & sizeMask
+m <- timeMask & latMask & lonMask & ecoregionMask & sizeMask & causeMask & !ELEV_MASK
 FPA_FOD <- FPA_FOD[m,]
 
 # Get the cuase so we can create comparisons 
 fireCause     <- FPA_FOD$STAT_CAUSE_DESCR
 lightningMask <- fireCause == "Lightning"
+humanMask     <- fireCause != "Lightning" 
 
 # Function for plotting two distributions
 plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
   
   # Create the density estimates for the two types. 
-  dHuman     <- density(FPA_FOD[[VAR]][humanMask])
+  dHuman     <- density(FPA_FOD[[VAR]][humanMask], na.rm=T)
   dLightning <- density(FPA_FOD[[VAR]][!humanMask])
   
   par(las=1)
@@ -116,7 +142,7 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
   legend_human <- paste("Human, n=", sum(humanMask))
   legend_lightning <- paste0("Lightning, n=", sum(!humanMask))
   
-  legend("topleft",
+  legend("topright",
          legend=c(legend_human, legend_lightning),
          col=c("orange", "darkgray"),
          lty=1,
@@ -132,8 +158,15 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
 png(filename=paste0(experimentDir, "t2m_distribution_all.png"),
     width=2500, height=2200, res=250)
 par(mar=c(5,5,5,5))
-plot_ignition_weather_distribution("t2m", "Temperature [C]", !lightningMask)
+plot_ignition_weather_distribution("t2m", "Temperature [C]", humanMask)
 dev.off()
+
+png(filename=paste0(experimentDir, "fm1000_distribution_all.png"),
+    width=2500, height=2200, res=250)
+par(mar=c(5,5,5,5))
+plot_ignition_weather_distribution("fuel_moisture_1000hr", "1000-hr fuel moisture %", humanMask)
+dev.off()
+
 
 ################################################################################
 # Sample mean differences vs. Julain day
@@ -145,7 +178,7 @@ weatherVAR <- "t2m"
 
 # Time difference tolerance in JDays for fires to be comparable
 # Sets the size for a batch of days where I consider season to be accounted for 
-JDayTol       <- 10 
+JDayTol       <- 20 
 
 # How many fires of each ignition type are required for us to compare them at a 
 # given JDay window and elevation bin.
@@ -154,7 +187,7 @@ minSampleSize <- 50
 # The elevation bins. We make the assumption that locations within these bins
 # will not have different temperatures that can be entirely explained by 
 # differences in elevation
-elevationBins <- seq(-300, 3900, by=100)
+elevationBins <- seq(-100, 4000, by=100)
 nBins         <- length(elevationBins) - 1 # bins are values between these
 
 # Get the fire occurence day of year for ignitions information 
@@ -162,41 +195,97 @@ JDay       <- FPA_FOD$DISCOVERY_DOY
 JDaysArray <- sort(unique(JDay)) # limited by selected months
 nDays      <- length(JDaysArray)
 
+# Do the same for burn area of fires started by Julian day. 
+# TODO: Do this with dplr or aggreate 
+# TODO: https://stackoverflow.com/questions/7560671/aggregate-data-in-one-column-based-on-values-in-another-column
+JDayBurnArea <- rep(NA, nDays)
+for (j in 1:nDays){
+  # Mask the data by each JDay and count the burn area that occurs from fires
+  # that start on that JDay. 
+  jDayMask        <- FPA_FOD$DISCOVERY_DOY == JDaysArray[j] 
+  JDayBurnArea[j] <- sum(FPA_FOD$FIRE_SIZE[jDayMask])
+}
+cumulative_BA <- cumsum(JDayBurnArea)
+
+
 # Find the edges of the julain day experiment using a histogram of ignition counts
 # by JDay 
 png(filename=paste0(experimentDir, "JDayIgnitionCounts.png"),
     res=250, height=2000, width=3700)
-# All
-hist(JDay, breaks = JDaysArray, main="Julian Day Ignition Counts: 1992-2015", las=1)
+
+par(mar=c(4,5.5,4,8))
+
+# Histrogram of all ignitions by Julian day
+h <- hist(JDay, breaks = JDaysArray, 
+          main="", las=1, xaxt="n", 
+          xlab="", ylab="Ignition Count",
+          cex.lab=1.8)
+title(paste("Ecoregion", ecoName,"ignition counts: 1992-2015"))
 # Non-lightning only 
-hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T, xlim=c(0, 370))
+hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T, xlim=c(0, 370), xaxt="n")
+mtext("Day of year", 1, line=2.4, cex=1.5)
+# TODO: Make this by burn area? That way we are choosing the area based on 
+# TODO: significance? 
 span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
-abline(v=span, col="red", lwd=3)
-legend("topleft", legend=c("Total Ignitions", "Human Ignitions"),
-       fill=c("white", "orange"), bty="n", cex=2)
+abline(v=span, col="gray", lwd=3, lty=3)
+
+# Give this a white background so vertical lines do not go through this text
+legend("topleft", 
+       legend=c("Total Ignitions", "Human Ignitions"),
+       fill=c("white", "orange"), 
+       #bty="n", 
+       box.col="white",
+       cex=2,
+       bg="white"
+       )
+
+# Add a date axis
+t0 <- as.POSIXct("2012-01-01", tz="UTC")
+DOY <- t0 + JDaysArray*24*60^2
+
+axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"))
+# TODO: Also consider axis.Date()
+# TODO: burn area in background on second axis would make compelling argument..
+par(new=TRUE)
+plot(JDaysArray, cumulative_BA, pch=19, col="blue", bty="n", yaxt="n", xaxt="n",
+     ylab="", xlab="")
+eaxis(4)
+mtext("Cumulative Burn Area (Acres)", side=4, col="blue", line=-2, cex=1.5)
+
+# TODO: How do I find the julain days the contain 80% of the data?
+percentOfBurn <- cumulative_BA/max(cumulative_BA)
+x10 <- which.min(abs(percentOfBurn-.10))
+x90 <- which.min(abs(percentOfBurn-.90))
+BA_span <- c(JDaysArray[x10], JDaysArray[x90])
+
+# Shows where 80% of burn area start days are
+abline(v=BA_span, col="blue",lty=3, lwd=3)
 
 dev.off()
 
-print(paste("80% of data is between JDays", span[1], "-", span[2]))
+print(paste("80% of ignitions are between JDays", span[1], "-", span[2]))
+print(paste("80% of BA is between JDays", BA_span[1], "-", BA_span[2]))
 
-
-# Define the range explicitly 
-minJDay <- span[1]
-maxJDay <- span[2]
+# Define the range explicitly
+# NOTE: I am not sure it makes sense to do this, as compared to the whole year 
+# NOTE: story, since we account for JDay as it is. 
+minJDay <- min(JDaysArray) #span[1]
+maxJDay <- max(JDaysArray) #span[2]
 
 # Create expiment data storage arrays
-loopJDays <- seq(minJDay, maxJDay, by = JDayTol) # This is what we loop. These datys and tol gets inbetween 
+# These are what we loop. These datys and tol gets inbetween 
+loopJDays <- seq(minJDay, maxJDay, by = JDayTol) 
 nLoop <- length(loopJDays)
 JDayFireCount <- rep(NA, nLoop)
 
-# Empty storage dataframes creation. Lots of calculations per Julain day chunk
+# Empty storage dataframes creation. Lots of calculations per Julian day chunk
 # needs to be saved for plotting. 
 nCol <- nBins
 a <- array(NA, dim= c(nLoop,  nCol) )
 df_dummy <- data.frame(a)
 row.names(df_dummy) <- loopJDays
 
-# For samples
+# For storing samples
 df_difference_of_means <- df_dummy
 df_sd <- df_dummy
 
@@ -211,6 +300,7 @@ df_L_wilkes_W <- df_dummy
 df_t_test  <- df_dummy
 df_t_upper <- df_dummy
 df_t_lower <- df_dummy
+
 # TODO: Create array to store 95% confidense level values. 
 
 # Loop through each day and perform experiment. Loop by JDayTol so no data is 
@@ -218,40 +308,50 @@ df_t_lower <- df_dummy
 for (i in 1:nLoop){ 
   
   # Subset fires to a given julain day (or maybe range of +-10 or something?)
-  JDayMask <- abs(JDay - loopJDays[i]) <= JDayTol
+  JDayMask <- abs(JDay - loopJDays[i]) <= (JDayTol/2)
   JDayFireCount[i] <- sum(JDayMask)
   
-  # Subset the dataframe by those that are within the JDay tolerance
-  df <- FPA_FOD[JDayMask,]
+  day_left_bound  <- min(JDay[JDayMask])
+  day_right_bound <- max(JDay[JDayMask])
+  
+  print(paste("These data are coming from JDays:", 
+              day_left_bound, "-", day_right_bound))
+  
+  # Subset the dataframe by those that are within the JDay tolerance, l==lightning
+  df    <- FPA_FOD[JDayMask,]
   lMask <- df$STAT_CAUSE_DESCR == "Lightning"
   
   # Default color is orange until seen that it is lightning 
   COL <- rep("orange", sum(JDayMask))
   COL[lMask] <- "gray"
   
+  # Plot the fire on an elevation vs. met variable set of axis. 
   # TODO: boxplot of these data by elevation bin! 
   # TODO: Also show the 
-  jDayFilename <- paste0(dailyDir, "JDay_", loopJDays[i],
-                         "_elevation_vs_",weatherVAR,".png")
-  png(filename=jDayFilename, res=250, height=2000, width=4000)
+  if(TRUE){
+    jDayFilename <- paste0(dailyDir, "JDay_", loopJDays[i],
+                           "_elevation_vs_",weatherVAR,".png")
+    png(filename=jDayFilename, res=250, height=2000, width=4000)
+    
+    plot(df$elevation, df[[weatherVAR]], 
+         xlab="Elevation [m]", ylab=weatherVAR,
+         col=COL, pch=19, cex=0.5, 
+         ylim=c(0, 30))
+    abline(v=elevationBins, lty=2)
+    title(paste("Julain Days in these data:", 
+                day_left_bound, "-", day_right_bound))
   
-  plot(df$elevation, df[[weatherVAR]], 
-       xlab="Elevation [m]", ylab=weatherVAR,
-       col=COL, pch=19, cex=0.5, 
-       ylim=c(0, 30))
-  abline(v=elevationBins, lty=2)
-  title(paste("Julain Day Center:", loopJDays[i], "+-", JDayTol))
-
-  # All elevations difference of means 
-  meanLT <- mean(df[[weatherVAR]][lMask])
-  meanHT <- mean(df[[weatherVAR]][!lMask])
-  
-  abline(h=meanLT, col="gray", lwd=3)
-  abline(h=meanHT, col="orange", lwd=3)
-  
-  allDT <- meanLT - meanHT
-  
-  dev.off()
+    # All elevations difference of means 
+    meanLT <- mean(df[[weatherVAR]][lMask])
+    meanHT <- mean(df[[weatherVAR]][!lMask])
+    
+    abline(h=meanLT, col="gray", lwd=3)
+    abline(h=meanHT, col="orange", lwd=3)
+    
+    allDT <- meanLT - meanHT
+    
+    dev.off()
+  }
   
   # Now account for elevation by separating data by the chosen elevation bins. 
   # IDEA: Adjust temperature based on elevation using standard lapse rate?
@@ -259,10 +359,11 @@ for (i in 1:nLoop){
   
   png(filename = paste0(dailyDir, "JDay_", loopJDays[i],"_sample_elevations.png"),
       width=1000, height=1000, res=200)
+
   # TODO: change this to a density curve and make it easier to read
   hist(sampleElavations[lMask], col=adjustcolor("gray", 0.4) )
   hist(sampleElavations[!lMask], col=adjustcolor("orange", 0.4), add=T)
-  
+
   dev.off()
   
   # Count total in each elevation bin for each ignition type. We will exclude
@@ -354,7 +455,7 @@ for (i in 1:nLoop){
       
     }
     
-  } # end of elvation bin looping 
+  } # end of elevation bin looping 
   
   
 }
@@ -367,19 +468,24 @@ df <- df_difference_of_means
 
 png(filename = paste0(experimentDir, "JDay_diff_Series.png"), 
     width=3600, height=1500, res=250)
-par(mar=c(4,6,4,6))
+par(mar=c(4,6.5,4,6))
 
 # Absolute biggest value in data
 maxValue <- max(abs(range(df, na.rm = T)))
 ylim <- c(maxValue * -1, maxValue)
   
 plot(loopJDays, df[,8], pch="", bty="n", ylim=ylim, 
-     ylab=paste("Detla", weatherVAR),
+     ylab=paste("Ignition", weatherVAR,"| (Lightning - Human)"),
      xlab="Julain Day", 
-     cex.lab=2)
-title(paste("(Mean Lightning Ignition", weatherVAR, 
-            ") - (Mean Human Ignition", weatherVAR,")"),
-      cex.main=2)
+     xaxt="n",
+     cex.lab=1.5)
+
+axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"))
+
+
+# title(paste("(Mean Lightning Ignition", weatherVAR, 
+#             ") - (Mean Human Ignition", weatherVAR,")"),
+#       cex.main=2)
 
 # # Add a nice date axis
 # DATES <- as.Date( (loopJDays-1), origin = "2014-01-01")
@@ -397,11 +503,6 @@ for (r in 1:nLines){ #
   sigMask <- df_t_test[,r] < 0.05
   points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=19)
   
-  # # Add points with errorbars 
-  # arrows(x0=loopJDays, y0= df_t_lower[,r], 
-  #        x1=loopJDays, y1= df_t_upper[,r],
-  #        length=0.05, angle=90, code=3,
-  #        col=lineColors[r])
   
 }
 
