@@ -10,31 +10,29 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-#Lat lon extent for FPA FOD data in the western US
-minLat <- 30
+# #Lat lon extent for FPA FOD data in the western US
+# minLat <- 30
+# maxLat <- 50
+# minLon <- -125
+# maxLon <- -100
+# 
+# # ecoregion
+# ecoregion <- 11.1
+
+# Lat lon extent for FPA FOD data in contiguous US (CONUS)
+minLat <- 25
 maxLat <- 50
 minLon <- -125
-maxLon <- -100
-
+maxLon <- -60
 # ecoregion
-ecoregion <- 11.1
+ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
 
 # Select which environmental variable assigned to fires will be subset by
 # elevation and compared between ignition types
 weatherVAR <- "fuel_moisture_1000hr" # "fuel_moisture_1000hr" "t2m"
 
-# # Lat lon extent for FPA FOD data in contiguous US (CONUS)
-# minLat <- 25
-# maxLat <- 50
-# minLon <- -125
-# maxLon <- -60
-# # ecoregion
-# ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
-
-
 # Season
 includeMonths <- c(1:12)
-
 
 # Min fire size. Recal, even though fire managers view every small fire as a 
 # potentially large fire, in terms on when real emissions occur, there is a 
@@ -202,14 +200,30 @@ nDays      <- length(JDaysArray)
 # Do the same for burn area of fires started by Julian day. 
 # TODO: Do this with dplr or aggreate 
 # TODO: https://stackoverflow.com/questions/7560671/aggregate-data-in-one-column-based-on-values-in-another-column
-JDayBurnArea <- rep(NA, nDays)
+JDayBurnArea_H <- rep(NA, nDays)
+JDayBurnArea_L <- rep(NA, nDays)
 for (j in 1:nDays){
   # Mask the data by each JDay and count the burn area that occurs from fires
   # that start on that JDay. 
   jDayMask        <- FPA_FOD$DISCOVERY_DOY == JDaysArray[j] 
-  JDayBurnArea[j] <- sum(FPA_FOD$FIRE_SIZE[jDayMask])
+  JDayBurnArea_H[j] <- sum(FPA_FOD$FIRE_SIZE[jDayMask & humanMask])
+  JDayBurnArea_L[j] <- sum(FPA_FOD$FIRE_SIZE[jDayMask & lightningMask])
+  
 }
-cumulative_BA <- cumsum(JDayBurnArea)
+
+cumulative_BA_H <- cumsum(JDayBurnArea_H)
+cumulative_BA_L <- cumsum(JDayBurnArea_L)
+cumulative_BA <- cumulative_BA_H + cumulative_BA_L
+
+# Estimate the 10th and 90th percent accumulation of burn area JDays
+get_span <- function(BAC){
+  percentOfBurn <- BAC/max(BAC)
+  x10 <- which.min(abs(percentOfBurn-.10))
+  x90 <- which.min(abs(percentOfBurn-.90))
+  SPAN <- c(JDaysArray[x10], JDaysArray[x90])
+  return(SPAN)
+}
+
 
 
 # Find the edges of the julain day experiment using a histogram of ignition counts
@@ -223,25 +237,18 @@ par(mar=c(4,5.5,4,8))
 h <- hist(JDay, breaks = JDaysArray, 
           main="", las=1, xaxt="n", 
           xlab="", ylab="Ignition Count",
-          cex.lab=1.8)
+          cex.lab=1.8,
+          col="gray")
 title(paste("Ecoregion", ecoName,"ignition counts: 1992-2015"))
+
 # Non-lightning only 
-hist(JDay[!lightningMask], breaks = JDaysArray, col="orange", add=T, xlim=c(0, 370), xaxt="n")
+hist(JDay[!lightningMask], breaks = JDaysArray, 
+     col="orange", add=T, xlim=c(0, 370), xaxt="n")
 mtext("Day of year", 1, line=2.4, cex=1.5)
 # TODO: Make this by burn area? That way we are choosing the area based on 
 # TODO: significance? 
 span <- as.numeric(quantile(JDay, c(0.10, 0.90) ) ) 
-abline(v=span, col="gray", lwd=3, lty=3)
-
-# Give this a white background so vertical lines do not go through this text
-legend("topleft", 
-       legend=c("Total Ignitions", "Human Ignitions"),
-       fill=c("white", "orange"), 
-       #bty="n", 
-       box.col="white",
-       cex=2,
-       bg="white"
-       )
+#abline(v=span, col="black", lwd=3, lty=3)
 
 # Add a date axis
 t0 <- as.POSIXct("2012-01-01", tz="UTC")
@@ -251,19 +258,26 @@ axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"))
 # TODO: Also consider axis.Date()
 # TODO: burn area in background on second axis would make compelling argument..
 par(new=TRUE)
-plot(JDaysArray, cumulative_BA, pch=19, col="blue", bty="n", yaxt="n", xaxt="n",
-     ylab="", xlab="")
+plot(JDaysArray, cumulative_BA_L, pch=19, col="gray", bty="n", yaxt="n", xaxt="n",
+     ylab="", xlab="", type="l", lwd=5)
+lines(JDaysArray, cumulative_BA_H, col="orange", pch=19, lwd=5)
+
 eaxis(4)
-mtext("Cumulative Burn Area (Acres)", side=4, col="blue", line=-2, cex=1.5)
+mtext("Cumulative Burn Area (Acres) -", side=4, col="black", line=-2, cex=1.5)
 
-# TODO: How do I find the julain days the contain 80% of the data?
-percentOfBurn <- cumulative_BA/max(cumulative_BA)
-x10 <- which.min(abs(percentOfBurn-.10))
-x90 <- which.min(abs(percentOfBurn-.90))
-BA_span <- c(JDaysArray[x10], JDaysArray[x90])
+# Show date of 10% and 90th percent of burn area met for both ignitions
+abline(v=get_span(cumulative_BA_L), col="gray",lty=3, lwd=3)
+abline(v=get_span(cumulative_BA_H), col="orange",lty=3, lwd=3)
 
-# Shows where 80% of burn area start days are
-abline(v=BA_span, col="blue",lty=3, lwd=3)
+# Give this a white background so vertical lines do not go through this text
+legend("topleft", 
+       legend=c("Total Ignitions", "Human Ignitions"),
+       fill=c("gray", "orange"), 
+       #bty="n", 
+       box.col="white",
+       cex=2,
+       bg="white"
+)
 
 dev.off()
 
