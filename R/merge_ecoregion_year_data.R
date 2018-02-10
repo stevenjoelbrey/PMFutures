@@ -64,6 +64,9 @@ FPA_FOD_merged$STATE <- as.character(FPA_FOD_merged$STATE)
 FPA_FOD_merged$NA_L2CODE[FPA_FOD_merged$STATE == "HI"] <- 0
 FPA_FOD_merged$NA_L2CODE[FPA_FOD_merged$STATE == "PR"] <- 0
 
+# Make "STAT_CAUSE_DESCR" charactors, not factors
+FPA_FOD_merged$STAT_CAUSE_DESCR <- as.character(FPA_FOD_merged$STAT_CAUSE_DESCR)
+
 print("Number of fires with no ecoregion assignment made:")
 print(sum(is.na(FPA_FOD_merged$NA_L2CODE)))
 
@@ -102,6 +105,17 @@ plot(fireLocations[FPA_FOD_merged$NA_L2CODE==9.4,], add=T, col="salmon",pch=".")
 plot(fireLocations[FPA_FOD_merged$NA_L2CODE==5.2,], add=T, col="light blue",pch=".")
 
 map("state", add=T)
+
+# Check state location situation
+plot(fireLocations[FPA_FOD_merged$STATE=="AK",], add=T, col="black",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="HI",], add=T, col="red",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="PR",], add=T, col="green",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="CO",], add=T, col="green",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="MI",], add=T, col="green",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="CA",], add=T, col="green",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="WA",], add=T, col="green",pch=".")
+plot(fireLocations[FPA_FOD_merged$STATE=="WY",], add=T, col="green",pch=".")
+
 
 FPA_FOD <- FPA_FOD_merged
 save(FPA_FOD, file=paste0("Data/FPA_FOD/FPA_FOD_",startYear,"_",endYear,"_eco.RData"))
