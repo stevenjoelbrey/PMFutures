@@ -8,6 +8,10 @@ if(length(args)==0){
   year2 <- args[2]
 }
 
+# TODO: Figure out why those 2 small fires in Wisconsin do not get gridMet vars
+# TODO: assigned. 
+
+# TODO: Assign temperature, wind speed, and RH using these data. 
 
 #------------------------------- Description -----------------------------------
 # This script takes the merged FPA FOD fire data created by 
@@ -16,7 +20,9 @@ if(length(args)==0){
 # Data description: http://www.climatologylab.org/gridmet.html
 #
 # DataURL: https://www.northwestknowledge.net/metdata/data/
-
+#
+# NOTE: Great care was taken to make sure assignment method is optimal in 
+# NOTE: "R/assign_ecmwf_reanalysis_to_FPA_FOD.R"
 
 
 library(stringr)
@@ -121,7 +127,7 @@ FPA_FOD$fuel_moisture_1000hr <- fm1000_assigned
 
 # Save the appended dataframe
 saveName <- paste0("Data/FPA_FOD/FPA_FOD_gridMet_",year1, "-", year2, ".RData")
-save(FPA_FOD, file="gridMet_test.RData")
+save(FPA_FOD, file=saveName)
 
 # plot a slize of these assigned data, for July, to see if they make sense  
 library(ggplot2)
@@ -139,7 +145,7 @@ dev.off()
 
 
 # Make fire location color depend on fuel_moisture_1000hr
-pdf(file="fire_fm1000_mapped_january.pdf", width=15, height=10)
+pdf(file="Figures/fire_fm1000_mapped_january.pdf", width=15, height=10)
 
 df_plot <- FPA_FOD[FPA_FOD$START_MONTH==1 & !noMetGRID,]
 ggplot(df_plot, aes(x=LONGITUDE, y=LATITUDE, color=fuel_moisture_1000hr)) + 
