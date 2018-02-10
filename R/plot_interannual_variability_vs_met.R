@@ -26,10 +26,10 @@ minLon <- -125
 maxLon <- -100
 
 year1 <- 1992
-year2 <- 2015 # extent of current FPA-FOD, will be 2015 soon. 
+year2 <- 2015 
 ecoregion_select <- 11.1
 state_select <- 7 #c("Washington", "Oregon", "Montana") # coming soon
-month_select  <- 5:12
+month_select  <- 5:10
 
 years  <- year1:year2
 nYears <- length(years)
@@ -53,6 +53,11 @@ if(!dir.exists(figureDir)){
 # TODO: load the one with weather and make sure they match! 
 load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_", year1,"_", year2,".RData"))
 
+# Get rid of fires that have "Missing/Undefined" start types, cleaner analysis
+# with fewer assumptions. 
+HasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
+FPA_FOD <- FPA_FOD[HasStartInfo,]
+
 # Get fire parameters too be used in subsetting the data 
 fireDate      <- FPA_FOD$DISCOVERY_DATE
 fireLat       <- FPA_FOD$LATITUDE
@@ -64,7 +69,7 @@ fireMonth     <- lubridate::month(fireDate)
 fireSize      <- FPA_FOD$FIRE_SIZE
 
 # Handy arrays
-humanStart <- fireCause != "Lightning"
+humanStart <- fireCause != "Lightning" # because "Missing" have been removed
 nFires     <- length(fireSize)
 
 # Load ecoregion borders, for plotting, analysis etc. 
@@ -182,6 +187,10 @@ lines(monthlyTimeArray, FPA_BA_human_m, col="orange")
 title(paste("Monthly Burn area in ecoregion", ecoregion_select),
       cex.main=2)
 
+# We also want to show how well these lines ar correlated, that is the point of
+# this plot.
+r_cor <- cor(FPA_BA_lightning_m, FPA_BA_human_m, method="spearman")
+r_cor_pretty <- round(r_cor,2)
 
 legend("topleft",
        bty="n",
@@ -190,6 +199,13 @@ legend("topleft",
        col=c("Orange", "gray"),
        cex=1.3
        )
+
+legend("topright",
+       bty="n",
+       legend=paste0("r =", r_cor_pretty),
+       cex=1.3
+       )
+
 
 dev.off()
 }
@@ -202,7 +218,7 @@ png(filename=paste0(figureDir,"FPA_FOD_interannual_variability_mapped_",
                     ".png"),
     height=2000, width=4800, res=250)
 
-par(mfrow=c(1,2), xpd=T, mar=c(4,10,4,0))
+par(mfrow=c(1,1), xpd=T, mar=c(4,10,4,0))
 
 maxValue <- max(c(FPA_BA_lightning/10^6, FPA_BA_human/10^6))
 
@@ -210,6 +226,8 @@ maxValue <- max(c(FPA_BA_lightning/10^6, FPA_BA_human/10^6))
 # figure)
 
 r_annual <- cor(FPA_BA_lightning, FPA_BA_human, method="spearman")
+r_annual_pretty <- round(r_annual, 2)
+
 
 plot(years, FPA_BA_lightning/10^6, col="gray", 
      pch=19, bty="n", yaxt="n", xaxt="n",
@@ -235,49 +253,50 @@ legend("topleft",
        bty = "n"
        )
 
-title(paste("r = ", r_annual), line=-2)
+title(paste("Spearman correlation = ", r_annual_pretty), line=0, 
+      cex.main=2.5)
 
-# Map the fires in the time series
-# TODO: make sure to plot the fires in ascending size! That way we can see small
-# TODO: fires next to big fires. 
-
-par(xpd=F, mar=c(4,4,4,4))
-
-monthMask      <- fireMonth %in% month_select
-ecoRegionMask  <- fireEcoregion == ecoregion_select
-
-humanLocations <- monthMask & ecoRegionMask & humanStart
-
-plot(FPA_FOD$LONGITUDE[humanLocations], FPA_FOD$LATITUDE[humanLocations], 
-     cex=sizeClass[humanLocations],
-     col=adjustcolor("orange", 0.5), pch=1,
-     bty="n", xaxt="n", yaxt="n",
-     ylab="",
-     xlab="")
-
-map("state", add=T)
-
-lightningLocations <- monthMask & ecoRegionMask & !humanStart
-
-points(FPA_FOD$LONGITUDE[lightningLocations], FPA_FOD$LATITUDE[lightningLocations], 
-       cex=sizeClass[lightningLocations],
-       col=adjustcolor("gray",0.5), pch=1,
-       bty="n", xaxt="n", yaxt="n",
-       ylab="",
-       xlab="")
-
-# Show the ecoregion border 
-plot(ecoregion_polygon, add=T, lty=1, border="lightgray")
-
-legend("bottomleft", bty="n",
-       #title="Acres",
-       inset=c(0,0),
-       xpd=TRUE,
-       legendText,
-       pt.cex=cexBins[2:(nBins-1)],
-       pch=1,
-       col="black",
-       horiz=F)
+# # Map the fires in the time series
+# # TODO: make sure to plot the fires in ascending size! That way we can see small
+# # TODO: fires next to big fires. 
+# 
+# par(xpd=F, mar=c(4,4,4,4))
+# 
+# monthMask      <- fireMonth %in% month_select
+# ecoRegionMask  <- fireEcoregion == ecoregion_select
+# 
+# humanLocations <- monthMask & ecoRegionMask & humanStart
+# 
+# plot(FPA_FOD$LONGITUDE[humanLocations], FPA_FOD$LATITUDE[humanLocations], 
+#      cex=sizeClass[humanLocations],
+#      col=adjustcolor("orange", 0.5), pch=1,
+#      bty="n", xaxt="n", yaxt="n",
+#      ylab="",
+#      xlab="")
+# 
+# map("state", add=T)
+# 
+# lightningLocations <- monthMask & ecoRegionMask & !humanStart
+# 
+# points(FPA_FOD$LONGITUDE[lightningLocations], FPA_FOD$LATITUDE[lightningLocations], 
+#        cex=sizeClass[lightningLocations],
+#        col=adjustcolor("gray",0.5), pch=1,
+#        bty="n", xaxt="n", yaxt="n",
+#        ylab="",
+#        xlab="")
+# 
+# # Show the ecoregion border 
+# plot(ecoregion_polygon, add=T, lty=1, border="lightgray")
+# 
+# legend("bottomleft", bty="n",
+#        #title="Acres",
+#        inset=c(0,0),
+#        xpd=TRUE,
+#        legendText,
+#        pt.cex=cexBins[2:(nBins-1)],
+#        pch=1,
+#        col="black",
+#        horiz=F)
 
 dev.off()
 
