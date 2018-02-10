@@ -10,24 +10,31 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-# Lat lon extent for FPA FOD data in the western US
-# minLat <- 30
-# maxLat <- 50
-# minLon <- -125
-# maxLon <- -100
-
-# Lat lon extent for FPA FOD data in contiguous US
-minLat <- 25
+#Lat lon extent for FPA FOD data in the western US
+minLat <- 30
 maxLat <- 50
 minLon <- -125
-maxLon <- -60
+maxLon <- -100
+
+# ecoregion
+ecoregion <- 11.1
+
+# Select which environmental variable assigned to fires will be subset by
+# elevation and compared between ignition types
+weatherVAR <- "fuel_moisture_1000hr" # "fuel_moisture_1000hr" "t2m"
+
+# # Lat lon extent for FPA FOD data in contiguous US (CONUS)
+# minLat <- 25
+# maxLat <- 50
+# minLon <- -125
+# maxLon <- -60
+# # ecoregion
+# ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
+
 
 # Season
 includeMonths <- c(1:12)
 
-# ecoregion 
-#ecoregion <- 6.2 
-ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
 
 # Min fire size. Recal, even though fire managers view every small fire as a 
 # potentially large fire, in terms on when real emissions occur, there is a 
@@ -172,9 +179,6 @@ dev.off()
 # Sample mean differences vs. Julain day
 ################################################################################
 
-# Select which environmental variable assigned to fires will be subset by
-# elevation and compared between ignition types
-weatherVAR <- "t2m"
 
 # Time difference tolerance in JDays for fires to be comparable
 # Sets the size for a batch of days where I consider season to be accounted for 
@@ -182,7 +186,7 @@ JDayTol       <- 20
 
 # How many fires of each ignition type are required for us to compare them at a 
 # given JDay window and elevation bin.
-minSampleSize <- 50 
+minSampleSize <- 10 
 
 # The elevation bins. We make the assumption that locations within these bins
 # will not have different temperatures that can be entirely explained by 
@@ -301,7 +305,6 @@ df_t_test  <- df_dummy
 df_t_upper <- df_dummy
 df_t_lower <- df_dummy
 
-# TODO: Create array to store 95% confidense level values. 
 
 # Loop through each day and perform experiment. Loop by JDayTol so no data is 
 # used more than once.  
@@ -357,14 +360,14 @@ for (i in 1:nLoop){
   # IDEA: Adjust temperature based on elevation using standard lapse rate?
   sampleElavations <- df$elevation
   
-  png(filename = paste0(dailyDir, "JDay_", loopJDays[i],"_sample_elevations.png"),
-      width=1000, height=1000, res=200)
-
-  # TODO: change this to a density curve and make it easier to read
-  hist(sampleElavations[lMask], col=adjustcolor("gray", 0.4) )
-  hist(sampleElavations[!lMask], col=adjustcolor("orange", 0.4), add=T)
-
-  dev.off()
+  # png(filename = paste0(dailyDir, "JDay_", loopJDays[i],"_sample_elevations.png"),
+  #     width=1000, height=1000, res=200)
+  # 
+  # # TODO: change this to a density curve and make it easier to read
+  # hist(sampleElavations[lMask], col=adjustcolor("gray", 0.4) )
+  # hist(sampleElavations[!lMask], col=adjustcolor("orange", 0.4), add=T)
+  # 
+  # dev.off()
   
   # Count total in each elevation bin for each ignition type. We will exclude
   # the bins where there are not enough of each type
@@ -387,18 +390,18 @@ for (i in 1:nLoop){
       elevMask <- sampleElavations >= elevationBins[m] & 
                   sampleElavations < elevationBins[m+1]
       
-      # We need to know if the eleation distributions within this bin look 
-      # alike. Elevation differences could still explain small differences
-      # in temperature or other variable. 
-      png(filename=paste0(binnedDir, "JDay_",loopJDays[i], "_",
-                          elevationBins[m],"-", elevationBins[m],".png"),
-          res=250, height=1000, width=1000)
-      
-      hist(sampleElavations[elevMask & lMask], col=adjustcolor("gray", 0.4),
-           xlab="Ignition Elevations")
-      hist(sampleElavations[elevMask & !lMask], add=T, col=adjustcolor("orange", 0.4))
-      
-      dev.off()
+      # # We need to know if the eleation distributions within this bin look 
+      # # alike. Elevation differences could still explain small differences
+      # # in temperature or other variable. 
+      # png(filename=paste0(binnedDir, "JDay_",loopJDays[i], "_",
+      #                     elevationBins[m],"-", elevationBins[m],".png"),
+      #     res=250, height=1000, width=1000)
+      # 
+      # hist(sampleElavations[elevMask & lMask], col=adjustcolor("gray", 0.4),
+      #      xlab="Ignition Elevations")
+      # hist(sampleElavations[elevMask & !lMask], add=T, col=adjustcolor("orange", 0.4))
+      # 
+      # dev.off()
       
       # Subset the data by elevation. Make these arrays ready to use. From here
       # forward in JDayLoop:
@@ -407,11 +410,11 @@ for (i in 1:nLoop){
       H <- df[[weatherVAR]][elevMask & !lMask]
       L <- df[[weatherVAR]][elevMask & lMask]
       
-      # mean human Temperature sample  
+      # mean human ignited location weatherVAR sample  
       meanHTs <- mean(H)
       sdHTs   <- sd(H)
       
-      # mean lightning Temperature sample 
+      # mean lightning weatherVAR sample 
       meanLTs <- mean(L)
       sdLTs   <- sd(L)
       
@@ -462,102 +465,127 @@ for (i in 1:nLoop){
 
 ################################################################################
 # Plot up these differences over Julain dates, one elevation curve at a time
+# TODO: ggplot2, size of dot related to sample size!!!
 ################################################################################
 library(fields)
-df <- df_difference_of_means
 
-png(filename = paste0(experimentDir, "JDay_diff_Series.png"), 
+# Label colums with bin mid-point elevation
+elev_labs <- elevationBins[1:nBins] + mean(diff(elevationBins))/2
+
+df <- df_difference_of_means
+colnames(df) <- as.character(elev_labs)
+
+
+png(filename = paste0(experimentDir, "JDay_diff_Series_",weatherVAR,".png"), 
     width=3600, height=1500, res=250)
 par(mar=c(4,6.5,4,6))
 
 # Absolute biggest value in data
 maxValue <- max(abs(range(df, na.rm = T)))
-ylim <- c(maxValue * -1, maxValue)
+minValue <- min(range(df, na.rm = T))
+ylim <- c(minValue, maxValue)
   
-plot(loopJDays, df[,8], pch="", bty="n", ylim=ylim, 
-     ylab=paste("Ignition", weatherVAR,"| (Lightning - Human)"),
+
+if(weatherVAR == "fuel_moisture_1000hr"){
+  niceYLab <- "1000-hr dead fuel moisture %"
+} else if (weatherVAR=="t2m"){
+  niceYLab <- "2-meter T [C]"
+}
+
+plot(loopJDays, df[,8], 
+     pch="", bty="n", 
+     ylim=ylim, 
+     ylab=paste(niceYLab,"\n(Lightning - Human)"),
      xlab="Julain Day", 
      xaxt="n",
-     cex.lab=1.5)
+     cex.lab=2, 
+     las=1)
 
-axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"))
+axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"), cex=2)
 
 
 # title(paste("(Mean Lightning Ignition", weatherVAR, 
 #             ") - (Mean Human Ignition", weatherVAR,")"),
 #       cex.main=2)
 
-# # Add a nice date axis
-# DATES <- as.Date( (loopJDays-1), origin = "2014-01-01")
-# axis(1, at=loopJDays, labels=DATES, lines=4)
-
-# Place lines for different elevation bands on blank plot 
+# Place lines for different elevation bands on blank plot, elevation bands
+# are represented by the number of columns. Time is rows. 
 nLines <- dim(df)[2]
 lineColors <- terrain.colors(nLines)
 
 for (r in 1:nLines){ # 
   
-  lines(loopJDays, df[,r], col=lineColors[r], lwd=2, lty=2)
-  
   # Place points where significantly different from zero 
   sigMask <- df_t_test[,r] < 0.05
-  points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=19)
+  points(loopJDays[sigMask], df[,r][sigMask], col=lineColors[r], pch=19, cex=2)
   
+  # Now plot the points where the sigMask has p-value above 0.05
+  points(loopJDays[!sigMask], df[,r][!sigMask], col=lineColors[r], pch=1, cex=2)
+  
+  # # Add lines to make connexting the dots easier, also messing looking. 
+  # lines(loopJDays, df[,r], col=lineColors[r], lwd=2, lty=2)
   
 }
 
 abline(h=0, lwd=1, lty=2)
 
 # Legend to understand the colors relation to elevation
-image.plot( legend.only=TRUE, zlim= range(elevationBins), col=lineColors) 
+fields::image.plot( legend.only=TRUE, 
+                    zlim= range(elevationBins), 
+                    col=lineColors,
+                    #legend.lab="Elevation [m]",
+                    line=3,
+                    bg="transparent") 
+
+mtext("Elevation [m]", side=4, line=-1, xpd=T, cex=2)
 
 dev.off()
 
-################################################################################
-# Histogram of differences chunked by Julain day and elevation
-################################################################################
-
-# # Skip columns (height bins) that are all NA, i.e. sample sizes were never 50
-# # for each type of ignition on each day. 
-nCol   <- dim(df_difference_of_means)[2]
-# useCol <- rep(TRUE, nCol)
-# for (x in 1:nCol){
-#   is.na(unique(df_difference_of_means[, 1]))
+# ################################################################################
+# # Histogram of differences chunked by Julain day and elevation
+# ################################################################################
+# 
+# # # Skip columns (height bins) that are all NA, i.e. sample sizes were never 50
+# # # for each type of ignition on each day. 
+# nCol   <- dim(df_difference_of_means)[2]
+# # useCol <- rep(TRUE, nCol)
+# # for (x in 1:nCol){
+# #   is.na(unique(df_difference_of_means[, 1]))
+# # }
+# 
+# # TODO: Show the total number of fires that went into the calculation for
+# # TODO: each elevation bin. Segregated by ignition type. 
+# # TODO: Need objective way to determine which columns (height bins) are to be
+# # TODO: looped and plotted. 
+# 
+# # What elevation bins have enough values to plot? 
+# for (i in 1:nCol){
+#   
+#   DT <- df_difference_of_means[, i]
+#   
+#   if (sum(is.na(DT)) < nLoop){
+#     
+#     # Figure out the correct elevation bin associated with each row. 
+#     binLabel <- paste(elevationBins[i], "-", elevationBins[i+1], "meters")
+#     
+#     # There is non NA data to make the histogram 
+#     png(filename=paste0(experimentDir,"diffence_of_means_elevation_bin=",
+#                         binLabel,".png"), 
+#         width=1000, height=1000, res=250)
+#     par(mfrow=c(1,1), las=1)
+#     
+#     # Show consistent size of hist 
+#     hist(DT, xlim=c(-5,5), ylim = c(0, 40),
+#          main="", ylab="", xlab="(T_lightning - T_human) [C]", 
+#          col=lineColors[i])
+#     abline(v=0, lty=2)
+#     title(binLabel)
+#     
+#     dev.off()
+#     
+#   }
+#   
 # }
-
-# TODO: Show the total number of fires that went into the calculation for
-# TODO: each elevation bin. Segregated by ignition type. 
-# TODO: Need objective way to determine which columns (height bins) are to be
-# TODO: looped and plotted. 
-
-# What elevation bins have enough values to plot? 
-for (i in 1:nCol){
-  
-  DT <- df_difference_of_means[, i]
-  
-  if (sum(is.na(DT)) < nLoop){
-    
-    # Figure out the correct elevation bin associated with each row. 
-    binLabel <- paste(elevationBins[i], "-", elevationBins[i+1], "meters")
-    
-    # There is non NA data to make the histogram 
-    png(filename=paste0(experimentDir,"diffence_of_means_elevation_bin=",
-                        binLabel,".png"), 
-        width=1000, height=1000, res=250)
-    par(mfrow=c(1,1), las=1)
-    
-    # Show consistent size of hist 
-    hist(DT, xlim=c(-5,5), ylim = c(0, 40),
-         main="", ylab="", xlab="(T_lightning - T_human) [C]", 
-         col=lineColors[i])
-    abline(v=0, lty=2)
-    title(binLabel)
-    
-    dev.off()
-    
-  }
-  
-}
 
 
 # ################################################################################
