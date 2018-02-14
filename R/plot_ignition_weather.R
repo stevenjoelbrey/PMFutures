@@ -15,8 +15,8 @@ library(sfsmisc)
 # maxLat <- 50
 # minLon <- -125
 # maxLon <- -100
-# 
-# # ecoregion
+
+# ecoregion
 # ecoregion <- 11.1
 
 # Lat lon extent for FPA FOD data in contiguous US (CONUS)
@@ -26,6 +26,8 @@ minLon <- -125
 maxLon <- -60
 # ecoregion
 ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
+
+
 
 # Select which environmental variable assigned to fires will be subset by
 # elevation and compared between ignition types
@@ -47,7 +49,7 @@ if(length(ecoregion)>1){
 }else{
   ecoName <- ecoregion
 }
-experimentVARS <- paste0("ecoregion=", ecoName,"_",
+experimentVARS <- paste0("ecoregion=", ecoName,"_", #"west_",
                          "months=", min(includeMonths), "-", max(includeMonths), "_",
                          "sizeMin=", minFireSize
                          )
@@ -129,16 +131,16 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
   plot(dHuman$x, dHuman$y, 
        type="l", col='orange',
        xlab=varLabel,
-       ylab="", 
        ylim=c(0, maxVal),
        lwd=4,
        bty="n", 
        cex.axis=2,
        cex.lab=2,
-       yaxt="n")
+       yaxt="n",
+       ylab="")
   eaxis(2, cex.axis=2)
   
-  mtext("Probability Density", 2,  line=5, cex=2)
+  mtext("Probability\nDensity   ", 2,  line=5, cex=2)
   
   lines(dLightning$x, dLightning$y, col="darkgray", lwd=4)
   
@@ -162,13 +164,13 @@ plot_ignition_weather_distribution <- function(VAR="t2m", varLabel, humanMask){
 # for all elevations and days to motivated subset comparison
 png(filename=paste0(experimentDir, "t2m_distribution_all.png"),
     width=2500, height=2200, res=250)
-par(mar=c(5,5,5,5))
+par(mar=c(5,8,5,5))
 plot_ignition_weather_distribution("t2m", "Temperature [C]", humanMask)
 dev.off()
 
 png(filename=paste0(experimentDir, "fm1000_distribution_all.png"),
-    width=2500, height=2200, res=250)
-par(mar=c(5,5,5,5))
+    width=2900, height=2200, res=250)
+par(mar=c(5,15,5,5))
 plot_ignition_weather_distribution("fuel_moisture_1000hr", "1000-hr fuel moisture %", humanMask)
 dev.off()
 
@@ -258,7 +260,13 @@ axis(1, at=JDaysArray, labels=format(DOY, "%m/%d"))
 # TODO: Also consider axis.Date()
 # TODO: burn area in background on second axis would make compelling argument..
 par(new=TRUE)
-plot(JDaysArray, cumulative_BA_L, pch=19, col="gray", bty="n", yaxt="n", xaxt="n",
+
+# Set up the ylim, because sometimes there is more burn area from humanm ignited
+yMax <- max(c(cumulative_BA_L, cumulative_BA_H))
+
+plot(JDaysArray, cumulative_BA_L, 
+     ylim=c(0, yMax),
+     pch=19, col="gray", bty="n", yaxt="n", xaxt="n",
      ylab="", xlab="", type="l", lwd=5)
 lines(JDaysArray, cumulative_BA_H, col="orange", pch=19, lwd=5)
 
@@ -271,7 +279,7 @@ abline(v=get_span(cumulative_BA_H), col="orange",lty=3, lwd=3)
 
 # Give this a white background so vertical lines do not go through this text
 legend("topleft", 
-       legend=c("Total Ignitions", "Human Ignitions"),
+       legend=c("Lightning Ignitions", "Human Ignitions"),
        fill=c("gray", "orange"), 
        #bty="n", 
        box.col="white",
@@ -281,8 +289,8 @@ legend("topleft",
 
 dev.off()
 
-print(paste("80% of ignitions are between JDays", span[1], "-", span[2]))
-print(paste("80% of BA is between JDays", BA_span[1], "-", BA_span[2]))
+# print(paste("80% of ignitions are between JDays", span[1], "-", span[2]))
+# print(paste("80% of BA is between JDays", span[1], "-", BA_span[2]))
 
 # Define the range explicitly
 # NOTE: I am not sure it makes sense to do this, as compared to the whole year 
@@ -510,7 +518,7 @@ plot(loopJDays, df[,8],
      pch="", bty="n", 
      ylim=ylim, 
      ylab=paste(niceYLab,"\n(Lightning - Human)"),
-     xlab="Julain Day", 
+     xlab="Day of Year", 
      xaxt="n",
      cex.lab=2, 
      las=1)

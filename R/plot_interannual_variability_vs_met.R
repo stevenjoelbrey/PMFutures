@@ -29,7 +29,7 @@ year1 <- 1992
 year2 <- 2015 
 ecoregion_select <- 11.1
 state_select <- 7 #c("Washington", "Oregon", "Montana") # coming soon
-month_select  <- 5:10
+month_select  <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN!
 
 years  <- year1:year2
 nYears <- length(years)
@@ -147,68 +147,6 @@ for (i in 1:nYears){
   
 }
 
-################################################################################
-# Plot Monthly time series of burn area
-################################################################################
-if(FALSE){
-png(filename=paste0(figureDir,"FPA_FOD_monthly_timeSeries_",
-                ecoregion_select,".png"),
-    height=2000, width=3000, res=250)
-
-par(mar=c(4,8,4,4), lty=1, cex=2)
-
-# Set the limits on the y-axis for the plot so we can create a correct sized
-# blank. 
-yMin <- min( c(FPA_BA_human_m, FPA_BA_lightning_m) )
-yMax <- max( c(FPA_BA_human_m, FPA_BA_lightning_m) )
-
-# Create the blank space (baby, I'll right your name)
-plot(monthlyTimeArray, FPA_BA_lightning_m, col="gray", 
-     bty="n", yaxt="n", xaxt="n",
-     ylab="", xlab="", cex=1,
-     ylim = c(yMin, yMax),
-     xlim = c(min(monthlyTimeArray), max(monthlyTimeArray)),
-     pch="")
-lines(monthlyTimeArray, FPA_BA_lightning_m, col="gray")
-
-# Label the x-axis
-BY <- seq(1, length(monthlyTimeArray), by = 12)
-axis(1, at = monthlyTimeArray[BY], labels = years)
-
-
-# vertical axis
-eaxis(2)
-mtext("Acres Burned", side=2, line=5, cex=2)
-
-# Human
-#points(monthlyTimeArray, FPA_BA_human_m, col="orange", pch=1)
-lines(monthlyTimeArray, FPA_BA_human_m, col="orange")
-
-title(paste("Monthly Burn area in ecoregion", ecoregion_select),
-      cex.main=2)
-
-# We also want to show how well these lines ar correlated, that is the point of
-# this plot.
-r_cor <- cor(FPA_BA_lightning_m, FPA_BA_human_m, method="spearman")
-r_cor_pretty <- round(r_cor,2)
-
-legend("topleft",
-       bty="n",
-       legend=c("Human", "Lightning"),
-       pch= 19,
-       col=c("Orange", "gray"),
-       cex=1.3
-       )
-
-legend("topright",
-       bty="n",
-       legend=paste0("r =", r_cor_pretty),
-       cex=1.3
-       )
-
-
-dev.off()
-}
 
 ################################################################################
 # Plot Interannual variability over time for selected months 
@@ -245,15 +183,15 @@ lines(years, FPA_BA_human/10^6, col="orange", lty=2)
 
 
 legend("topleft",
-       legend=c("Lightning", "Human"),
+       legend=c("Lightning", "Human", paste("r =", r_annual_pretty) ),
        pch=19,
        pt.cex=2,
-       col=c("gray", "orange"),
-       cex=2,
+       col=c("gray", "orange","transparent"),
+       cex=2.7,
        bty = "n"
        )
 
-title(paste("Spearman correlation = ", r_annual_pretty), line=0, 
+title(paste("Ecoregion", ecoregion_select), line=0, 
       cex.main=2.5)
 
 # # Map the fires in the time series
@@ -478,12 +416,16 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
 
   yLab <- str_replace(yLab, " ", "\n")
   
+  YMAX <- max( c(y1, y2), na.rm=T)
+  
   png(filename=f, width=1700, height=1400, res=300)
   par(mar=c(4,8,4,4))
   
   plot(x, y1, pch=19, cex=1.8,
        col="gray", bty="n", yaxt="n",
-       ylab="", xlab="")
+       ylab="", xlab="",
+       ylim=c(0,YMAX)
+       )
   mtext(xLab, side=1, line = 2)
   mtext(yLab, side=2, line = 4.5, las=1)
   
