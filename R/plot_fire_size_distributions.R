@@ -39,7 +39,10 @@ latMask <- fireLat <= maxLat & fireLat >= minLat
 lonMask <- fireLon <= maxLon & fireLon >= minLon
 spatialMask <- latMask & lonMask
 
-FPA_FOD <- FPA_FOD[spatialMask,]
+# Also, mask out fires with "Unknown/Undefined" cause. 
+hasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
+
+FPA_FOD <- FPA_FOD[spatialMask & hasStartInfo,]
 
 # Extract key pieces of FPA-FOD data 
 burn_area     <- FPA_FOD$FIRE_SIZE
@@ -180,6 +183,7 @@ for (i in 1:nBins){
 
 }
 
+
 # Plot and save the figure 
 
 fileName <- paste0("Figures/burn_area_comparison/",
@@ -207,6 +211,16 @@ lines(acre_bins, percent_human, lwd=4, col="orange")
 lightningPercent <- round(percent_lightning[nBins], 1)
 humanPercent     <- round(percent_human[nBins], 1)
 
+legend("topleft",
+       bty="n",
+       legend=c("Lightning-ignition",
+                "Human-ignition",
+                "Combined"),
+       lty=1,
+       col=c("orange", "gray","black"),
+       cex=2,
+       lwd=4
+       )
 
 text(acre_bins[nBins], percent_lightning[nBins]+3, labels=paste(lightningPercent, "%"), col="gray", cex=2, xpd=T)
 text(acre_bins[nBins], percent_human[nBins]+3, labels=paste(humanPercent, "%"), col="orange", cex=2, xpd=T)
