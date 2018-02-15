@@ -53,7 +53,8 @@ df       <- read.delim(dataFile, header=FALSE, sep=",")
 
 # Now load the file that has the headers (could only export a few rows as csv
 # because Microsoft Access is garbage.)
-headers_csv <- read.csv(paste0(drive, "Fires_from_accdb_headers.csv")) 
+headers_csv <- read.csv(paste0(drive, "Fires_from_accdb_headers.csv"), 
+                        stringsAsFactors = FALSE) 
 
 # assign these names to df. They came from the same place. 
 names(df) <- names(headers_csv)
