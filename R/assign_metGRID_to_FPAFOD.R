@@ -133,7 +133,7 @@ save(FPA_FOD, file=saveName)
 library(ggplot2)
 
 # Make fire location color depend on fuel_moisture_1000hr
-pdf(file="fire_fm1000_mapped_julys.pdf", width=15, height=10)
+png(filename="Figures/fire_fm1000_mapped_julys.png", width=3000, height=2000, res=250)
 
 df_plot <- FPA_FOD[FPA_FOD$START_MONTH==7 & !noMetGRID,]
 ggplot(df_plot, aes(x=LONGITUDE, y=LATITUDE, color=fuel_moisture_1000hr)) + 
@@ -145,7 +145,7 @@ dev.off()
 
 
 # Make fire location color depend on fuel_moisture_1000hr
-pdf(file="Figures/fire_fm1000_mapped_january.pdf", width=15, height=10)
+png(file="Figures/fire_fm1000_mapped_january.png", width=3000, height=2000, res=250)
 
 df_plot <- FPA_FOD[FPA_FOD$START_MONTH==1 & !noMetGRID,]
 ggplot(df_plot, aes(x=LONGITUDE, y=LATITUDE, color=fuel_moisture_1000hr)) + 
