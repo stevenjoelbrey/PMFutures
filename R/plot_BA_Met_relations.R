@@ -19,20 +19,22 @@ maxLon <- -100
 
 year1 <- 1992
 year2 <- 2015 
-ecoregion_select <- 6.2
-ecoregion_name   <- "Forested mountains" 
-month_select  <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
-minSize <- 1000 # acres
-
+ecoregion_select <- 10.1
+ecoregion_name   <- "High deserts" # "Mediterranean California" "Forested mountains" "High deserts"
+month_select     <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
+minSize <- 0     # acres
+maxSize <- 1000  # acres
 years  <- year1:year2
 nYears <- length(years)
+
+print(paste("Working on:", ecoregion_select, ecoregion_name,"minSize:",minSize))
 
 ################################################################################
 # Save figures in directory specific to how the data are subset
 ################################################################################
 experimentDir <- paste0("eco=", ecoregion_select, "_", 
                         "months=", min(month_select),"_", max(month_select), "_",
-                        "minSize=", minSize,
+                        "minSize=", minSize, "_maxSize=", maxSize, 
                         "/" )
 figureDir     <- paste0("Figures/regional_met_relations/", experimentDir)
 
@@ -49,13 +51,18 @@ load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_", year1,"_", year2,".RData"))
 # Get rid of fires that have "Missing/Undefined" start types, cleaner analysis
 # with fewer assumptions. 
 HasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
-bigEnough    <- FPA_FOD$FIRE_SIZE >= 1000
+bigEnough    <- FPA_FOD$FIRE_SIZE >= minSize
+smallEnough  <- FPA_FOD$FIRE_SIZE <= maxSize
 FPA_month_mask <- lubridate::month(FPA_FOD$DISCOVERY_DATE) %in% month_select
 FPA_ecoregion_mask <- FPA_FOD$NA_L2CODE %in% ecoregion_select
 
-m <- HasStartInfo & bigEnough & FPA_month_mask & FPA_ecoregion_mask
+m <- HasStartInfo & bigEnough & smallEnough & FPA_month_mask & FPA_ecoregion_mask
 
+# Subset the data
 FPA_FOD <- FPA_FOD[m,]
+
+print("The dim of subset FPA_FOD is:")
+print(dim(FPA_FOD))
 
 # Get fire parameters too be used in subsetting the data 
 fireDate      <- FPA_FOD$DISCOVERY_DATE
@@ -81,6 +88,9 @@ for (i in 1:nYears){
   FPA_BA_lightning[i] <- sum(FPA_FOD$FIRE_SIZE[(fireCause == "Lightning") & yMask])
   FPA_BA_human[i] <- sum(FPA_FOD$FIRE_SIZE[(fireCause != "Lightning") & yMask])
 }
+
+print(paste("Total FPA_BA_lightning:", sum(FPA_BA_lightning)))
+print(paste("Total FPA_BA_human:", sum(FPA_BA_human)))
 
 # Load ecoregion borders, for plotting, analysis etc. 
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData") # <- SPDF
@@ -205,10 +215,12 @@ grid_ecoregion_subset <- grid_ecoregion[grid_lon_keeps, grid_lat_keeps]
 grid_ecoregion_mask   <- grid_ecoregion_subset == ecoregion_select
 
 # Plot the masked ecoregion with a state and ecoregion map 
+quartz()
 f <- length(ecmwf_latitude):1
 image.plot(x=(ecmwf_longitude-360), y=ecmwf_latitude[f], grid_ecoregion_mask[,f])
 map("state", add=T, lwd=0.3)
 plot(ecoregion_polygon, add=T)
+title("Red should be over plotted ecoregion")
 
 # Make summer totals / means depending on the paramter. This is only done for
 # selected eco_region and months. 
