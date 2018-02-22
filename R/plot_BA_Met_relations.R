@@ -19,11 +19,11 @@ maxLon <- -100
 
 year1 <- 1992
 year2 <- 2015 
-ecoregion_select <- 10.1
-ecoregion_name   <- "High deserts" # "Mediterranean California" "Forested mountains" "High deserts"
+ecoregion_select <- 6.2
+ecoregion_name   <- "Forested mountains" # "Mediterranean California" "Forested mountains" "High deserts"
 month_select     <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
 minSize <- 0     # acres
-maxSize <- 1000  # acres
+maxSize <- Inf   # acres
 years  <- year1:year2
 nYears <- length(years)
 
@@ -235,17 +235,20 @@ wg_mean  <- v
 
 # This fuction handles the multi-step hasle of subsetting in both time and
 # a non regular grid space (ecoregion) 
-spaceTimeStat <- function(x, tMask, FUN="mean"){
+spaceTimeStat <- function(x, tMask, FUN="mean", grid_ecoregion_mask){
   
-  # Time subset first 
+  # Time subset first, preserve only desired months 
   spatialSubset <- x[,, tMask]
   # stats on time (called mean but could be "sum")
   gridMeans <- apply(spatialSubset, 1:2, FUN)
-  # Spatial subset
-  # TODO: Think about weather mean of precip grid box totals in more valueble
-  # TODO: than the total precip of all grid boxes. For now going with mean. 
-  spatialMean <- mean(gridMeans[grid_ecoregion_mask])
   
+  # Take the final stat of the spatial subset
+#  if(FUN=="mean"){
+    spatialMean <- mean(gridMeans[grid_ecoregion_mask])
+  # } else{
+  #   # FUN == "sum"
+  #   spatialMean <- sum(gridMeans[grid_ecoregion_mask])
+  # }
   return(spatialMean)
   
 }
@@ -259,13 +262,13 @@ for (i in 1:nYears){
   tMask     <- yearMask & monthMask 
   
   # Take the spatial temporal subset average or sum and store 
-  t2m_mean[i] <- spaceTimeStat(t2m, tMask, FUN="mean")
-  tp_total[i] <- spaceTimeStat(tp, tMask, FUN="sum")
-  e_total[i]  <- spaceTimeStat(e, tMask, FUN="sum")
-  rh2m_mean[i]<- spaceTimeStat(rh2m, tMask, FUN="mean")  
-  d2m_mean[i] <- spaceTimeStat(d2m, tMask, FUN="mean")  
-  ws_mean[i]  <- spaceTimeStat(ws, tMask, FUN="mean") 
-  wg_mean[i]  <- spaceTimeStat(wg, tMask, FUN="mean")
+  t2m_mean[i] <- spaceTimeStat(t2m, tMask, FUN="mean", grid_ecoregion_mask)
+  tp_total[i] <- spaceTimeStat(tp, tMask, FUN="sum", grid_ecoregion_mask)
+  e_total[i]  <- spaceTimeStat(e, tMask, FUN="sum", grid_ecoregion_mask)
+  rh2m_mean[i]<- spaceTimeStat(rh2m, tMask, FUN="mean", grid_ecoregion_mask)  
+  d2m_mean[i] <- spaceTimeStat(d2m, tMask, FUN="mean", grid_ecoregion_mask)  
+  ws_mean[i]  <- spaceTimeStat(ws, tMask, FUN="mean", grid_ecoregion_mask) 
+  wg_mean[i]  <- spaceTimeStat(wg, tMask, FUN="mean", grid_ecoregion_mask)
   
 }
 
@@ -338,9 +341,11 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
   
 }
 
+inPerM <- 39.3701
+
 # TODO: make total precip mean of all boxes totals.
 scatter_plot(x=t2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
-scatter_plot(x=tp_total, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Total precip", yLab="Acres Burned", regionName = ecoregion_name)
+scatter_plot(x=tp_total*inPerM, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Total precipitation [in]", yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=rh2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Relative humidity", yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=d2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Dew point temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=ws_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="10-meter wind speed [meters per second]",  yLab="Acres Burned", regionName = ecoregion_name)
