@@ -8,15 +8,11 @@ library(ggplot2)
 library(cowplot)
 library(RColorBrewer)
 library(scales) 
+library(ggthemes)
 
 
-ecoregionSelect <- 6.2
-ecoRegionName   <- "Forested mountains" # "Mediterranean CA" # mediterranean
+ecoregionSelect <- c(6.2, 10.1, 11.1) # choose the ecoregions to plot
 minSize         <- 1000 # minimum fire size to include
-# Figure out maximum and minimum values for colorbar, make it consistent across
-# ecoregions. 
-x1 <- 0
-x2 <- 25 # Ok to saturate at 40 when including the very small fires. 25 good for 1000
 
 # Load the data that has griodMET appended. 
 load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
@@ -24,107 +20,74 @@ load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
 # Mask by ecoregion and lat and lon. 
 latMask <- (FPA_FOD$LATITUDE <= 50) & (FPA_FOD$LATITUDE > 31)
 lonMask <- (FPA_FOD$LONGITUDE <= -100) & (FPA_FOD$LONGITUDE > -127)
-ecoregionMask <- FPA_FOD$NA_L2CODE == ecoregionSelect
+ecoregionMask <- FPA_FOD$NA_L2CODE %in% ecoregionSelect
 hasStartMask <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
 sizeMask <- FPA_FOD$FIRE_SIZE >= minSize
 elevationMask <- FPA_FOD$elevation > -80 # this is ~lowest elevation in death valley
 m <- latMask & lonMask & ecoregionMask & hasStartMask & sizeMask & elevationMask
 
-# In order for elevation scale to be consistent we need to set the ylim before
-# creating the sibset dataframe
-yMin <- -10
-yMax <- max(FPA_FOD$elevation)
 
 df <- FPA_FOD[m, ]
-# Try making FIRE_SIZE_CLASS numeric via factor
-df$numeric_SIZE_CLASS <- as.numeric(as.factor(df$FIRE_SIZE_CLASS ))
+nRow <- dim(df)[1]
+
+ecoRegionNames <- rep("", nRow)
+ecoRegionNames[df$NA_L2CODE==6.2] <- "Forested mountains"
+ecoRegionNames[df$NA_L2CODE==10.1] <- "High deserts"
+ecoRegionNames[df$NA_L2CODE==11.1] <- "Mediterranean California"
+
+ecoRegionNames <-  base::factor(ecoRegionNames, 
+                                levels = c("Forested mountains",
+                                           "High deserts",
+                                           "Mediterranean California"))
+df$ecoRegionNames <- ecoRegionNames
+
+# Add ignitionType column as a factor
+ignition <- rep("Human-ignition", length(df$STAT_CAUSE_DESCR) )
+ignition[df$STAT_CAUSE_DESCR=="Lightning"] <- "Lightning-ignition"
+df$ignitionType <- base::factor(ignition, levels = c("Lightning-ignition", 
+                                                     "Human-ignition"))
 
 
-
-# maxSize <- max(df$FIRE_SIZE)
-# if(minSize==0){
-#   sizeClassBreaks <- c(0 , 10, 100, 300, 1000, 5000, 10000, 100000)
-#   sizeTheme <- scale_size_area(labels = comma, 
-#                                breaks=sizeClassBreaks, max_size = 10)
-# }else{
-#   sizeTheme <- scale_size_area(labels = comma, 
-#                                limits=c(minSize, maxSize), max_size = 10)
-# }
-
-# Consistent breaks
+# Consistent breaks, fire size class
 sizeClassBreaks <- c(0 , 10, 100, 300, 1000, 5000, 10000, 100000)
 sizeTheme <- scale_size_area(labels = comma, 
-                             breaks=sizeClassBreaks, max_size = 10)
+                             breaks=sizeClassBreaks, 
+                             max_size = 14)
 
-# Make the seperate dataframes based on ignition
-df_L <- df[df$STAT_CAUSE_DESCR == "Lightning",]
-df_H <- df[df$STAT_CAUSE_DESCR != "Lightning",]
 
 # Create a color palette (NOT USED)
 myPalette <- colorRampPalette(colors = c("blue", "orange"))
 
 # Create a colorscale that is shared
-sc <- scale_colour_gradient(limits=c(x1, x2), labels=comma, 
-                            low = alpha("orange", 0.75), high = alpha("blue", 0.75) )
+sc <- scale_colour_gradient( labels=comma, limits=c(2, 38),
+                            low = "orange", 
+                            high = "blue")
 
-# Plot the lightning-ignited 
-lightning <- ggplot(df_L, aes(x=DISCOVERY_DOY, y=elevation, 
-                              color=fuel_moisture_1000hr,
-                              size=FIRE_SIZE)) +
+# Plot BOTH
+p <- ggplot(df, aes(x=DISCOVERY_DOY, y=elevation, 
+                    color=fuel_moisture_1000hr,
+                    size=FIRE_SIZE)) +
   geom_point(aes(x=DISCOVERY_DOY, y=elevation, 
                  color=fuel_moisture_1000hr,
                  size=FIRE_SIZE), 
              alpha=0.75)+
-  sc +  
+  facet_wrap(ignitionType~ecoRegionNames)+ 
   sizeTheme+
+  sc +  
   theme_bw()+
-  ggtitle(paste(ecoRegionName, "lightning-ignited wildfires"))+
   xlab("Day of year")+
-  ylab("Elevation [m]")+
-  ylim(yMin,yMax)+
+  ylab("Wildfire elevation [m]")+
   labs(color='1000 hr \nfuel moisture %') +
   labs(size='Fire size \n(acres)')+
-  theme(axis.text=element_text(size=12, face="bold"),
-        axis.title=element_text(size=16, face="bold"),
-        legend.title = element_text(size=16, face="bold"),
-        legend.text = element_text(size=12, face="bold"),
-        legend.key.width=unit(2,"line"),
-        title = element_text(size=15, face="bold")
-  )+
-  guides(size = guide_legend(order=2))
-
-print("Ran lightning figure")
-
-# Plot the human-ignited 
-human <- ggplot(df_H, aes(x=DISCOVERY_DOY, y=elevation, 
-                          color=fuel_moisture_1000hr,
-                          size=FIRE_SIZE)) + 
-  geom_point(aes(x=DISCOVERY_DOY, y=elevation, 
-                 color=fuel_moisture_1000hr,
-                 size=FIRE_SIZE),
-             alpha=0.75)+
-  sc +  
-  sizeTheme+
-  theme_bw()+
-  ggtitle(paste(ecoRegionName, "human-ignited wildfires"))+
-  xlab("Day of year")+
-  ylab("Elevation [m]")+
-  ylim(yMin,yMax)+
-  labs(color='1000 hr \nfuel moisture %') +
-  labs(size='Fire size \n(acres)')+
-  theme(axis.text=element_text(size=12, face="bold"),
-        axis.title=element_text(size=16, face="bold"),
-        legend.title = element_text(size=16, face="bold"),
-        legend.text = element_text(size=12, face="bold"),
-        legend.key.width=unit(2,"line"),
-        title = element_text(size=15, face="bold")
-  )+
-  guides(size = guide_legend(order=2))
+  guides(size = guide_legend(order=2))+
+  theme_tufte(ticks=T, base_size = 25)
+  
 
 print("Getting to code to save figure.")
-saveName <- paste0("Figures/elevation_DOY_space/minSize_",
-                   minSize,"_ecoregion_", ecoregionSelect,"_acres.png")
-png(filename=saveName, width=4000, height=1500, res=250)
-plot_grid(lightning, human, labels = "AUTO")
+saveName <- paste0("Figures/elevation_DOY_space/minSize=",
+                   minSize,"_west.png")
+png(filename=saveName, width=4000, height=2700, res=250)
+p
 print("Ran save figiure code")
 dev.off()
+
