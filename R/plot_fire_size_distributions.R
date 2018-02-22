@@ -217,7 +217,7 @@ legend("topleft",
                 "Human-ignition",
                 "Combined"),
        lty=1,
-       col=c("orange", "gray","black"),
+       col=c("gray","orange","black"),
        cex=2,
        lwd=4
        )
