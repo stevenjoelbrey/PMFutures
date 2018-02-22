@@ -33,7 +33,7 @@ library(rgeos)
 library(raster)
 library(ncdf4)
 library(geosphere)
-library(lubridate)
+library(lubridate) # For handy "month()" and "year()" functions
 library(fields)
 
 if(grid=="gfed4s"){
