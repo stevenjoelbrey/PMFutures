@@ -5,6 +5,9 @@
 # area by ignition type. This plot will use burn area from FPA_FOD dataframe
 # for all available years. 
 
+# TODO: What % of western US wildfires are less than 1000 acres and what
+# TODO: percent of total burn area do they account for?
+
 # TODO: combine ignition_size_histogram_western_US.png and 
 # TODO: cumulativeBurnAreaBySize_western_US.png by making the later a second
 # TODO: y-axis of the former. Use the former x-axis as it shows the log scale
@@ -15,9 +18,9 @@
 # TODO: Figure out why colorado subset does not add up to 100% for both types
 
 # What region are you investigating? 
-minLat <- 31
-maxLat <- 49
-minLon <- -125
+minLat <- 26 # when 31 parts of west texas are lost, eco-region not considerd though
+maxLat <- 50
+minLon <- -127
 maxLon <- -100
 
 regionName <- "western_US"
@@ -27,7 +30,7 @@ library(sfsmisc) # For engineering axis
 # TODO: subset by region and ecoregion
 
 # Path is project relative
-dataFile <- "Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData"
+dataFile <- "Data/FPA_FOD/FPA_FOD_1992_2015_eco.RData"
 load(dataFile)
 
 # Select components needed for subsetting the FPA-FOD data
@@ -35,16 +38,17 @@ fireLon <- FPA_FOD$LONGITUDE
 fireLat <- FPA_FOD$LATITUDE
 
 # Spatial subset the data 
-latMask <- fireLat <= maxLat & fireLat >= minLat
-lonMask <- fireLon <= maxLon & fireLon >= minLon
+latMask <- (fireLat <= maxLat) & (fireLat >= minLat)
+lonMask <- (fireLon <= maxLon) & (fireLon >= minLon)
 spatialMask <- latMask & lonMask
 
 # Also, mask out fires with "Unknown/Undefined" cause. 
 hasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
 
+# Subset the FOD
 FPA_FOD <- FPA_FOD[spatialMask & hasStartInfo,]
 
-# Extract key pieces of FPA-FOD data 
+# Extract key pieces of subset FPA-FOD data 
 burn_area     <- FPA_FOD$FIRE_SIZE
 fire_cause    <- FPA_FOD$STAT_CAUSE_DESCR
 
@@ -59,11 +63,12 @@ fireLat <- FPA_FOD$LATITUDE
 ################################################################################
 
 fireYear <- FPA_FOD$FIRE_YEAR
-years <- min(fireYear):max(fireYear)
-nYears <- length(years)
-humanTotal     <- rep(NA, nYears)
+years    <- min(fireYear):max(fireYear)
+nYears   <- length(years)
+humanTotal     <- rep(NA, nYears) # Array to store human-ignited burn area
 lightningTotal <- rep(NA, nYears)
 
+# Sum the annual burn area totals 
 for (i in 1:nYears){
   
   y <- years[i]
@@ -151,35 +156,62 @@ legend("topright",
 dev.off()
 
 
+# Consider making a nice ggplot histogram 
+# library(ggplot2)
+# library(ggthemes)
+# 
+# 
+# ignitionType <- rep("Human-ignition", length(fireSize))
+# ignitionType[lightningMask] <- "Lightning-ignition"
+# ignitionType <- factor(ignitionType)
+# 
+# df <- data.frame(fireSize=fireSize, ignitionType=ignitionType)
+# 
+# 
+# p <- ggplot(df, aes(fireSize, fill = ignitionType), log10="y") +
+#   geom_histogram() # geom_freqpoly() for lines
+
+
 ################################################################################
-# Create cumulative sum distribution figure (Requires additional quality vetting)
+# Create cumulative sum distribution figure 
 ################################################################################
 
 # Sort the burn area arrays and place into perspective of total burn area
 total_burn_area  <- sum(burn_area) 
-burn_area_sorted <- sort(burn_area)            # Small to large
+burn_area_sorted <- sort(burn_area)            # small to large
 cumulative_sum   <- cumsum(burn_area_sorted)   
 
 # For plotting, get the min and max fire size for bounds 
 maxFireSize <- max(burn_area)
-logLim      <- log10(maxFireSize)
+logLim      <- log10(maxFireSize) # consider cieling 
 
 # TODO: Make each of these lines for all fires, human started fires, and lightning
 # TODO: started fires seperately.
 acre_bins <- 10^(seq(0, logLim, length.out=80))
 nBins <- length(acre_bins)
 percent_burn_area <- rep(NA, length(acre_bins))
-percent_lightning <- rep(NA, length(acre_bins))
+percent_lightning <- rep(NA, length(acre_bins)) # area implied
 percent_human     <- rep(NA, length(acre_bins))
 
+# Count what percent of burn area is less than a given acre_bin
 for (i in 1:nBins){
   
+  # What fires are less than acre_bin[i], starts asking for < 1 acres. 
   sizeMask <- burn_area <= acre_bins[i]
   
-  percent_burn_area[i] <- sum(burn_area[sizeMask]) / total_burn_area * 100
+  # When i is equal to nBins (largest bin), make sure all values of size mask
+  # are TRUE
+  if(i == nBins){
+    TEST <- sum(sizeMask)/length(sizeMask)
+    print(paste("Burn area account for proportion is:", TEST))
+  }
   
-  percent_lightning[i] <- sum(burn_area[sizeMask & lightningMask]) / total_burn_area * 100
-  percent_human[i]     <- sum(burn_area[sizeMask & !lightningMask]) / total_burn_area * 100
+  # Fires of either kind of ignition
+  percent_burn_area[i] <- (sum(burn_area[sizeMask]) / total_burn_area) * 100
+  
+  # Now for each ignition type, so burn_area masked with ignition type too
+  percent_lightning[i] <- (sum(burn_area[sizeMask & lightningMask]) / total_burn_area) * 100
+  percent_human[i]     <- (sum(burn_area[sizeMask & !lightningMask]) / total_burn_area) * 100
 
 }
 
@@ -193,6 +225,7 @@ png(filename=fileName,
 
 par(mar=c(4,12,4,4))
 
+# Set up an empty plot 
 plot(acre_bins, percent_burn_area,
      type="l", bty="n", 
      log="x", lwd=4,
@@ -227,6 +260,23 @@ text(acre_bins[nBins], percent_human[nBins]+3, labels=paste(humanPercent, "%"), 
 
 eaxis(1, cex.axis=1.6)
 mtext("Fire Size (acres)", 1 , line=3, cex=2)
+
+
+y1 <- sum(burn_area[(burn_area<=1000)]) / total_burn_area * 100
+
+
+# Vertical line at 1000 acres fire size
+segments(x0=1000, y0=-5, x1 = 1000, y1 = y1, col="black", lty=2, lwd=3)
+# horizonal line to show the percent of total burn area these fires account for 
+segments(x0=0.1, y0=y1, x1 = 1000, y1 = y1, col="black", lty=2, lwd=3)
+text(50, 12, labels=paste(round(y1,2), "%"), col="black", cex=2, xpd=T)
+
+# y2 <- sum(burn_area[(burn_area<=10^5)]) / total_burn_area * 100
+# # Vertical line at 10^5 acres fire size
+# segments(x0=10^5, y0=-5, x1 = 10^5, y1 = y2, col="black", lty=2, lwd=3)
+# # horizonal line to show the percent of total burn area these fires account for 
+# segments(x0=0.1, y0=y2, x1 = 10^5, y1 = y2, col="black", lty=2, lwd=3)
+
 
 dev.off()
 
