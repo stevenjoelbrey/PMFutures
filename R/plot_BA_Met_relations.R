@@ -12,15 +12,15 @@ library(sfsmisc)
 library(lubridate) # for month()
 
 # What region are you investigating? 
-minLat <- 31
-maxLat <- 49
+minLat <- 25
+maxLat <- 49.5
 minLon <- -125
 maxLon <- -100
 
 year1 <- 1992
 year2 <- 2015 
-ecoregion_select <- 6.2
-ecoregion_name   <- "Forested mountains" # "Mediterranean California" "Forested mountains" "High deserts"
+ecoregion_select <- 11.1
+ecoregion_name   <- "Mediterranean California" # "Mediterranean California" "Forested mountains" "High deserts"
 month_select     <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
 minSize <- 0     # acres
 maxSize <- Inf   # acres
@@ -283,8 +283,12 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
   
   # Calculate the correlations, these are being calculated with respect to 
   # predictive ability so now use pearson correlation coef. 
-  r1 <- round(cor(x, y1, method="pearson"), 2)
-  r2 <- round(cor(x, y2, method="pearson"), 2)
+  r1 <- cor(x, y1, method="pearson")
+  r2 <- cor(x, y2, method="pearson")
+  
+  r1_show <- round(r1, 2)
+  r2_show <- round(r2, 2)
+  
   
   print(paste("r2=",summary(lm(y1 ~ x))$r.squared))
   
@@ -324,7 +328,7 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
   
   # Put the linear-correlations on the y-axis
   legend("topleft",
-         legend=c(paste0("r=",r1), paste0("r=",r2) ),
+         legend=c(paste0("r=",r1_show), paste0("r=",r2_show) ),
          title=" Pearson correlation: ",
          pch=19,
          box.lwd=0.7,
@@ -339,18 +343,34 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
   
   dev.off()
   
+  return(c(r1, r2))
+  
 }
 
 inPerM <- 39.3701
 
+
+
 # TODO: make total precip mean of all boxes totals.
-scatter_plot(x=t2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
-scatter_plot(x=tp_total*inPerM, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Total precipitation [in]", yLab="Acres Burned", regionName = ecoregion_name)
-scatter_plot(x=rh2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Relative humidity", yLab="Acres Burned", regionName = ecoregion_name)
+r_T2m <- scatter_plot(x=t2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
+r_TP <- scatter_plot(x=tp_total*inPerM, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Total precipitation [in]", yLab="Acres Burned", regionName = ecoregion_name)
+r_RH <- scatter_plot(x=rh2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Relative humidity", yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=d2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Dew point temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=ws_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="10-meter wind speed [meters per second]",  yLab="Acres Burned", regionName = ecoregion_name)
 scatter_plot(x=wg_mean, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="10-meter wind gust [meters per second]",  yLab="Acres Burned", regionName = ecoregion_name)
 
+x <- rep(NA, 6)
+r_df <- data.frame(r=x, variable=x, ignitionType=x, ecoregion=x)
+r_df[1,] <-c(r_T2m[1], "T2M", "Lightning", ecoregion_select)
+r_df[2, ] <- c(r_T2m[2], "T2M", "Human", ecoregion_select)
+r_df[3,] <-c(r_TP[1], "TP", "Lightning", ecoregion_select)
+r_df[4, ] <- c(r_TP[2], "TP", "Human", ecoregion_select)
+r_df[5,] <-c(r_RH[1], "RH", "Lightning", ecoregion_select)
+r_df[6, ] <- c(r_RH[2], "RH", "Human", ecoregion_select)
+
+saveName <- paste0("Data/correlations/ecoregion_", ecoregion_select, ".RData")
+save(r_df, file=saveName)
+ 
 
 # ################################################################################
 # # These relationships should happen on a grid by grid basis. Show correlations
