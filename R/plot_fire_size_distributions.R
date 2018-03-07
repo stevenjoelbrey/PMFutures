@@ -17,17 +17,27 @@
 
 # TODO: Figure out why colorado subset does not add up to 100% for both types
 
-# What region are you investigating? 
-minLat <- 26 # when 31 parts of west texas are lost, eco-region not considerd though
-maxLat <- 50
-minLon <- -127
-maxLon <- -100
+regionName <- "southeast"
 
-regionName <- "western_US"
+if (regionName == "western_US"){
+  
+  minLat <- 26
+  maxLat <- 49
+  minLon <- -125
+  maxLon <- -100
+  
+} else if(regionName == "southeast"){
+  
+  minLat <- 24 
+  maxLat <- 41.5 
+  minLon <- -91   
+  maxLon <- -72     
+  
+}
 
 library(sfsmisc) # For engineering axis 
 
-# TODO: subset by region and ecoregion
+# TODO: subset by region and ecoregion but only do that if using ggplot2
 
 # Path is project relative
 dataFile <- "Data/FPA_FOD/FPA_FOD_1992_2015_eco.RData"
@@ -61,7 +71,6 @@ fireLat <- FPA_FOD$LATITUDE
 # Create burn area time series for western U.S. by ignition type and show
 # frequency histogram of fire size by type underneath
 ################################################################################
-
 fireYear <- FPA_FOD$FIRE_YEAR
 years    <- min(fireYear):max(fireYear)
 nYears   <- length(years)
@@ -77,7 +86,6 @@ for (i in 1:nYears){
   lightningTotal[i] <- sum( FPA_FOD$FIRE_SIZE[yearMask & lightningMask] )
   humanTotal[i]     <- sum( FPA_FOD$FIRE_SIZE[yearMask & !lightningMask] )
   
-  
 }
 
 ################################################################################
@@ -87,12 +95,15 @@ png(filename=fileName, height=2000, width=2000, res=250)
 
 par(mfrow=c(2,1), mar=c(0, 6, 4, 2))
 
+yMax <- max(c(lightningTotal,humanTotal))
+
 plot(years, lightningTotal,
      bty="n",
      yaxt="n",
      ylab="",
      xlab="",
-     pch="")
+     pch="",
+     ylim=c(0, yMax))
 
 points(years, humanTotal, pch=19, col="orange")
 lines(years, humanTotal, pch=19, col="orange", lty=2)
@@ -154,22 +165,6 @@ legend("topright",
 
 
 dev.off()
-
-
-# Consider making a nice ggplot histogram 
-# library(ggplot2)
-# library(ggthemes)
-# 
-# 
-# ignitionType <- rep("Human-ignition", length(fireSize))
-# ignitionType[lightningMask] <- "Lightning-ignition"
-# ignitionType <- factor(ignitionType)
-# 
-# df <- data.frame(fireSize=fireSize, ignitionType=ignitionType)
-# 
-# 
-# p <- ggplot(df, aes(fireSize, fill = ignitionType), log10="y") +
-#   geom_histogram() # geom_freqpoly() for lines
 
 
 ################################################################################
@@ -269,14 +264,13 @@ y1 <- sum(burn_area[(burn_area<=1000)]) / total_burn_area * 100
 segments(x0=1000, y0=-5, x1 = 1000, y1 = y1, col="black", lty=2, lwd=3)
 # horizonal line to show the percent of total burn area these fires account for 
 segments(x0=0.1, y0=y1, x1 = 1000, y1 = y1, col="black", lty=2, lwd=3)
-text(50, 12, labels=paste(round(y1,2), "%"), col="black", cex=2, xpd=T)
+text(50, y1+4, labels=paste(round(y1,2), "%"), col="black", cex=2, xpd=T)
 
 # y2 <- sum(burn_area[(burn_area<=10^5)]) / total_burn_area * 100
 # # Vertical line at 10^5 acres fire size
 # segments(x0=10^5, y0=-5, x1 = 10^5, y1 = y2, col="black", lty=2, lwd=3)
 # # horizonal line to show the percent of total burn area these fires account for 
 # segments(x0=0.1, y0=y2, x1 = 10^5, y1 = y2, col="black", lty=2, lwd=3)
-
 
 dev.off()
 
