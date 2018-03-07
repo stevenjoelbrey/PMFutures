@@ -21,25 +21,47 @@ library(grid)
 library(gridExtra)
 library(sfsmisc)
 library(ncdf4)
+library(maps)
+library(fields)
 
-startYear <- 1992 # When this is 1992 all the data are used.
+# When start year is 1997 then GFED comparison is made. 
+startYear <- 1997 # When this is 1992 all the data are used.
 endYear   <- 2015 # When this is 2015 all the data are used. 
 
-# What region are you investigating? 
-minLat <- 31
-maxLat <- 49
-minLon <- -125
-maxLon <- -100
+# What is the general part of the country you are looking at? This will be a 
+# directory under figures from here forward?
+largeRegion <- "west"
 
-keepRegions <- c(6.2, 10.1, 7.1, 9.3, 9.4, 13.1, 12.1, 11.1, 10.2)
-regionColors <- c("#65B657", "#E7ED90", "#60BAAF", "#F2DBA1", "#EDCB9B",
-                  "#B5D67C",  "#D6D292", "#D2E5B1", "#F3DB70")
+if (largeRegion == "west"){
+  
+  minLat <- 31
+  maxLat <- 49
+  minLon <- -125
+  maxLon <- -100
+  
+  keepRegions <- c(6.2, 10.1, 7.1, 9.3, 9.4, 13.1, 12.1, 11.1, 10.2)
+  regionColors <- c("#65B657", "#E7ED90", "#60BAAF", "#F2DBA1", "#EDCB9B",
+                    "#B5D67C",  "#D6D292", "#D2E5B1", "#F3DB70")
+  
+} else if(largeRegion == "southeast"){
+  
+  minLat <- 24 
+  maxLat <- 41.5 
+  minLon <- -91   
+  maxLon <- -72     
+
+  keepRegions <- c(8.1, 8.2, 8.3, 8.4, 8.5, 15.4, 5.3)
+  # TODO: Make colors match map. Make unique for now. 
+  regionColors <- rainbow(length(keepRegions))
+    
+}
+
 nRegions <- length(keepRegions)
 regionBA_L <- rep(NA, nRegions) # lightning
 regionBA_H <- rep(NA, nRegions) # human 
   
 # Load FPA-FOD data and subset by latitude and longitude 
-load("Data/FPA_FOD/FPA_FOD_1992_2015.RData")
+load("Data/FPA_FOD/FPA_FOD_1992_2015_eco.RData")
 
 # Spatial subset 
 latMask <- FPA_FOD$LATITUDE > minLat & FPA_FOD$LATITUDE < maxLat
@@ -49,9 +71,13 @@ regionMask <- FPA_FOD$NA_L2CODE %in% keepRegions
 # Temporal Subset
 yearMask <- FPA_FOD$FIRE_YEAR >= startYear & FPA_FOD$FIRE_YEAR <= endYear
 
+# get rid of rows that do not have start info
+hasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
+
 # spatially subset the data and get a mask for the fires that are started by
 # lightning 
-FPA_FOD <- FPA_FOD[latMask & lonMask & regionMask & yearMask, ]
+m <- latMask & lonMask & regionMask & yearMask & hasStartInfo
+FPA_FOD <- FPA_FOD[m, ]
 lightningMask <- FPA_FOD$STAT_CAUSE_DESCR == "Lightning"
 
 # Count ecoregion total burn area from FPA-FOD. 
@@ -67,7 +93,8 @@ for (i in 1:nRegions){
 
 ################################################################################
 # Now sum the total GFED4s emissions by ecoregion for the same spatial and 
-# temporal domain. 
+# temporal domain. TODO: Use native 0.25 degree grid for GFED, no need for 
+# use of ecmwf grid here. /GFED4.1s_monthly_DM_1997.nc are available.
 ################################################################################
 if(startYear == 1997 & endYear == 2015){
   
@@ -84,17 +111,19 @@ if(startYear == 1997 & endYear == 2015){
   # Sum the first years 12 months of data
   yearSum <- apply(monthly_DM, 1:2, sum)
  
-  
   # Add each year sum to yearSum
   for(y in (startYear + 1):endYear){
     
-    ncFile <- paste0(gfedDir, "GFED4.1s_ecmwf_monthly_DM_1997.nc")
+    ncFile <- paste0(gfedDir, "GFED4.1s_ecmwf_monthly_DM_",y,".nc")
+    print(ncFile)
     nc <- nc_open(ncFile)
     monthly_DM <- ncvar_get(nc, "monthly_DM")
     nc_close(nc)
     
     # append the total burn area on this grid. Take all months. 
-    yearSum <- yearSum + apply(monthly_DM, 1:2, sum)
+    thisYearSum <- apply(monthly_DM, 1:2, sum)
+    print(sum(thisYearSum))
+    yearSum <- yearSum + thisYearSum
     
   }
   
@@ -106,15 +135,15 @@ if(startYear == 1997 & endYear == 2015){
   image.plot(grid_lon, grid_lat[f], yearSumPlot[,f])
   title("Sum of DM")
   
-  # Now we need to subset by the western US coords and then load grid attributes
-  # to subset. 
+  # Now we need to subset by the largeRegion coords and then load grid 
+  # attributes to subset. 
   ncFile <- "Data/grid_attributes/grid_attributes_75x75.nc"
   nc <- nc_open(ncFile)
   ecoregion <- round(ncvar_get(nc, "ecoregion"),1)
   elevation <- ncvar_get(nc, "elevation")
   nc_close(nc)
   
-  # For finding North America CONUS
+  # For finding North America CONUS. Will only work is western hemisphere. 
   psuedo_lon <- grid_lon - 360
   
   quartz()
@@ -125,11 +154,11 @@ if(startYear == 1997 & endYear == 2015){
   image.plot(psuedo_lon, grid_lat[f], ecoregion[,f])
   title("ecoregions")
   
-  # Create the spatial mask subset
+  # Create the spatial mask subset using the psuedo lon
   lonMask <- psuedo_lon >= minLon & psuedo_lon <= maxLon
   latMask <- grid_lat >= minLat & grid_lat <= maxLat
   
-  # subset all the variables that these of these coords
+  # subset all the variables that live on these coords
   yearSum_subset <- yearSum[lonMask, latMask]
   ecoregion_subset <- ecoregion[lonMask, latMask]
   elevation_subset <- elevation[lonMask, latMask]
@@ -161,13 +190,11 @@ if(startYear == 1997 & endYear == 2015){
     
     # Create region Mask
     rMask_2D <- keepRegions[i] == ecoregion_subset
-    rMask_2D[is.na(rMask_2D)] <- FALSE
+    rMask_2D[is.na(rMask_2D)] <- FALSE # where mask NA make FALSE
     
     regionDM[i] <- sum(yearSum_subset[rMask_2D])
 
   }
-  
-  
   
 }
 ################################################################################
@@ -175,29 +202,34 @@ if(startYear == 1997 & endYear == 2015){
 # For nice labels 
 # https://jangorecki.gitlab.io/data.table/library/sfsmisc/html/axTexpr.html
 ################################################################################
+# Create total burn area by adding the two types together
 BA <- regionBA_L + regionBA_H
 
-# sort 
-ORDER <- order(BA, decreasing = TRUE)
-BA <- BA[ORDER]
-keepRegions <- keepRegions[ORDER]
-regionBA_L  <- regionBA_L[ORDER]
-regionBA_H  <- regionBA_H[ORDER]
+# sort the data by total burn area
+ORDER        <- order(BA, decreasing = TRUE)
+BA           <- BA[ORDER]
+keepRegions  <- keepRegions[ORDER]
+regionBA_L   <- regionBA_L[ORDER]
+regionBA_H   <- regionBA_H[ORDER]
 regionColors <- regionColors[ORDER]
 regionDM     <- regionDM[ORDER]
 
 # Create the bar plot that shows total burn area and emissions in the selected
 # date range. 
-png(filename=paste0("Figures/summary/ecoregio_burn_area_emission_bar",
+png(filename=paste0("Figures/summary/ecoregio_burn_area_emission_bar_",
+                    largeRegion, "_",
                     startYear, "_", endYear, ".png"), 
     res=250, height=1600, width=3700)
 par(las=1, mar=c(4,14,4,16))
 
+# Plot the total burn area first, make the bars the color of lightning
 bp <- barplot(height=BA, 
               names.arg=keepRegions, yaxt="n", col="gray", 
               cex.names = 1.8)
 #axis(side=1, at = bp, labels=keepRegions, col=)
 
+# Now cover up lightnihng with human bar. Now the colors that show represent
+# fraction by ignition
 barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
 
 # Nice axis label 
@@ -207,13 +239,15 @@ mtext("Acres \n Burned", side=2, line=7, cex=2)
 # Add emissions from GFED4s if we are looking at the right years 
 if(startYear == 1997 & endYear == 2015){
  
-   par(new = TRUE)
-
-  bp_new <- barplot(height=regionDM, pch="*", border="transparent", col="transparent",
+  par(new = TRUE)
+  
+  # Use barplot command to set up the same x - y field
+  bp_new <- barplot(height=regionDM, pch="*", border="transparent", 
+                    col="transparent",
                     axes = FALSE, bty = "n", xlab = "", ylab = "")
   text(bp_new, regionDM, "*", col=regionColors, cex=5, xpd=T)
-  eaxis(side=4, at = pretty(range(regionDM)), col="red", cex.axis=1.5)
-  axis(side=4, at = pretty(range(regionDM)), col="red", labels=rep("",7) )
+  eaxis(side=4, at = pretty(range(regionDM)),  cex.axis=1.5, f.smalltcl=0)
+  #axis(side=4, at = pretty(range(regionDM)), col="red", labels=rep("",5) )
   
   mtext("*kg Dry Fuel \n Consumed", side=4, line=6.5, cex=1.8)
   
@@ -229,7 +263,8 @@ map.det <- get(load(ecoRegionFile))
 # Make the annoying factor a numeric array 
 map.det$NA_L2CODE <- as.numeric(as.character(map.det$NA_L2CODE))
 
-png(filename="Figures/summary/ecoregio_burn_area_map.png", 
+png(filename=paste("Figures/summary/ecoregion_burn_area_map_",
+                   largeRegion,".png"), 
     res=250, height=2350, width=3000)
 par(las=1, mar=c(0,0,0,0))
 
@@ -241,11 +276,20 @@ for (i in 1:nRegions){
     plot(map.det[m,], col=regionColors[i], add=T)
 }
 map("state", add=T, lty=2)
-legend("topleft",
-       legend=keepRegions,
-       fill=regionColors,
-       bty="n",
-       cex=3)
+if(largeRegion == "southeast"){
+  legend("bottomright",
+         legend=keepRegions,
+         fill=regionColors,
+         bty="n",
+         cex=3)
+} else{
+  legend("topleft",
+         legend=keepRegions,
+         fill=regionColors,
+         bty="n",
+         cex=3)
+}
+
 
 dev.off()
 # # get centroids
