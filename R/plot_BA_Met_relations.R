@@ -11,17 +11,31 @@ library(fields)
 library(sfsmisc)
 library(lubridate) # for month()
 
-# What region are you investigating? 
-minLat <- 25
-maxLat <- 49.5
-minLon <- -125
-maxLon <- -100
+# What region are you investigating?
+regionName <- "southeast"
+if (regionName == "western_US"){
+  
+  minLat <- 26
+  maxLat <- 49
+  minLon <- -125
+  maxLon <- -100
+  
+} else if(regionName == "southeast"){
+  
+  # TODO: Make a more precise west boundary of interest and think about seasons? 
+  minLat <- 24 
+  maxLat <- 41.5 
+  minLon <- -91   
+  maxLon <- -72     
+  
+}
 
+# TODO: Assign ecoregion nice names to all FPA_FOD df 
 year1 <- 1992
 year2 <- 2015 
-ecoregion_select <- 11.1
-ecoregion_name   <- "Mediterranean California" # "Mediterranean California" "Forested mountains" "High deserts"
-month_select     <- 5:10 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
+ecoregion_select <- 15.4
+ecoregion_name   <- "Everglades" #"Mississippi Alluvial"#"Ozark" #"Southern Plains" # "Mediterranean California" "Forested mountains" "High deserts"
+month_select     <- 1:12 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
 minSize <- 0     # acres
 maxSize <- Inf   # acres
 years  <- year1:year2
@@ -107,10 +121,10 @@ fireLonAdjusted <- fireLon + 360
 # https://software.ecmwf.int/wiki/display/CKB/ERA-Interim%3A+monthly+means
 ################################################################################
 
-# These are nice 0:360 lon bounds that include what we need from North America 
+# These are nice 0:360 lon bounds that include what we need from CONUS 
 # when loading ecmwf data 
 minLon     <- 230.0
-maxLon     <- 263
+maxLon     <- 290
 
 ################################################################################
 # Apply ecmwf gridded ecoregion mask. Want to only look at meteorology in 
@@ -133,6 +147,7 @@ nc_close(grid_attributes)
 grid_latMask       <- grid_latitude > minLat & grid_latitude < maxLat
 grid_lonMask       <- grid_longitude > minLon & grid_longitude < maxLon
 
+# Where in grid are the indicies that cover my limits?
 lati <- min(which(grid_latMask)); 
 lat_count <- max(which(grid_latMask)) - lati
 
@@ -142,7 +157,7 @@ lon_count <- max(which(grid_lonMask)) - loni
 # Location of local nc data batch
 ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
 
-# The gridded array are very large. So we only want to extact exactly what
+# The gridded array are very large. So we only want to extract exactly what
 # we need. This needs to be done for time, lat, and lon. 
 nc_file <- paste0(ncDir, "t2m_", year1, "_", 2016, ".nc")
 nc      <- nc_open(nc_file)
@@ -178,6 +193,17 @@ image.plot(ecmwf_longitude, ecmwf_latitude[flipper], t2m[,flipper, 180])
 # Add fires
 points(fireLonAdjusted, fireLat, pch=".")
 map("state", add=T)
+title("This is where fireLon is adjusted + 360")
+
+
+quartz(width=8, height=5)
+map("state")
+image.plot(ecmwf_longitude-360, ecmwf_latitude[flipper], t2m[,flipper, 180])
+# Add fires
+points(fireLon, fireLat, pch=".")
+map("state", add=T)
+title("This is where ecmwf is adjusted - 360")
+
 
 # Function for loading large .nc files disired latitude longitude extent as 
 # demonstrated by t2m above
@@ -202,7 +228,6 @@ rm(v10, u10)
 
 # wind gust 
 wg <- getMetVar("fg10", loni, lati, ti, lon_count, lat_count, tf)
-
 
 # Now we need the grid_attributes to be subset by the same latitude longitude 
 # we extracted from nc. 
@@ -348,8 +373,6 @@ scatter_plot <- function(x=t2m_mean, y1=FPA_BA_lightning, y2=FPA_BA_human,
 }
 
 inPerM <- 39.3701
-
-
 
 # TODO: make total precip mean of all boxes totals.
 r_T2m <- scatter_plot(x=t2m_mean-273.15, y1=FPA_BA_lightning, y2=FPA_BA_human, xLab="Temperature [C]", yLab="Acres Burned", regionName = ecoregion_name)
