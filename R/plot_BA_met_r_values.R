@@ -7,29 +7,48 @@
 library(ggplot2)
 library(ggthemes)
 
+regionName <- "east"
+
 # where the r (ceof) values live. 
 dataDir <- "Data/correlations/"
 
-df_6.2 <- get(load(paste0(dataDir, "ecoregion_6.2.RData")))
-df_10.1 <- get(load(paste0(dataDir, "ecoregion_10.1.RData")))
-df_11.1 <- get(load(paste0(dataDir, "ecoregion_11.1.RData")))
+if(regionName == "west"){
+  
+  df_6.2 <- get(load(paste0(dataDir, "ecoregion_6.2.RData")))
+  df_10.1 <- get(load(paste0(dataDir, "ecoregion_10.1.RData")))
+  df_11.1 <- get(load(paste0(dataDir, "ecoregion_11.1.RData")))
+  
+  df <- rbind(df_6.2, df_10.1, df_11.1)
+  df$r <- as.numeric(df$r)
+  df$ecoregion <- factor(df$ecoregion, levels=c("6.2", "10.1", "11.1"))
+  # Give nice names to ecoregions 
+  levels(df$ecoregion) <- c("Forested Mountains", "High Deserts", "Mediterranean California")
+
+}else if(regionName == "east"){
+  
+  df_8.3 <- get(load(paste0(dataDir, "ecoregion_8.3.RData")))
+  df_8.4 <- get(load(paste0(dataDir, "ecoregion_8.4.RData")))
+  df_8.5 <- get(load(paste0(dataDir, "ecoregion_8.5.RData")))
+  df_15.4 <- get(load(paste0(dataDir, "ecoregion_15.4.RData")))
+  
+  df <- rbind(df_8.3, df_8.4, df_8.5, df_15.4)
+  df$r <- as.numeric(df$r)
+  df$ecoregion <- factor(df$ecoregion, levels=c("8.3", "8.4", "8.5", "15.4"))
+  # Give nice names to ecoregions 
+  levels(df$ecoregion) <- c("Southeast Plains", "Ozark", 
+                            "Mississippi Alluvial", "Everglades")
+}
+
 rm(r_df)
 
-df <- rbind(df_6.2, df_10.1, df_11.1)
-df$r <- as.numeric(df$r)
-df$ecoregion <- factor(df$ecoregion, levels=c("6.2", "10.1", "11.1"))
 df$ignitionType <- factor(df$ignitionType, levels=c("Lightning", "Human"))
 df$variable <- factor(df$variable, levels=c("T2M","TP","RH"))
-
-# Give nice names to ecoregions 
-levels(df$ecoregion) <- c("Forested Mountains", "High Deserts", "Mediterranean California")
 
 # Make the plot 
 p <- ggplot(df, aes(x=variable, y=r, fill=ignitionType))+
   geom_bar(stat="identity", width=.5, position = "dodge")+
   scale_x_discrete("Meteorology variable",     
                    labels=c("T","Precip", "RH%"))+
-  
   facet_wrap(~ecoregion)+ 
   scale_fill_manual(values=c("gray", "orange"))+
   scale_y_continuous("Pearson correlation")+
@@ -40,7 +59,8 @@ p <- ggplot(df, aes(x=variable, y=r, fill=ignitionType))+
   theme_tufte(ticks=F, base_size = 18)
 
 # Save the plot
-png(filename="Figures/regional_met_relations/correlation_summaruy.png",
+png(filename=paste0("Figures/regional_met_relations/correlation_summary_",
+                    regionName,".png"),
     width=2300, height=1100, res=260)
 p 
 dev.off()
