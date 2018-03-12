@@ -8,17 +8,13 @@ load("Data/FPA_FOD/FPA_FOD_1992_2015.RData")
 library(raster)
 library(randomcoloR)
 
-# # What region are you investigating? 
-# minLat <- 31
-# maxLat <- 49
-# minLon <- -125
-# maxLon <- -100
+# For plotting large wildfires only later 
+regionName <- "southeast"
 
-# Mask out non-CONUS
+# Mask out non-CONUS and lat lon bounds
 noThanks <- c("PR", "HI", "AK") 
 stateMask <- FPA_FOD$STATE %in% noThanks
-FPA_FOD <- FPA_FOD[!stateMask,]
-
+FPA_FOD <- FPA_FOD[!stateMask, ]
 
 lat <- FPA_FOD$LATITUDE
 lon <- FPA_FOD$LONGITUDE
@@ -63,6 +59,33 @@ dev.off()
 # Class F - 1,000 acres or more, but less than 5,000 acres;
 # Class G - 5,000 acres or more.
 
+if (regionName == "west"){
+  
+  minLat <- 26
+  maxLat <- 49
+  minLon <- -125
+  maxLon <- -100
+  
+} else if(regionName == "southeast"){
+  
+  minLat <- 24 
+  maxLat <- 41.5 
+  minLon <- -91   
+  maxLon <- -72     
+  
+}
+
+# Spatial mask is go
+latMask <- (lat <= maxLat) & (lat >= minLat)
+lonMask <- (lon <= maxLon) & (lon >= minLon)
+
+FPA_FOD <- FPA_FOD[latMask & lonMask, ]
+
+# Remake ignition type array
+lat <- FPA_FOD$LATITUDE
+lon <- FPA_FOD$LONGITUDE
+cause <- as.character(FPA_FOD$STAT_CAUSE_DESCR)
+
 # Make charactor not factor
 FPA_FOD$FIRE_SIZE_CLASS <- as.character(FPA_FOD$FIRE_SIZE_CLASS)
 
@@ -86,7 +109,8 @@ for(i in 1:12){
 classCex <- rev(c(0.4, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1))
 
 # Show each panel of fire locations, by class, by ignition. 
-png(file="Figures/CONUS_FPA_FOD_fires_w_class.png", width=1800, height=3700, res=250)
+png(file=paste0("Figures/",regionName,"_FPA_FOD_fires_w_class.png"), 
+    width=1800, height=3700, res=250)
 par(mfrow=c(7,2))
 
 # Plot the large fires first
@@ -95,10 +119,9 @@ for(i in nClasses:1){
   m <- unique_classes[i] == size_class
   
   # Lightning 
-  map("state", xlim=c(-125, -65), mar=c(0,0,3,0))
+  map("state", xlim=c(minLon, maxLon), mar=c(0,0,3,0))
   lightningMask <- (cause == "Lightning") & m 
-  points(lon[lightningMask], lat[lightningMask], 
-         col=monthColor[lightningMask], 
+  points(lon[lightningMask], lat[lightningMask], col=monthColor[lightningMask], 
          pch=19, cex=classCex[i])
   title(paste("Lightning-ignited class", unique_classes[i], "wildfires. n = ",
               sum(lightningMask)), 
@@ -113,7 +136,7 @@ for(i in nClasses:1){
          cex=0.7)
   
   # Human 
-  map("state", xlim=c(-125, -65), mar=c(0,0,3,0))
+  map("state", xlim=c(minLon, maxLon), mar=c(0,0,3,0))
   humanMask <- (cause != "Missing/Undefined") & (cause != "Lightning") & m
   points(lon[humanMask], lat[humanMask], 
          col=monthColor[humanMask], 
@@ -128,22 +151,25 @@ dev.off()
 
 
 ################################################################################
-# Plot the same for western US only and 3 biggest size class only
+# Plot the same for region only US only and 3 biggest size class only
 ################################################################################
-# TODO: THIS NEEDS TO BE CHECKED BUT DON'T BOTHER IF YOU DONT USE THE FIGURE
 
-# We want to investigate the largest fires only. Use this mask to also get rid
-# of fires in the east. 
-lonMask <- lon <= -100
+# TODO: THIS NEEDS TO BE CHECKED BUT DON'T BOTHER IF YOU DONT USE THE FIGURE
+load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
+# SPDF <- SPDF[SPDF$NA_L2CODE %in% c(6.2, 10.1, 11.1),]
+# 
+# SPDF_COL <- c("#E7ED90", "#D2E5B1", "#65B657")
+
+# We want to investigate the largest fires only.
 classMask <- size_class == "G" | size_class == "F" 
 
 # Mask lightning ignitions of G and F Class in the west
 lightningMask <- (cause == "Lightning") 
-m1            <-  classMask & lightningMask & lonMask
+m1            <-  classMask & lightningMask 
 
 # Mask human ignitions of G and F Class in the west
 humanMask <- (cause != "Missing/Undefined") & (cause != "Lightning") 
-m2        <-  classMask & humanMask & lonMask
+m2        <-  classMask & humanMask
 
 # Now I want to make a histogram showing the months these fires occur. First
 # count the number of fires in each month for each ignition
@@ -157,11 +183,12 @@ for (i in 1:12){
 YLIM <- c(0, max(c(m1_month_count, m2_month_count)))
 
 # Plot the locations
-png(file="Figures/large_western_US_FPA_FOD_fires.png", 
+png(file=paste0("Figures/large_",regionName,"_US_FPA_FOD_fires.png"), 
     width=2300, height=2000, res=250)
 par(mfrow=c(2,2))
 
-map("state", xlim=c(-125, -100), mar=c(0,0,4,0))
+map("state", xlim=c(minLon, maxLon), mar=c(0,0,4,0))
+plot(SPDF, lty=2, lwd=1, add=T, col=SPDF_COL)
 points(lon[m1], lat[m1], pch=19, col=monthColor[m1], cex=0.5)
 title(paste0("Lightning-ignited fires > 1000 acres"), line=0, cex.main=1.5)
 
@@ -173,7 +200,8 @@ barplot(height = m1_month_count, names.arg=1:12, ylim=YLIM,
 title( paste0("n=", sum(m1)))#, line=0)
 
 # Plot the large western US fires started by people
-map("state", xlim=c(-125, -100), mar=c(0,0,4,0))
+map("state", xlim=c(minLon, maxLon), mar=c(0,0,4,0))
+plot(SPDF, lty=2, lwd=1, add=T, col=SPDF_COL)
 points(lon[m2], lat[m2], pch=19, col=monthColor[m2], cex=0.5)
 title(paste0("Human-ignited fires > 1000 acres"), line=0, cex.main=1.5)
 
