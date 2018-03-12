@@ -16,7 +16,6 @@
 # 	getYearlyEmissions()
 #	getMonthlyBurnArea()
 
-# TODO: Function that just gets the monthly emissions?
 
 # Daily emissions estimates made possible by
 # http://onlinelibrary.wiley.com/doi/10.1029/2011JD016245/abstract
@@ -48,11 +47,11 @@ import cesm_nc_manager as cnm
 # TODO: estimate daily burn area and save this out!
 # TODO: include 'basis_regions' in nc output?
 # TODO: Save all the two dimensional attributes as thier own NETCDF file
-startYear = 2016
-endYear   = 2016  # If different than startYear, they will be appended.
-species   = 'burned_area'  # 'C' , 'DM' 'burned_area'# (These have daily fraction est.)
-getDaily  = True # execute code to create daily nc
-getMonthly= False # execute code to create monthly nc
+startYear = 1997
+endYear   = 1997  # If different than startYear, they will be appended.
+species   = 'DM'  # 'C' , 'DM' 'burned_area'# (These have daily fraction est.)
+getDaily  = False # execute code to create daily nc
+getMonthly= True # execute code to create monthly nc
 
 # Figure out what machine this code is running on. Set file paths.
 drive = cnm.getDrive()
