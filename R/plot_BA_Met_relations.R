@@ -13,6 +13,7 @@ library(lubridate) # for month()
 
 # What region are you investigating?
 regionName <- "southeast"
+
 if (regionName == "western_US"){
   
   minLat <- 26
