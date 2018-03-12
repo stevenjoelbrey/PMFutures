@@ -34,7 +34,7 @@ largeRegion <- "west"
 
 if (largeRegion == "west"){
   
-  minLat <- 31
+  minLat <- 26
   maxLat <- 49
   minLon <- -125
   maxLon <- -100
