@@ -12,30 +12,29 @@ library(sfsmisc)
 library(lubridate) # for month()
 
 # What region are you investigating?
-regionName <- "southeast"
+regionName <- "southeast" # west
 
-if (regionName == "western_US"){
+if (regionName == "west"){
   
-  minLat <- 26
+  minLat <- 31.2
   maxLat <- 49
   minLon <- -125
-  maxLon <- -100
+  maxLon <- -104
   
 } else if(regionName == "southeast"){
   
-  # TODO: Make a more precise west boundary of interest and think about seasons? 
-  minLat <- 24 
-  maxLat <- 41.5 
+  minLat <- 25 
+  maxLat <- 39 
   minLon <- -91   
-  maxLon <- -72     
+  maxLon <- -75.5  
   
 }
 
 # TODO: Assign ecoregion nice names to all FPA_FOD df 
 year1 <- 1992
 year2 <- 2015 
-ecoregion_select <- 15.4
-ecoregion_name   <- "Everglades" #"Mississippi Alluvial"#"Ozark" #"Southern Plains" # "Mediterranean California" "Forested mountains" "High deserts"
+ecoregion_select <- 11.1
+ecoregion_name   <- "Mediterranean California" #"Mississippi Alluvial"#"Ozark" #"Southern Plains" # "Mediterranean California" "Forested mountains" "High deserts"
 month_select     <- 1:12 # THIS MAY BE VERY WRONG FOR HUMAN and it does vary by region. 
 minSize <- 0     # acres
 maxSize <- Inf   # acres
