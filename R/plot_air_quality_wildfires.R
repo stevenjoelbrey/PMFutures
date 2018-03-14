@@ -3,6 +3,8 @@
 # ------------------------- Description ---------------------------------------
 # This script is used to take a look at the wildfires that qualify as air quality
 # relevent via assignment of HYSPLIT points with assign_HYSPLITPoints_to_FPAFOD.R
+# This script is also responsible for creating dataframes merging the yearly 
+# analysis files output by R/assign_HYSPLITPoints_to_FPAFOD.R
 
 library(ggplot2)
 library(ggmap)
@@ -10,34 +12,58 @@ library(maps)
 library(mapdata)
 library(ggthemes)
 
+# When true remakes merged years from individual years data. 
+makeNew <- TRUE
+
 figureDir <- "Figures/HMS_assignments/"
 
 # Load and append the yearly wildfire data 
 dataDir <- "Data/HMS/" 
 
-if(!file.exists(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))){
+# If the merged datasets do not exist, make them. 
+if(!file.exists(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData")) | makeNew){
 
   # Merge the yearly files 
   df <- get(load( paste0(dataDir, "FPA_FOD_with_HP_", 2007, ".RData") ))
+  df_hms <- get(load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", 2007, ".RData") ))
   for(y in 2008:2015){
+    
     print(paste("Appending:", y))
+    
+    # Load "FPA_FOD" dataframe 
     load( paste0(dataDir, "FPA_FOD_with_HP_", y, ".RData") )
     df <- rbind(df, FPA_FOD)
     rm(FPA_FOD)
     
+    # Load "hysplitPoints" data frame
+    load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", y, ".RData") )
+    df_hms <- rbind(df_hms, hysplitPoints)
+    rm(hysplitPoints)
+    
   }
+  # Give them the original load nice name now that they are merged 
   FPA_FOD <- df
-  rm(df)
-  save(FPA_FOD, file=paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
+  hysplitPoints <- df_hms
   
+  # Make a "paired" variable for making factors needed for plotting easy later
+  # for each dataset. This will help with plotting later when re-doing this 
+  # analysis with AQ context. 
+  FPA_FOD$pairedWithHMS <- FPA_FOD$n_HP > 0
+  hysplitPoints$pairedWithFPAFOD <- hysplitPoints$nFPAFODPaired > 0 
+  
+  rm(df, df_hms)
+  save(FPA_FOD, file=paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
+  save(hysplitPoints, file=paste0(dataDir, "hysplitPoints_with_FPAFOD_2007_2015.RData"))
+    
 } else{
   
   print("Loading data file that exists")
   load(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
+  load(paste0(dataDir, "hysplitPoints_with_FPAFOD_2007_2015.RData"))
   
 }
 
-# I do not want Alaska, HI, or PR
+# I do not want Alaska, HI, or PR, for plotting purposes. 
 fire_states <- FPA_FOD$STATE
 stateMask <- fire_states != "HI" & fire_states != "AK" & fire_states != "PR"
 FPA_FOD <- FPA_FOD[stateMask, ]
@@ -51,6 +77,7 @@ FPA_FOD$fire_cause <- fire_cause
 
 # Lets get some basics out of the way. Wildfires per year, proportion associated
 # with HMS analysis
+# TODO: Make monthly
 years <- unique(FPA_FOD$FIRE_YEAR)
 nYears <- length(years)
 n_fires     <- rep(NA, nYears)
@@ -79,6 +106,7 @@ dev.off()
 ################################################################################
 # Map when and where the paired fire data occur in the US. 
 # http://eriqande.github.io/rep-res-web/lectures/making-maps-with-R.html
+################################################################################
 AQ_fires <- FPA_FOD[FPA_FOD$n_HP > 0, ] 
 
 png(filename=paste0(figureDir, "AQ_fires_mapped.png"), res=100, 
@@ -96,6 +124,55 @@ ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
   scale_colour_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))
   
 dev.off()  
+
+################################################################################
+# Plot the locations of HYSPLIT points that have been paired with FPA FOD and 
+# those that have not. 
+################################################################################
+
+world <- map_data("world")
+
+
+hysplitPoints$paried  <- as.factor(hysplitPoints$nFPAFODPaired > 0)
+
+png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"), res=100, 
+    width=2000, height=1200)
+
+ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
+                        fill = NA, color = "gray") + 
+  coord_fixed(1.3)+ 
+  theme_tufte(ticks=T, base_size = 20)+
+  geom_point(data = hysplitPoints, aes(x = Lon, y = Lat, 
+                                  color = paried), shape=19, size=0.5)+
+  xlim(c(-125,-60))+
+  ylim(c(27,49))+
+  ggtitle("Hysplit points shaded by pairing with FPA FOD")
+  # geom_polygon(data = world, aes(x=long, y = lat, group = group),
+  #              fill = "white", color = NA) 
+
+dev.off()  
+
+################################################################################
+# Plot the paired datasets on the same map. Color by dataset. Dots off alone
+# in the wild represent errors as there should be no more than 10 km of seperation.
+################################################################################
+
+HP_paired <- hysplitPoints[hysplitPoints$nFPAFODPaired > 0, ]
+
+png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"), 
+    width=2000, height=1200)
+
+ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
+                        fill = NA, color = "gray") + 
+  coord_fixed(1.3)+
+  geom_point(data = HP_paired, aes(x = Lon, y = Lat), shape=19, size=0.5, col="blue")+
+  geom_point(data = AQ_fires, aes(x = LONGITUDE, y = LATITUDE), shape=19, size=0.5, col="red")+
+  theme_tufte(ticks=T, base_size = 20)+
+  ylim(c(25,49.5))+
+  xlim(c(-125,-60))
+
+
+dev.off()
 
 ################################################################################
 # HMS smoke duration hours as a function of 
