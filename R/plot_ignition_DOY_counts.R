@@ -12,23 +12,24 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-regionName <- "southeast"
+regionName <- "west"
 
 if (regionName == "west"){
   
-  minLat <- 25
+  minLat <- 31.2
   maxLat <- 49
   minLon <- -125
-  maxLon <- -100
+  maxLon <- -104
   
 } else if(regionName == "southeast"){
   
-  minLat <- 24 
-  maxLat <- 41.5 
+  minLat <- 25 
+  maxLat <- 39 
   minLon <- -91   
-  maxLon <- -72     
+  maxLon <- -75.5  
   
 }
+
 
 # # Bounds take care of this subestting specification 
 # ecoregion <- c(6.2,  9.2,  9.3, 10.1, 9.4, 13.1, 12.1, 10.2, 11.1,  7.1,  8.4,  8.3,  8.5,  9.5,  5.2,  8.1, 5.3,  3.1,  6.1, 15.4,  0.0 , 2.2,  3.2,  2.3,  8.2,  9.6)
@@ -150,7 +151,8 @@ h <- hist(JDay, breaks = JDaysArray,
           main="", las=1, xaxt="n", 
           xlab="", ylab="Ignition Count",
           cex.lab=1.8,
-          col="gray")
+          col="gray",
+          ylim=c(0,7200))
 title(paste(regionName, "ignition counts: 1992-2015"))
 
 # Non-lightning only 

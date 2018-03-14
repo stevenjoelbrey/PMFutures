@@ -30,14 +30,14 @@ endYear   <- 2015 # When this is 2015 all the data are used.
 
 # What is the general part of the country you are looking at? This will be a 
 # directory under figures from here forward?
-largeRegion <- "west"
+largeRegion <- "southeast"
 
 if (largeRegion == "west"){
   
-  minLat <- 26
+  minLat <- 31.2
   maxLat <- 49
   minLon <- -125
-  maxLon <- -100
+  maxLon <- -104
   
   keepRegions <- c(6.2, 10.1, 7.1, 9.3, 9.4, 13.1, 12.1, 11.1, 10.2)
   regionColors <- c("#65B657", "#E7ED90", "#60BAAF", "#F2DBA1", "#EDCB9B",
@@ -45,10 +45,10 @@ if (largeRegion == "west"){
   
 } else if(largeRegion == "southeast"){
   
-  minLat <- 24 
-  maxLat <- 41.5 
+  minLat <- 25 
+  maxLat <- 39 
   minLon <- -91   
-  maxLon <- -72     
+  maxLon <- -75.5   
 
   keepRegions <- c(8.1, 8.2, 8.3, 8.4, 8.5, 15.4, 5.3)
   # TODO: Make colors match map. Make unique for now. 

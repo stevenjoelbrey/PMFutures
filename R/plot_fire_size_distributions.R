@@ -17,21 +17,21 @@
 
 # TODO: Figure out why colorado subset does not add up to 100% for both types
 
-regionName <- "southeast"
+regionName <- "west" # "west" "southeast"
 
-if (regionName == "western_US"){
+if (regionName == "west"){
   
-  minLat <- 26
+  minLat <- 31.2
   maxLat <- 49
   minLon <- -125
-  maxLon <- -100
+  maxLon <- -104
   
 } else if(regionName == "southeast"){
   
-  minLat <- 24 
-  maxLat <- 41.5 
+  minLat <- 25 
+  maxLat <- 39 
   minLon <- -91   
-  maxLon <- -72     
+  maxLon <- -75.5  
   
 }
 
