@@ -269,7 +269,11 @@ png(filename=paste("Figures/summary/ecoregion_burn_area_map_",
 par(las=1, mar=c(0,0,0,0))
 
 # Make a simple map showing the ecoregions 
-map("state", xlim=c(minLon-7, maxLon), ylim=c(minLat, maxLat), lwd=0.1)
+if(largeRegion=="west"){
+  map("state", xlim=c(minLon-7, maxLon), ylim=c(minLat, maxLat), lwd=0.1)
+} else{
+  map("state", xlim=c(minLon, maxLon), ylim=c(minLat, maxLat), lwd=0.1)
+}
 
 for (i in 1:nRegions){
   m <- as.numeric(as.character(map.det$NA_L2CODE)) == keepRegions[i]
