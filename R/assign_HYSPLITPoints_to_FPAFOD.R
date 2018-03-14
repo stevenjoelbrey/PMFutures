@@ -4,7 +4,14 @@ if(length(args)==0){
   args=2007
 }
 
+# TODO: Assign Unique FPA ID to the HMS hysplit points that are assigned to 
+# TODO: wildfires. This tells us how many are associated with all lands wildfires
+# TODO: and allows easy sanity checking of pairs via plotting. 
+
 # assign_HYSPLITPoints_to_FPAFOD.R 
+
+# TO RUN THIS SCRIPT
+# Rscript --vanilla R/assign_HYSPLITPoints_to_FPAFOD.R 2007
 
 year <- args[1]
 print(paste("WORKING ON ASSIGNING HMS TO FPA FOD YEAR:", year))
@@ -21,8 +28,6 @@ print(paste("WORKING ON ASSIGNING HMS TO FPA FOD YEAR:", year))
 # Description of the HMS HYPSLIT points can be found in Brey et al. 2017
 # https://www.atmos-chem-phys.net/18/1745/2018/acp-18-1745-2018-discussion.html
 #
-# TO RUN THIS SCRIPT
-# Rscript --vanilla R/assign_HYSPLITPoints_to_FPAFOD.R 2007
 #
 # The FPA FOD data used by this script was processes by:
 # R/assign_ecoregion_to_FPAFOD.R
@@ -31,6 +36,7 @@ print(paste("WORKING ON ASSIGNING HMS TO FPA FOD YEAR:", year))
 
 library(geosphere)
 library(maps)
+library(lubridate)
 
 # -------------------------- Set tolerance values  -----------------------------
 distanceTol <- 10  # haversinse kilometers required for HP to be assigned to FPAFOD
@@ -38,8 +44,20 @@ timeBefireTol <- 1 # days before FPAFOD discovery_date HP allowed to occur for m
 timeAfterTol <- 7  # days after FPAFOD discovery_date HP allowed to be assigned
 
 
-# Load the HMS Hysplit Points dataframe
+# Load the HMS Hysplit Points dataframe. To be sure nothing strange happens in
+# assignments, allow assignments to be made using only this years data. This 
+# will impact assignments at the end and beginning of year. 
 load("Data/HMS/hysplitPoints_2007_2017.RData")
+yearMask <- lubridate::year(hysplitPoints$DATE) == year
+hysplitPoints <- hysplitPoints[yearMask,]
+
+# Keep track of how many wildfires this is assocaited with
+hysplitPoints$nFPAFODPaired <- rep(0, dim(hysplitPoints)[1])
+
+# HEADERS <- c("Fire1", "Fire2", "Fire3", "Fire4", "Fire5", "Fire6")
+# df <-  data.frame(matrix(ncol = length(HEADERS), nrow = dim(hysplitPoints)[1]))
+# names(df) <- HEADERS
+# hysplitPoints <- cbind(hysplitPoints, df)
 
 # Load the FPA-FOD wildfires that will be assigned Hysplit Point Stats
 load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
@@ -110,18 +128,11 @@ for (i in 1:nWildfire){ # nWildfire
     
   }
   
-  # plot(hysplitPoints$Lon[distMaskClone], hysplitPoints$Lat[distMaskClone],
-  #      pch=".", col="blue")
-  # map("state", add=T)
-  # points(fireLon, fireLat, col="red")
-  # points(p2[dist_km_mask,1], p2[dist_km_mask,2], col="blue", pch=19, cex=0.5)
-  # points(hysplitPoints$Lon[distMask], hysplitPoints$Lat[distMask],
-  #        pch=19, cex=0.3, col="red")
-  
   # See if there are any overlap of the time and space mask. This needs to be
   # done again now that the km distance restriction has been applied
   timeAndSpace <- distMask & tMask
   n_HP <- sum(timeAndSpace)
+  
   
   if(n_HP > 0){
     
@@ -135,12 +146,22 @@ for (i in 1:nWildfire){ # nWildfire
     FPA_FOD$minDate[i] <- min(hysplitPoints$DATE[timeAndSpace])
     FPA_FOD$maxDate[i] <- max(hysplitPoints$DATE[timeAndSpace])
     
-  }else{
+    # We also want to know what wildfire the HYSPLIT point was paired to. 
+    # TODO: Get those fires ID, that would be epic!
+    hysplitPoints$nFPAFODPaired[timeAndSpace] <- hysplitPoints$nFPAFODPaired[timeAndSpace] + 1
     
+    # plot(hysplitPoints$Lon[distMaskClone], hysplitPoints$Lat[distMaskClone],
+    #      pch=19, col="blue") # Plots hysplit points that are close enough
+    # map("state", add=T)
+    # points(fireLon, fireLat, col="red") # plot the wildfire of interest
+    # points(hysplitPoints$Lon[timeAndSpace], hysplitPoints$Lat[timeAndSpace],
+    #        pch=19, cex=0.3, col="red") # plots the wildfires that are close enough in space and time. 
+    # 
+    
+  }else{
     # All other rows left NA, there are no hysplit points associated with this
     # wildfire 
     FPA_FOD$n_HP[i] <- 0
-    
   }
   
   # Update the user with how far along we are
@@ -150,12 +171,14 @@ for (i in 1:nWildfire){ # nWildfire
   
 } # End of wildfire loop
 
-
 # Where no meaningful date was assigned, turn back to NA
 FPA_FOD$minDate[FPA_FOD$minDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 FPA_FOD$maxDate[FPA_FOD$maxDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 
 # save the appended data 
-saveName <- paste0("Data/HMS/FPA_FOD_with_HP_", year, ".RData")
-save(FPA_FOD, file = saveName)
+saveName1 <- paste0("Data/HMS/FPA_FOD_with_HP_", year, ".RData")
+save(FPA_FOD, file = saveName1)
 
+# Save the hysplitpoints dataframe with the number of FOD fires it was paired to
+saveName2 <- paste0("Data/HMS/hysplitPoints_with_FPAFOD_", year, ".RData")
+save(hysplitPoints, file = saveName2)
