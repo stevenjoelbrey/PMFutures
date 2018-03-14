@@ -7,9 +7,9 @@
 library(ggplot2)
 library(ggthemes)
 
-regionName <- "east"
+regionName <- "west"
 
-# where the r (ceof) values live. 
+# where the r (coef) values live. 
 dataDir <- "Data/correlations/"
 
 if(regionName == "west"){
@@ -24,7 +24,7 @@ if(regionName == "west"){
   # Give nice names to ecoregions 
   levels(df$ecoregion) <- c("Forested Mountains", "High Deserts", "Mediterranean California")
 
-}else if(regionName == "east"){
+}else if(regionName == "southeast"){
   
   df_8.3 <- get(load(paste0(dataDir, "ecoregion_8.3.RData")))
   df_8.4 <- get(load(paste0(dataDir, "ecoregion_8.4.RData")))
