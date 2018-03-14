@@ -7,9 +7,26 @@ load("Data/FPA_FOD/FPA_FOD_1992_2015.RData")
 
 library(raster)
 library(randomcoloR)
+library(maps)
 
 # For plotting large wildfires only later 
 regionName <- "southeast"
+
+if (regionName == "west"){
+  
+  minLat <- 31.2
+  maxLat <- 49
+  minLon <- -125
+  maxLon <- -104
+  
+} else if(regionName == "southeast"){
+  
+  minLat <- 25 
+  maxLat <- 39 
+  minLon <- -91   
+  maxLon <- -75.5  
+  
+}
 
 # Mask out non-CONUS and lat lon bounds
 noThanks <- c("PR", "HI", "AK") 
@@ -29,7 +46,20 @@ map("state", xlim=c(-125, -65))
 points(lon, lat, pch=".", col=dot_color)
 map("state", add=T)
 title("US Wildfires | 1992 - 2015", cex.main=4)
-abline(v=-100, lty=3, lwd=3)
+
+
+boxLwd <- 3
+# Show the east box 
+segments(x0=-75.5 , y0=25, x1=-91, y1=25, col="black", lty=3, lwd=boxLwd)
+segments(x0=-75.5 , y0=39, x1=-91, y1=39, col="black", lty=3, lwd=boxLwd)
+segments(x0=-75.5 , y0=25, x1=-75.5 , y1=39, col="black", lty=3, lwd=boxLwd)
+segments(x0=-91, y0=25, x1=-91, y1=39, col="black", lty=3, lwd=boxLwd)
+
+# Show the west box
+segments(x0=-104, y0=31.2, x1=-104, y1=49, col="black", lty=3, lwd=boxLwd)
+segments(x0=-125, y0=49, x1=-104, y1=49, col="black", lty=3, lwd=boxLwd)
+segments(x0=-125, y0=31.2, x1=-125, y1=49, col="black", lty=3, lwd=boxLwd)
+segments(x0=-125, y0=31.2, x1=-104, y1=31.2, col="black", lty=3, lwd=boxLwd)
 
 # # Cover part of line we do not want with Canada and Mexico
 # canada <- getData("GADM",country="CAN", level=1)
@@ -59,21 +89,7 @@ dev.off()
 # Class F - 1,000 acres or more, but less than 5,000 acres;
 # Class G - 5,000 acres or more.
 
-if (regionName == "west"){
-  
-  minLat <- 26
-  maxLat <- 49
-  minLon <- -125
-  maxLon <- -100
-  
-} else if(regionName == "southeast"){
-  
-  minLat <- 24 
-  maxLat <- 41.5 
-  minLon <- -91   
-  maxLon <- -72     
-  
-}
+
 
 # Spatial mask is go
 latMask <- (lat <= maxLat) & (lat >= minLat)
