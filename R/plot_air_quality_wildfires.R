@@ -12,56 +12,13 @@ library(maps)
 library(mapdata)
 library(ggthemes)
 
-# When true remakes merged years from individual years data. 
-makeNew <- TRUE
-
+dataDir <- "Data/HMS/" 
 figureDir <- "Figures/HMS_assignments/"
 
-# Load and append the yearly wildfire data 
-dataDir <- "Data/HMS/" 
-
-# If the merged datasets do not exist, make them. 
-if(!file.exists(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData")) | makeNew){
-
-  # Merge the yearly files 
-  df <- get(load( paste0(dataDir, "FPA_FOD_with_HP_", 2007, ".RData") ))
-  df_hms <- get(load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", 2007, ".RData") ))
-  for(y in 2008:2015){
-    
-    print(paste("Appending:", y))
-    
-    # Load "FPA_FOD" dataframe 
-    load( paste0(dataDir, "FPA_FOD_with_HP_", y, ".RData") )
-    df <- rbind(df, FPA_FOD)
-    rm(FPA_FOD)
-    
-    # Load "hysplitPoints" data frame
-    load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", y, ".RData") )
-    df_hms <- rbind(df_hms, hysplitPoints)
-    rm(hysplitPoints)
-    
-  }
-  # Give them the original load nice name now that they are merged 
-  FPA_FOD <- df
-  hysplitPoints <- df_hms
-  
-  # Make a "paired" variable for making factors needed for plotting easy later
-  # for each dataset. This will help with plotting later when re-doing this 
-  # analysis with AQ context. 
-  FPA_FOD$pairedWithHMS <- FPA_FOD$n_HP > 0
-  hysplitPoints$pairedWithFPAFOD <- hysplitPoints$nFPAFODPaired > 0 
-  
-  rm(df, df_hms)
-  save(FPA_FOD, file=paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
-  save(hysplitPoints, file=paste0(dataDir, "hysplitPoints_with_FPAFOD_2007_2015.RData"))
-    
-} else{
-  
-  print("Loading data file that exists")
-  load(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
-  load(paste0(dataDir, "hysplitPoints_with_FPAFOD_2007_2015.RData"))
-  
-}
+# Load the merged yearly paired fire data created by R/merge_paired_fires.R
+print("Loading data file that exists")
+load(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
+load(paste0(dataDir, "hysplitPoints_with_FPA_FOD_2007_2015.RData"))
 
 # I do not want Alaska, HI, or PR, for plotting purposes. 
 fire_states <- FPA_FOD$STATE
@@ -102,6 +59,58 @@ title("Annual percent of FPA FOD wildfires paired with HYSPLIT Points")
 
 dev.off()
 
+
+################################################################################
+# Show the number of FPA wildfires that are associated with air quality 
+# forecasts in each region. 
+################################################################################
+png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region.png"), 
+    res=250, height=1000, 
+    width=1500)
+
+# Mask out non west or southeast region, also wildfires with no hysplits
+m <- (FPA_FOD$region != "") & (FPA_FOD$n_HP > 0)
+df <- FPA_FOD[m,]
+
+ggplot(df, aes(x=region, fill=fire_cause))+
+  geom_bar(stat="count", width=0.5, position = "dodge")+
+  scale_fill_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  guides(fill=guide_legend(title="Fire Cause"))+
+  theme_tufte(ticks=T, base_size = 20)+
+  ylab("Wildfire count")+
+  ggtitle("FPA FOD wildires associated\nwith air quality forecasts")
+
+
+dev.off()
+
+################################################################################
+# Show the number of Hysplit points that are associated with FPA FOD wildfires
+# in each region. 
+################################################################################
+png(filename=paste0(figureDir, "HysplitPoints_wFPA_FOD_count_by_region.png"), 
+    res=250, height=1000, 
+    width=1500)
+
+# Mask out non west or southeast region, also wildfires with no hysplits
+m <- (hysplitPoints$region != "") 
+df <- hysplitPoints[m,]
+
+# Make an association factor 
+wild <- rep("", sum(m))
+wild[df$pairedWithFPAFOD] <- "Yes"
+wild[!df$pairedWithFPAFOD] <- "No"
+df$wild <- wild
+
+ggplot(df, aes(x=region, fill=wild))+
+  geom_bar(stat="count", width=0.5, position = "dodge")+
+  #scale_fill_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  guides(fill=guide_legend(title="Accounted for in\nFPA FOD"))+
+  theme_tufte(ticks=T, base_size = 20)+
+  theme(plot.title = element_text(hjust = 0.5))+ # Center the title
+  ylab("Hysplit point count")+
+  ggtitle("HYSPLIT points analysed")
+
+dev.off()
 
 ################################################################################
 # Map when and where the paired fire data occur in the US. 
