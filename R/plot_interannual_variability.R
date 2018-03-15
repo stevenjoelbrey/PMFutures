@@ -1,4 +1,4 @@
-# plot_interannual_variability_vs_met.R
+# plot_interannual_variability.R
 
 # ------------------------- Description ---------------------------------------
 # This script will be used to plot regional interannual variability in burn area
@@ -16,29 +16,13 @@ library(sfsmisc)
 library(lubridate) # for month()
 
 # What region are you investigating? 
-regionName <- "east"
-
-if (regionName == "west"){
-  
-  minLat <- 26
-  maxLat <- 49
-  minLon <- -125
-  maxLon <- -100
-  
-} else if(regionName == "east"){
-  
-  minLat <- 24 
-  maxLat <- 41.5 
-  minLon <- -91   
-  maxLon <- -72     
-  
-}
-
+regionName <- "west"
+ecoregion_select <- 11.1
 year1 <- 1992
-year2 <- 2015 
-ecoregion_select <- 15.4
-#state_select <- 7 #c("Washington", "Oregon", "Montana") # coming soon
+year2 <- 2015
 month_select  <- 1:12 # THIS MAY BE VERY WRONG FOR HUMAN OR NON WEST REGIONS!
+# Load the region lat and lon bounds
+load(paste0("Data/GIS/", regionName,"_bounds.RData"))
 
 years  <- year1:year2
 nYears <- length(years)
@@ -49,7 +33,7 @@ nYears <- length(years)
 experimentDir <- paste0("eco=", ecoregion_select, "_", 
                         "months=", min(month_select),"_", max(month_select), 
                         "/" )
-figureDir     <- paste0("Figures/regional_met_relations/", experimentDir)
+figureDir     <- paste0("Figures/regional_interannual_variability/", experimentDir)
 
 if(!dir.exists(figureDir)){
   dir.create(figureDir)
@@ -65,7 +49,15 @@ load(paste0("Data/FPA_FOD/FPA_FOD_ecmwf_", year1,"_", year2,".RData"))
 # Get rid of fires that have "Missing/Undefined" start types, cleaner analysis
 # with fewer assumptions. 
 HasStartInfo <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
-FPA_FOD <- FPA_FOD[HasStartInfo,]
+
+# There are parts of regions in the SE we do not want to include in the analysis
+# so the lat lon bounds need to be applied
+latMask <- (FPA_FOD$LATITUDE > minLat) & (FPA_FOD$LATITUDE < maxLat)
+lonMask <- (FPA_FOD$LONGITUDE > minLon) & (FPA_FOD$LONGITUDE < maxLon)
+
+m <- latMask & lonMask & HasStartInfo
+   
+FPA_FOD <- FPA_FOD[m, ]
 
 # Get fire parameters too be used in subsetting the data 
 fireDate      <- FPA_FOD$DISCOVERY_DATE
@@ -78,7 +70,7 @@ fireMonth     <- lubridate::month(fireDate)
 fireSize      <- FPA_FOD$FIRE_SIZE
 
 # Handy arrays
-humanStart <- fireCause != "Lightning" # because "Missing" have been removed
+humanStart <- fireCause != "Lightning" # because "Missing/Undefined" have been removed
 nFires     <- length(fireSize)
 
 # Load ecoregion borders, for plotting, analysis etc. 
@@ -160,7 +152,7 @@ for (i in 1:nYears){
 ################################################################################
 # Plot Interannual variability over time for selected months 
 ################################################################################
-png(filename=paste0(figureDir,"FPA_FOD_interannual_variability_mapped_",
+png(filename=paste0(figureDir,"FPA_FOD_interannual_variability_",
                     ecoregion_select,
                     ".png"),
     height=2000, width=4800, res=250)
