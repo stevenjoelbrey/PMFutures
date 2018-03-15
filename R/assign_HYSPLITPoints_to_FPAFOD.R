@@ -33,6 +33,9 @@ print(paste("WORKING ON ASSIGNING HMS TO FPA FOD YEAR:", year))
 # R/assign_ecoregion_to_FPAFOD.R
 # R/assign_ecmwf_reanalysis_to_FPA_FOD.R
 # R/assign_metGrid_to_FPAFOD.R 
+#
+# After this script is run for each year, combine the yearly data, adding 
+# desired attributes, using R/merge_paired_fires.R 
 
 library(geosphere)
 library(maps)
