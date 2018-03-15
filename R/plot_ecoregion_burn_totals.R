@@ -34,10 +34,7 @@ largeRegion <- "southeast"
 
 if (largeRegion == "west"){
   
-  minLat <- 31.2
-  maxLat <- 49
-  minLon <- -125
-  maxLon <- -104
+  load("Data/GIS/west_bounds.RData")
   
   keepRegions <- c(6.2, 10.1, 7.1, 9.3, 9.4, 13.1, 12.1, 11.1, 10.2)
   regionColors <- c("#65B657", "#E7ED90", "#60BAAF", "#F2DBA1", "#EDCB9B",
@@ -45,10 +42,7 @@ if (largeRegion == "west"){
   
 } else if(largeRegion == "southeast"){
   
-  minLat <- 25 
-  maxLat <- 39 
-  minLon <- -91   
-  maxLon <- -75.5   
+  load("Data/GIS/southeast_bounds.RData")
 
   keepRegions <- c(8.1, 8.2, 8.3, 8.4, 8.5, 15.4, 5.3)
   # TODO: Make colors match map. Make unique for now. 
