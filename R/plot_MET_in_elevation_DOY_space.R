@@ -4,25 +4,31 @@
 # NOTE: cowplot sometimes does not save figure when source() in RStudio is used. 
 # NOTE: run all code by selecting and executing till you figure this out. 
 
+# TODO: See if there is a difference in environmental conditions of where fires
+# TODO: occur based on association with air quality forecasts. 
+
+
 library(ggplot2)
 library(RColorBrewer)
 library(scales) 
 library(ggthemes)
 
-regionName <- "east"
+regionName <- "southeast_and_west" # "southeast", "west", "southeast_and_west"
+yAxis <- "t2m" # "elevation"
 
-if(regionName == "east_and_west"){
+if(regionName == "southeast_and_west"){
   ecoregionSelect <- c(6.2, 10.1, 11.1, 8.5, 8.4, 8.3, 15.4) 
-}else if(regionName == "east"){
+}else if(regionName == "southeast"){
   ecoregionSelect <- c(8.5, 8.4, 8.3, 15.4) 
 } else if(regionName == "west"){
   ecoregionSelect <- c(6.2, 10.1, 11.1) 
 }
 
-minSize         <- 0 # minimum fire size to include
+minSize <- 0 # minimum fire size to include
 
 # Load the data that has griodMET appended. 
 load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
+FPA_FOD$t2m <- FPA_FOD$t2m - 273.15
 
 # Mask by ecoregion and lat and lon. 
 # TODO: Do we even need to subset by lat and lon since we are doing ecoregions? 
@@ -90,10 +96,10 @@ if(minSize > 100){
 }
 
 # Plot the space for the desired ecoregions 
-p <- ggplot(df, aes(x=DISCOVERY_DOY, y=elevation, 
+p <- ggplot(df, aes(x=DISCOVERY_DOY, y=df[[yAxis]], 
                     color=fuel_moisture_1000hr,
                     size=FIRE_SIZE)) +
-  geom_point(aes(x=DISCOVERY_DOY, y=elevation, 
+  geom_point(aes(x=DISCOVERY_DOY, y=df[[yAxis]], 
                  color=fuel_moisture_1000hr,
                  size=FIRE_SIZE), 
              alpha=0.75)+
@@ -106,10 +112,10 @@ p <- ggplot(df, aes(x=DISCOVERY_DOY, y=elevation,
   labs(color='1000 hr \nfuel moisture %') +
   labs(size='Fire size \n(acres)')+
   guides(size = guide_legend(order=2))+
-  theme_tufte(ticks=T, base_size = 25)
+  theme_tufte(ticks=T, base_size = 20)
   
 print("Getting to code to save figure.")
-saveName <- paste0("Figures/elevation_DOY_space/minSize=",
+saveName <- paste0("Figures/elevation_DOY_space/", yAxis,"_minSize=",
                    minSize,"_",regionName,".png")
 png(filename=saveName, width=4000, height=2700, res=250)
 p
