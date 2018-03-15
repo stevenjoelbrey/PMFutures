@@ -4,6 +4,9 @@
 # This script will be used to compare the interannual variability of 
 # environmental variables and burn area, segregated by ignition type. 
 
+# TODO: Retire ecmwf here and use gridMet instead so we have more values 
+# TODO: representing small ecoregions and higher resolution. 
+
 library(stringr)
 library(maps)
 library(ncdf4)
