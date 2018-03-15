@@ -10,14 +10,17 @@ library(randomcoloR)
 library(maps)
 
 # For plotting large wildfires only later 
-regionName <- "southeast"
+regionName <- "west"
 
+# This is the script that sets the bounds used in all scripts for the SE and W
+# regions used in this study. 
 if (regionName == "west"){
   
   minLat <- 31.2
   maxLat <- 49
   minLon <- -125
   maxLon <- -104
+  save(minLat, maxLat, minLon, maxLon, file="Data/GIS/west_bounds.RData")
   
 } else if(regionName == "southeast"){
   
@@ -26,7 +29,12 @@ if (regionName == "west"){
   minLon <- -91   
   maxLon <- -75.5  
   
+  save(minLat, maxLat, minLon, maxLon, file="Data/GIS/southeast_bounds.RData")
+  
 }
+
+
+
 
 # Mask out non-CONUS and lat lon bounds
 noThanks <- c("PR", "HI", "AK") 
