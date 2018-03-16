@@ -12,12 +12,13 @@ if(length(args)==0){
 # This script takes the merged FPA FOD fire data created by 
 # R/merge_ecoregion_year_Data.R and assigns reanalysis and elevation data. 
 
-
 print("-----------------------------------------------------------------------")
 print("This script assigns ecmwf reanalysis and elevation data to FPA-FOD fires.")
 print(args)
 print("-----------------------------------------------------------------------")
 
+print("Spanning:")
+print( c(year1, year2) )
 
 # execute via command line, this takes about 3 hours, e.g. below  
 # Rscript --vanilla R/assign_ecmwf_reanalysis_to_FPA_FOD.R 1992 2015
@@ -30,7 +31,7 @@ print("-----------------------------------------------------------------------")
 # RH
 # T
 # precip, TODO: how much precip in season so far
-# days_since_rain_2003_2016.nc
+# days_since_rain_1992_2016.nc
 # dew point 
 
 library(stringr)
@@ -90,7 +91,7 @@ print(sum(is.na(FPA_FOD$DISCOVERY_DATE)))
 
 # NOTE: This only works since all fires are treated as points, and only exist
 # NOTE: in the western hemisphere. This adjustment is so 0:360 nc data can 
-# NOTE: interact with -180:180 fire data
+# NOTE: interact with -180:180 wildfire data
 fireLonAdjusted <- fireLon + 360
 
 # Set path to ecmwf era-interim data 
@@ -98,12 +99,14 @@ ncDir <- "/Volumes/Brey_external/era_interim_nc_daily_merged/"
 
 print("Loading lots of large nc data")
 
+# NOTE: All the daily_merged nc data end in the year 2016 so that number will
+# NOTE: be hard coded in the file names throughout
 nc_file <- paste0(ncDir,"t2m_", year1, "_", 2016, ".nc")
 nc <- nc_open(nc_file)
 
 # Handle ecmwf time with origin 1900-01-01 00:00:0.0
-ecmwf_hours <- ncvar_get(nc, "time")
-ecmwf_seconds <- ecmwf_hours * 60^2
+ecmwf_hours <- ncvar_get(nc, "time") # unites are hours from origin
+ecmwf_seconds <- ecmwf_hours * 60^2 # want secinds for easy POSIXct conversions
 
 # make time useful unit
 t0 <- as.POSIXct("1900-01-01 00:00:0.0", tz="UTC")
@@ -113,7 +116,7 @@ ecmwfDate <- t0 + ecmwf_seconds
 # the last date in the year2 is. 
 tf <- which(ecmwfDate == as.POSIXct(paste0(year2, "-12-31"), tz="UTC"))
 
-# Now actually load the data
+# Now actually load the data fields from the nc file connection
 ecmwf_latitude <- ncvar_get(nc, "latitude")
 ecmwf_longitude <- ncvar_get(nc, "longitude")
 nLat <- length(ecmwf_latitude)
@@ -144,6 +147,8 @@ nc_close(nc)
 ecmwfDate <- ecmwfDate[1:tf]
 if(length(ecmwfDate) != dim(t2m)[3]){
   stop("The ecmwfDate date array and variable array do not match in length")
+}else{
+  print(paste("The max time in the ecmwfDate array is:", ecmwfDate[tf]))
 }
 
 ################################################################################
@@ -151,8 +156,8 @@ if(length(ecmwfDate) != dim(t2m)[3]){
 # area you think you are...
 quartz()
 f <- length(ecmwf_latitude):1
-image.plot(ecmwf_longitude, ecmwf_latitude[f], t2m[,f,180])
-title(paste("This map should show T over North America for", ecmwfDate[180]))
+image.plot(ecmwf_longitude, ecmwf_latitude[f], t2m[,f,400])
+title(paste("This map should show T over North America for", ecmwfDate[400]))
 
 # Create array of starts and finishes to make loading nc code cleaner
 starts <- c(lon1,lat1, 1)
@@ -165,19 +170,19 @@ rh2m <- ncvar_get(nc, "rh2m", start=starts, count=counts)
 nc_close(nc)
 
 # days since rain 
-nc_file <- paste0(ncDir,"days_since_rain_",year1,"_",2016,".nc")
+nc_file <- paste0(ncDir,"days_since_rain_",year1,"_", 2016,".nc")
 nc <- nc_open(nc_file)
 daysSinceRain <- ncvar_get(nc, "days_since_rain", start=starts, count=counts)
 nc_close(nc)
 
 # total precip
-nc_file <- paste0(ncDir,"tp_",year1,"_",2016,".nc")
+nc_file <- paste0(ncDir,"tp_",year1,"_", 2016,".nc")
 nc <- nc_open(nc_file)
 tp <- ncvar_get(nc, "tp", start=starts, count=counts)
 nc_close(nc)
 
 # dew point
-nc_file <- paste0(ncDir,"d2m_",year1,"_",2016,".nc")
+nc_file <- paste0(ncDir,"d2m_",year1,"_", 2016,".nc")
 nc <- nc_open(nc_file)
 d2m <- ncvar_get(nc, "d2m", start=starts, count=counts)
 nc_close(nc)
@@ -208,8 +213,8 @@ rm(v10, u10)
 # much anywhere else. 
 quartz()
 f <- length(ecmwf_latitude):1
-image.plot(ecmwf_longitude, ecmwf_latitude[f], windSpeed[,f,180])
-title(paste("This map should show windspeed over North America for", ecmwfDate[180]))
+image.plot(ecmwf_longitude, ecmwf_latitude[f], windSpeed[,f,400])
+title(paste("This map should show windspeed over North America for", ecmwfDate[400]))
 
 # Load the elevation grid. Grid spacing of about ~1.8 km
 # NOTE: The elevation grid being loaded is on a lon -180:180 grid!!! 
@@ -240,7 +245,7 @@ nc_close(nc)
 # dev.off()
 
 # Make sure the fireLonAdjusted and ecmwf_longitude can be paired by ploting 
-# together. 
+# together. Ensure these imags make sense.
 quartz(width=8, height=5)
 flipper                <- length(ecmwf_latitude):1
 ecmwf_latitude_flipped <- ecmwf_latitude[flipper]
@@ -251,9 +256,10 @@ points(fireLonAdjusted, fireLat, pch=".", col="black")
 title("The fire locations (black dots, should be over the U.S. )")
 
 # NOTE: If the previous two images show fires and data agreeing of spatial coords
-# NOTE: then we are good to go with these long coord pairs. 
+# NOTE: then we are good-to-go with these long coord pairs. 
 
-# Get the assignment loop working, first just for temperature
+# Create arrays the length of the number of wildfires for storing fire attributes
+# to later be assigned to the FPA_FOD dataframe. 
 v <- rep(NA, nRow)
 t2m_assigned           <- v
 rh2m_assigned          <- v
@@ -274,7 +280,7 @@ tp_MonthAfter        <- v
 t2m_monthAfter       <- v
 
 # Loop through every single fire and assign its past current and future weather
-nECMWFTime <- length(ecmwfDate) # This is for?
+nECMWFTime <- length(ecmwfDate) # This is for checking for end of all dates for month after assignments 
 for (i in 1:nRow){ 
   
   # Find the fire match in space and time in the reanalysis data 
@@ -283,13 +289,17 @@ for (i in 1:nRow){
   yi <- which.min(abs(fireLat[i] - ecmwf_latitude))
   ti <- which(fireDate[i] == ecmwfDate)
   
+  if(fireDate[i] != ecmwfDate[ti]){
+    stop("Something is wrong with ti (date matching)")
+  }
+  
   # Check the distance on the assigned grid points. The minus 180 on the fire
   # coords are because haversine only works in -180:180 coordinates
-  dist_meters <- distHaversine(c(fireLonAdjusted[i]-180, fireLat[i]), 
-                               c(ecmwf_longitude[xi]-180, ecmwf_latitude[yi]))
+  dist_meters <- geosphere::distHaversine(c( (fireLonAdjusted[i]-180), fireLat[i]), 
+                               c((ecmwf_longitude[xi]-180), ecmwf_latitude[yi]))
   dist_km <- dist_meters/1000.0
   
-  distLon <- 0.75*111*cos(fireLat[i]*pi/180) # should it be fireLat or gridLat? 
+  distLon <- 0.75*111*cos(fireLat[i]*pi/180) # use fireLat as reference 
   distLat <- 0.75*111
   distHypotenuse <- sqrt(distLon^2 + distLat^2)
   maxDistAllowed <- distHypotenuse/2 + 0.18 # less than 1% estimated tolerance using fire lat
@@ -309,14 +319,15 @@ for (i in 1:nRow){
   }
   
   # Assign each environmental variable that lives on the adjusted lon grid.
-  # This should include all ecmwf variables to be assigned
+  # This should include all ecmwf variables to be assigned.
+  # "i" is the wildfire index, xi, yi, ti belong to ecmwf data 
   t2m_assigned[i]           <- t2m[xi, yi, ti]
   rh2m_assigned[i]          <- rh2m[xi, yi, ti]
   daysSinceRain_assigned[i] <- daysSinceRain[xi, yi, ti]
   tp_assigned[i]            <- tp[xi, yi, ti]
   d2m_assigned[i]           <- d2m[xi, yi, ti]
   
-  # Assign environmental variables with a timescale greater than say 
+  # Assign environmental variables with a timescale greater than say  30
   # Recal can't make these assignments near the edges of data, near beginning
   # 1992 and end of year 2015
   pastIndicies <- (ti-29):ti # makes length == 30
@@ -331,7 +342,7 @@ for (i in 1:nRow){
   
   # After fire start date indicies 
   futureIndicies <- ti:(ti+29) # length == 30
-  if(futureIndicies[30] <= nECMWFTime){
+  if(futureIndicies[length(futureIndicies)] <= nECMWFTime){
     
     windSpeed_MonthAfter[i] <- mean(windSpeed[xi, yi, futureIndicies])
     tp_MonthAfter[i]        <- sum(tp[xi, yi, futureIndicies])
