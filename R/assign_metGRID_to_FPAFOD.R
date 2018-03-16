@@ -11,9 +11,12 @@ if(length(args)==0){
 # TODO: Figure out why those 2 small fires in Wisconsin do not get gridMet vars
 # TODO: assigned. 
 
-# TODO: Assign temperature, wind speed, and RH using these data. 
+# TODO: Assign temperature (tmmn, tmmx), wind speed, and RH using these data. 
 
-#------------------------------- Description -----------------------------------
+print("years being assigned")
+print(paste(c(year1, year2)))
+
+#----------------------------- Description -------------------------------------
 # This script takes the merged FPA FOD fire data created by 
 # R/merge_ecoregion_year_Data.R and assigns gridMET data.
 #
@@ -23,7 +26,6 @@ if(length(args)==0){
 #
 # NOTE: Great care was taken to make sure assignment method is optimal in 
 # NOTE: "R/assign_ecmwf_reanalysis_to_FPA_FOD.R"
-
 
 library(stringr)
 library(maps)
@@ -41,18 +43,22 @@ load("Data/FPA_FOD/FPA_FOD_ecmwf_1992_2015.RData")
 ncDir <- "/Volumes/Brey_external/gridMET/"
 
 # Function for getting gridMet data
-load_gridMET_nc <- function(ncDir, year){
+load_gridMET_nc <- function(ncDir, year, VAR="fm1000"){
   
   # TODO: Give this function name arguments so it works with other variables,
   # TODO: just just 1000-hr dead fuel moisture %
-  ncFile <- paste0(ncDir, "fm1000_", year, ".nc")
+  ncFile <- paste0(ncDir, VAR, "_", year, ".nc")
   nc <- nc_open(ncFile)
-  day <- ncvar_get(nc, "day") # units: "days since 1900-01-01 00:00:00", local or GMT?
+  day <- ncvar_get(nc, "day") # units: "days since 1900-01-01 00:00:00", GMT?
   lat <- ncvar_get(nc, "lat")
   lon <- ncvar_get(nc, "lon")
   
+  # name of file var
+  varName <- names(nc$var)
+  print(paste("Loading:", varName, "for", year))
+  
   # dead_fuel_moisture_1000hr[lat,lon,day], 2.2 Gb in memory when loaded
-  values <- ncvar_get(nc, "dead_fuel_moisture_1000hr") # units: "Percent"
+  values <- ncvar_get(nc, varName)
   
   # Close the connection 
   nc_close(nc)
@@ -73,8 +79,13 @@ load_gridMET_nc <- function(ncDir, year){
   
 }
 
-# Create an array to store all fuel moisture values 
-fm1000_assigned <- rep(NA, dim(FPA_FOD)[1])
+# Create an array to store all gridMet values of interest
+v <- rep(NA, dim(FPA_FOD)[1])
+fm1000_assigned <- v
+tmmn_assigned <- v
+tmmx_assigned <- v
+bi_assigned <- v 
+dist_of_assigned <- v
 
 # Loop through each metGRID year of data. The files are big so it is best if
 # we load them one at a time, this is easy to accomplish in a loop. 
@@ -82,13 +93,17 @@ for (year in year1:year2){
 
   print(paste("Making assignments for fires year:", year))
   
-  # Open this years netCDF file to work with 
-  l <- load_gridMET_nc(ncDir, year)
+  # Open this years netCDF file to work with. Only need to load lat, lon, t once
+  l <- load_gridMET_nc(ncDir, year, "fm1000")
   lat <- l[["lat"]]
   lon <- l[["lon"]]
   t   <- l[["t"]]
   fm1000 <- l[["values"]]
   rm(l)
+  
+  tmmn <- load_gridMET_nc(ncDir, year, "tmmn")[["values"]]
+  tmmx <- load_gridMET_nc(ncDir, year, "tmmx")[["values"]]
+  bi <- load_gridMET_nc(ncDir, year, "bi")[["values"]]
   
   # Get a subset the fire data to make assignments for 
   yearMask <- lubridate::year(FPA_FOD$DISCOVERY_DATE) == year 
@@ -102,28 +117,61 @@ for (year in year1:year2){
   # Create array to store the years assigned values
   nFire <- dim(df)[1]
   fm1000_yearly <- rep(NA, nFire)
-  for (i in 1:nFire){
+  tmmn_yearly <- rep(NA, nFire)
+  tmmx_yearly <- rep(NA, nFire)
+  bi_yearly <- rep(NA, nFire)
+  dist_of_assigned_yearly <- rep(NA, nFire)
+  for (i in 1:nFire){ # loop through this years wildfires
     
     ti <- which(fireTime[i] == t)
-    xi <- which.min(abs( fireLon[i] - lon  ))
+    xi <- which.min(abs( fireLon[i] - lon ))
     yi <- which.min(abs( fireLat[i] - lat ))
     
+    # Check the match 
+    if(fireTime[i] == t[ti]){
+      dist_km <- geosphere::distHaversine(c(lon[xi], lat[yi]),
+                                          c(fireLon[i], fireLat[i]))/1000
+      dist_of_assigned_yearly[i] <- dist_km
+      # if(dist_km > 2.3){
+      #   stop(paste("Fire year:", year, "wildfire:", i, "too far from grid center"))
+      # }
+    } else{
+      print(paste("Fire year:", year, "wildfire:", i))
+      stop("Something went wrong with the time match.")
+    }
+    
+    # Place the gridMet data with the fire array
     fm1000_yearly[i] <- fm1000[yi, xi, ti]
-  
-  }
+    tmmn_yearly[i] <- tmmn[yi, xi, ti]    
+    tmmx_yearly[i] <- tmmx[yi, xi, ti]
+    bi_yearly[i] <- bi[yi, xi, ti]    
+
+  } # end of looping through this years wildfires 
   
   # Place yearly values into main storage array based on the yearMask 
   fm1000_assigned[yearMask] <- fm1000_yearly
+  tmmn_assigned[yearMask] <- tmmn_yearly
+  tmmx_assigned[yearMask] <- tmmx_yearly
+  bi_assigned[yearMask] <- bi_yearly
+  dist_of_assigned[yearMask] <- dist_of_assigned_yearly
 
-}
+} # end of year loop
 
-# make sure PR, HI, AK, excluded
+# make sure PR, HI, AK, excluded. THey will have been given values but they
+# will be from CONUS somewhere. 
 STATE <- FPA_FOD$STATE
-noMetGRID <- STATE == "AK" | STATE == "HI" | STATE == "PR"
+noMetGRID <- (STATE == "AK") | (STATE == "HI") | (STATE == "PR")
 fm1000_assigned[noMetGRID] <- NA
+tmmn_assigned[noMetGRID] <- NA
+tmmx_assigned[noMetGRID] <- NA
+bi_assigned[noMetGRID] <- NA
 
-# Append the information to the dataframe
+# Append the information to the dataframe and make the names a little nicer
 FPA_FOD$fuel_moisture_1000hr <- fm1000_assigned
+FPA_FOD$tmmn <- tmmn_assigned
+FPA_FOD$tmmx <- tmmx_assigned
+FPA_FOD$bi <- bi_assigned
+FPA_FOD$km_to_gridCenter <- dist_of_assigned
 
 # Save the appended dataframe
 saveName <- paste0("Data/FPA_FOD/FPA_FOD_gridMet_",year1, "-", year2, ".RData")
@@ -155,7 +203,15 @@ ggplot(df_plot, aes(x=LONGITUDE, y=LATITUDE, color=fuel_moisture_1000hr)) +
 
 dev.off()
 
+# Make fire location color depend on fuel_moisture_1000hr
+png(filename="Figures/dist_to_gridMet_center.png", width=3000, height=2000, res=250)
 
+ggplot(FPA_FOD, aes(x=LONGITUDE, y=LATITUDE, color=km_to_gridCenter)) + 
+  geom_point(shape=".") + 
+  theme_bw()+
+  ggtitle("Distance to fire gritMet matched center [km]")
+
+dev.off()
 
 
 
