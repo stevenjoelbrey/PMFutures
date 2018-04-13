@@ -14,21 +14,24 @@ library(scales)
 library(ggthemes)
 
 regionName <- "southeast_and_west" # "southeast", "west", "southeast_and_west"
-yAxis <- "t2m" # "elevation"
+yAxis <- "tmmx" # "elevation" "tmmx"
+yLabel <- "Wildfire Location [C]"
+minSize <- 0 # minimum fire size to include
+
 
 if(regionName == "southeast_and_west"){
-  ecoregionSelect <- c(6.2, 10.1, 11.1, 8.5, 8.4, 8.3, 15.4) 
+  ecoregionSelect <- c(6.2, 10.1, 11.1, 8.5, 8.4, 8.3, 15.4)
 }else if(regionName == "southeast"){
   ecoregionSelect <- c(8.5, 8.4, 8.3, 15.4) 
 } else if(regionName == "west"){
   ecoregionSelect <- c(6.2, 10.1, 11.1) 
 }
 
-minSize <- 0 # minimum fire size to include
 
 # Load the data that has griodMET appended. 
 load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
 FPA_FOD$t2m <- FPA_FOD$t2m - 273.15
+FPA_FOD$tmmx <- FPA_FOD$tmmx - 273.15
 
 # Mask by ecoregion and lat and lon. 
 # TODO: Do we even need to subset by lat and lon since we are doing ecoregions? 
@@ -49,22 +52,22 @@ ecoRegionNames <- rep("", nRow)
 
 ecoRegionNames[df$NA_L2CODE==6.2]  <- "Forested mountains"
 ecoRegionNames[df$NA_L2CODE==10.1] <- "High deserts"
-ecoRegionNames[df$NA_L2CODE==11.1] <- "Mediterranean California"
+ecoRegionNames[df$NA_L2CODE==11.1] <- "Mediterranean Cal."
 
-ecoRegionNames[df$NA_L2CODE==8.3] <- "Southern Plains"
-ecoRegionNames[df$NA_L2CODE==8.4] <- "Ozark"
-ecoRegionNames[df$NA_L2CODE==8.5] <- "Mississippi Alluvial" 
+ecoRegionNames[df$NA_L2CODE==8.3]  <- "Southern Plains"
+ecoRegionNames[df$NA_L2CODE==8.4]  <- "Ozark"
+ecoRegionNames[df$NA_L2CODE==8.5]  <- "Mississippi Alluvial" 
 ecoRegionNames[df$NA_L2CODE==15.4] <- "Everglades"
 
 
 ecoRegionNames <-  base::factor(ecoRegionNames, 
-                                levels = c("Forested mountains",
+                                levels = rev(c("Forested mountains",
                                            "High deserts",
-                                           "Mediterranean California",
+                                           "Mediterranean Cal.",
                                            "Southern Plains",
                                            "Ozark",
                                            "Mississippi Alluvial",
-                                           "Everglades"))
+                                           "Everglades")))
 df$ecoRegionNames <- ecoRegionNames
 
 # Add ignitionType column as a factor
@@ -72,7 +75,6 @@ ignition <- rep("Human-ignition", length(df$STAT_CAUSE_DESCR) )
 ignition[df$STAT_CAUSE_DESCR=="Lightning"] <- "Lightning-ignition"
 df$ignitionType <- base::factor(ignition, levels = c("Lightning-ignition", 
                                                      "Human-ignition"))
-
 
 # Consistent breaks, fire size class
 sizeClassBreaks <- c(0 , 10, 100, 300, 1000, 5000, 10000, 100000)
@@ -108,17 +110,38 @@ p <- ggplot(df, aes(x=DISCOVERY_DOY, y=df[[yAxis]],
   sc +  
   theme_bw()+
   xlab("Day of year")+
-  ylab("Wildfire elevation [m]")+
-  labs(color='1000 hr \nfuel moisture %') +
+  ylab(yLabel)+
+  labs(color="1000 hr \nfuel moisture %") +
   labs(size='Fire size \n(acres)')+
   guides(size = guide_legend(order=2))+
   theme_tufte(ticks=T, base_size = 20)
   
 print("Getting to code to save figure.")
-saveName <- paste0("Figures/elevation_DOY_space/", yAxis,"_minSize=",
+saveName <- paste0("Figures/fireAttribute_DOY_space/", yAxis,"_minSize=",
                    minSize,"_",regionName,".png")
-png(filename=saveName, width=4000, height=2700, res=250)
-p
+png(filename=saveName, width=4100, height=2700, res=250)
+print(p)
 print("Ran save figiure code")
 dev.off()
+
+
+# Now make a boxplot of fm-1000.
+g <- ggplot(df, aes(ecoRegionNames, fuel_moisture_1000hr))+
+  geom_boxplot(aes(colour = ignitionType))+
+  scale_colour_manual(values=c("darkgray", "orange"))+
+  theme_tufte(ticks=T, base_size = 22)+
+  coord_flip()+
+  ylab("1000 hr fuel moisture %")+
+  xlab("")+
+  labs(color="Ignition Type")
+  
+
+saveName <- paste0("Figures/fireAttribute_DOY_space/", yAxis,"_minSize=",
+                   minSize,"_",regionName,"_boxplot.png")
+png(filename=saveName, width=2500, height=2800, res=250)
+print(g)
+print("Ran save figiure code")
+dev.off()
+
+
 
