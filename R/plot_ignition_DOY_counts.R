@@ -6,13 +6,17 @@
 # Code in this script was inhereted from the deprecated plot_ignition_weather.R
 # script. 
 
+# TODO: Create a dataframe that calculates the IQR of wildfire season, but use
+# TODO: the dates that account for middle 50% of burn area, not fire counts!. 
+# TODO: Do this by ecoregion. 
+
 # Load the required libraries
 library(maps)
 library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-regionName <- "west"
+regionName <- "southeast"
 
 if (regionName == "west"){
   
