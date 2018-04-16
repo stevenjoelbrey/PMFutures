@@ -124,8 +124,12 @@ print(p)
 print("Ran save figiure code")
 dev.off()
 
-
+################################################################################
 # Now make a boxplot of fm-1000.
+# Showing only a single environmental variable for makes describing regional
+# differences in fuel moisture values where wildfires occur makes the discussion
+# of figure 6 much easier and to the point. 
+################################################################################
 g <- ggplot(df, aes(ecoRegionNames, fuel_moisture_1000hr))+
   geom_boxplot(aes(colour = ignitionType))+
   scale_colour_manual(values=c("darkgray", "orange"))+
@@ -133,11 +137,11 @@ g <- ggplot(df, aes(ecoRegionNames, fuel_moisture_1000hr))+
   coord_flip()+
   ylab("1000 hr fuel moisture %")+
   xlab("")+
-  labs(color="Ignition Type")
+  labs(color="Ignition Type")+
+  theme(legend.position="top")
   
-
 saveName <- paste0("Figures/fireAttribute_DOY_space/", yAxis,"_minSize=",
-                   minSize,"_",regionName,"_boxplot.png")
+                   minSize,"_",regionName,"_fm_100_boxplot.png")
 png(filename=saveName, width=2500, height=2800, res=250)
 print(g)
 print("Ran save figiure code")
