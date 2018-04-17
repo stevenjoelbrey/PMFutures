@@ -41,9 +41,6 @@ rm(FPA_FOD) # remove the main array, df contains all the wildfires of interest
 df$REGION <- factor(df$REGION, levels = c("West", "Southeast") ) 
 df$month  <- factor(df$START_MONTH, levels=c(1,2,3,4,5,6,7,8,9,10,11,12)) 
 
-# Save this dataframe, this will be handy for other plotting scripts that 
-# require comparing these large regions. 
-save(df, file="Data/FPA_FOD/west_and_southeast_FPA_FOD.RData")
 
 # Make a bar chart of the monthly occurence of wildfires by region and show
 # the types of igntiions responsible. 
@@ -89,6 +86,10 @@ if(complexColors){
   
   # Set the colors for the causes, in this case there are only two.
   causeColors <- c("orange", "gray")
+  
+  # Save this dataframe, this will be handy for other plotting scripts that 
+  # require comparing these large regions. 
+  save(df, file="Data/FPA_FOD/west_and_southeast_FPA_FOD.RData")
   
 }
 
