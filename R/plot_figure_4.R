@@ -57,7 +57,8 @@ SE <- subset(states, region %in% c("florida", "georgia", "south carolina",
                                    "louisiana", "arkansas", "indiana",
                                    "illinois", "maryland"))
 SE_map <- ggplot(data = SE) + 
-  geom_polygon(aes(x = long, y = lat, group = group),  fill="white", color = "black") +
+  geom_polygon(aes(x = long, y = lat, group = group),  
+               fill="white", color = "black") +
   coord_fixed(1.3) +
   guides(fill=FALSE)+
   theme_tufte(ticks=T, base_size = 18)+

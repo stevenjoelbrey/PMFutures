@@ -23,6 +23,7 @@ library(sfsmisc)
 library(ncdf4)
 library(maps)
 library(fields)
+library(RColorBrewer)
 
 # When start year is 1997 then GFED comparison is made. 
 startYear <- 1997 # When this is 1992 all the data are used.
@@ -30,21 +31,24 @@ endYear   <- 2015 # When this is 2015 all the data are used.
 
 # What is the general part of the country you are looking at? This will be a 
 # directory under figures from here forward?
-largeRegion <- "southeast"
+largeRegion <- "west"
 
 if (largeRegion == "west"){
   
   load("Data/GIS/west_bounds.RData")
   
-  keepRegions <- c(6.2, 10.1, 7.1, 9.3, 9.4, 13.1, 12.1, 11.1, 10.2)
-  regionColors <- c("#65B657", "#E7ED90", "#60BAAF", "#F2DBA1", "#EDCB9B",
-                    "#B5D67C",  "#D6D292", "#D2E5B1", "#F3DB70")
+  keepRegions <- c(6.2, 10.1, 13.1, 12.1, 11.1, 10.2)
+  
+  regionColors <- brewer.pal(length(keepRegions), "Accent")
+  
+  
+  #regionColors <- c("#65B657", "#E7ED90","#B5D67C",  "#D6D292", "#D2E5B1", "#F3DB70")
   
 } else if(largeRegion == "southeast"){
   
   load("Data/GIS/southeast_bounds.RData")
 
-  keepRegions <- c(8.1, 8.2, 8.3, 8.4, 8.5, 15.4, 5.3)
+  keepRegions <- c( 8.3, 8.4, 8.5, 15.4)
   # TODO: Make colors match map. Make unique for now. 
   regionColors <- rainbow(length(keepRegions))
     
@@ -214,12 +218,12 @@ png(filename=paste0("Figures/summary/ecoregio_burn_area_emission_bar_",
                     largeRegion, "_",
                     startYear, "_", endYear, ".png"), 
     res=250, height=1600, width=3700)
-par(las=1, mar=c(4,14,4,16))
+par(las=1, mar=c(4,14,4,18))
 
 # Plot the total burn area first, make the bars the color of lightning
 bp <- barplot(height=BA, 
               names.arg=keepRegions, yaxt="n", col="gray", 
-              cex.names = 1.8)
+              cex.names = 2)
 #axis(side=1, at = bp, labels=keepRegions, col=)
 
 # Now cover up lightnihng with human bar. Now the colors that show represent
@@ -227,7 +231,7 @@ bp <- barplot(height=BA,
 barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
 
 # Nice axis label 
-aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=1.5)
+aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=2)
 mtext("Acres \n Burned", side=2, line=7, cex=2)
 
 # Add emissions from GFED4s if we are looking at the right years 
@@ -240,10 +244,12 @@ if(startYear == 1997 & endYear == 2015){
                     col="transparent",
                     axes = FALSE, bty = "n", xlab = "", ylab = "")
   text(bp_new, regionDM, "*", col=regionColors, cex=5, xpd=T)
-  eaxis(side=4, at = pretty(range(regionDM)),  cex.axis=1.5, f.smalltcl=0)
-  #axis(side=4, at = pretty(range(regionDM)), col="red", labels=rep("",5) )
   
-  mtext("*kg Dry Fuel \n Consumed", side=4, line=6.5, cex=1.8)
+  # Place the labels for the right hand side kg dry fuel consumed axis
+  yVals <- c(0, max(regionDM))
+  eaxis(side=4, at = pretty(range(yVals)),  cex.axis=2, f.smalltcl=0)
+
+  mtext("*kg Dry Fuel \n Consumed", side=4, line=6.5, cex=2)
   
 }
 
