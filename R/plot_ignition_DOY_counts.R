@@ -6,9 +6,8 @@
 # Code in this script was inhereted from the deprecated plot_ignition_weather.R
 # script. 
 
-# TODO: Create a dataframe that calculates the IQR of wildfire season, but use
-# TODO: the dates that account for middle 50% of burn area, not fire counts!. 
-# TODO: Do this by ecoregion. 
+# NOTE: This script used to be responsible for making figure 2 in the manscript. 
+# NOTE: It has been replaced by R/plot_ignition_types.R
 
 # Load the required libraries
 library(maps)
@@ -16,7 +15,7 @@ library(sfsmisc)
 
 # ----------------------- Subset arguments -------------------------------------
 
-regionName <- "southeast"
+regionName <- "west"
 
 if (regionName == "west"){
   
@@ -98,7 +97,7 @@ causeMask <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"
 ELEV_MASK <- FPA_FOD$elevation <= -100 # meters
 
 # Subset the data, one mask to rule them all. 
-m <- timeMask & latMask & lonMask & sizeMask & causeMask & !ELEV_MASK
+m <- timeMask & latMask & lonMask & sizeMask &  !ELEV_MASK & causeMask 
 FPA_FOD <- FPA_FOD[m,]
 
 # Get the cuase so we can create comparisons 
