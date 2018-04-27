@@ -34,8 +34,11 @@ lonMask <- (FPA_FOD$LONGITUDE <= maxLon) & (FPA_FOD$LONGITUDE >= minLon)
 mSoutheast <- latMask & lonMask
 FPA_FOD$REGION[mSoutheast] <- "Southeast"
 
-# Now get rid of any wildfire that is not in the SE or the west 
-df <- FPA_FOD[FPA_FOD$REGION != "none", ]
+# Now get rid of any wildfire that is not in the SE or the west. This is also a
+# good place to get rid of wildfires with "Unknown/Missing" stat causes. 
+m1 <- FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined" # want where TRUE
+m2 <- FPA_FOD$REGION != "none"                        # want where TRUE
+df <- FPA_FOD[m1 & m2, ]
 rm(FPA_FOD) # remove the main array, df contains all the wildfires of interest
 
 df$REGION <- factor(df$REGION, levels = c("West", "Southeast") ) 
