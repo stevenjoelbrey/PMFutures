@@ -4,7 +4,10 @@
 # This script shows the number of wildfires by large region (west and southeast)
 # and color codes them by the ignition count assigned in the FPA FOD. 
 
-complexColors <- FALSE
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
+
+complexColors <- FALSE # TODO: Make this work with new color scheme 
 
 library(ggplot2)
 library(ggthemes)
@@ -76,7 +79,7 @@ if(complexColors){
   
   df$cause <- cause
   # A unique color for each cause but make lightning gray like always
-  causeColors <- c(brewer.pal(n=12, name="Paired"), "gray")
+  causeColors <- c(brewer.pal(n=12, name="Paired"), lightningCol)
   
 } else{
   
@@ -88,7 +91,7 @@ if(complexColors){
   df$cause <- cause
   
   # Set the colors for the causes, in this case there are only two.
-  causeColors <- c("orange", "gray")
+  causeColors <- c(humanCol, lightningCol)
   
   # Save this dataframe, this will be handy for other plotting scripts that 
   # require comparing these large regions. 

@@ -6,6 +6,7 @@
 # a bar plot and a map. Together they make the point. We are also going to show
 # GFED4s emission estimate totals for each ecoregion. This will demonstrate that
 # not all burn_area is equal. 
+
 # NOTE: When comparing GFED4s emissions and FPA-Burn area can only go back to
 # NOTE: 1997 for GFED. 
 
@@ -28,6 +29,8 @@ library(RColorBrewer)
 # When start year is 1997 then GFED comparison is made. 
 startYear <- 1997 # When this is 1992 all the data are used.
 endYear   <- 2015 # When this is 2015 all the data are used. 
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
 
 # What is the general part of the country you are looking at? This will be a 
 # directory under figures from here forward?
@@ -37,18 +40,19 @@ if (largeRegion == "west"){
   
   load("Data/GIS/west_bounds.RData")
   
+  # Select the desired regions and line them up with thier nice names 
   keepRegions <- c(6.2, 10.1, 13.1, 12.1, 11.1, 10.2)
+  keepRegionNames <- c("Forested Mtns", "High Deserts", "Gila Mtns", "Sierra Madre", "Med. Cal.", "Warm Deserts")
   
   regionColors <- brewer.pal(length(keepRegions), "Accent")
-  
-  
-  #regionColors <- c("#65B657", "#E7ED90","#B5D67C",  "#D6D292", "#D2E5B1", "#F3DB70")
   
 } else if(largeRegion == "southeast"){
   
   load("Data/GIS/southeast_bounds.RData")
 
   keepRegions <- c( 8.3, 8.4, 8.5, 15.4)
+  keepRegionNames <- c("Southeastern\nPlains", "Ozarks", 
+                       "Mississippi\nAlluvial", "Everglades")
   # TODO: Make colors match map. Make unique for now. 
   regionColors <- rainbow(length(keepRegions))
     
@@ -207,6 +211,7 @@ BA <- regionBA_L + regionBA_H
 ORDER        <- order(BA, decreasing = TRUE)
 BA           <- BA[ORDER]
 keepRegions  <- keepRegions[ORDER]
+keepRegionNames <- keepRegionNames[ORDER]
 regionBA_L   <- regionBA_L[ORDER]
 regionBA_H   <- regionBA_H[ORDER]
 regionColors <- regionColors[ORDER]
@@ -217,22 +222,24 @@ regionDM     <- regionDM[ORDER]
 png(filename=paste0("Figures/summary/ecoregio_burn_area_emission_bar_",
                     largeRegion, "_",
                     startYear, "_", endYear, ".png"), 
-    res=250, height=1600, width=3700)
-par(las=1, mar=c(4,14,4,18))
+    res=250, height=1800, width=3700)
+
+par(las=1, mar=c(14,15,4,20))
 
 # Plot the total burn area first, make the bars the color of lightning
 bp <- barplot(height=BA, 
-              names.arg=keepRegions, yaxt="n", col="gray", 
-              cex.names = 2)
+              names.arg=keepRegionNames, yaxt="n", col=lightningCol, 
+              cex.names = 2.0, cex.axis=2, las=2, font=2)
+
 #axis(side=1, at = bp, labels=keepRegions, col=)
 
 # Now cover up lightnihng with human bar. Now the colors that show represent
 # fraction by ignition
-barplot(height=regionBA_H, add=T, yaxt="n", col="orange")
+barplot(height=regionBA_H, add=T, yaxt="n", col=humanCol)
 
 # Nice axis label 
-aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=2)
-mtext("Acres \n Burned", side=2, line=7, cex=2)
+aY <- axTicks(2); axis(2, at=aY, label= axTexpr(2, aY), cex.axis=2.2)
+mtext("Acres \n Burned", side=2, line=9, cex=2, font=2)
 
 # Add emissions from GFED4s if we are looking at the right years 
 if(startYear == 1997 & endYear == 2015){
@@ -247,12 +254,11 @@ if(startYear == 1997 & endYear == 2015){
   
   # Place the labels for the right hand side kg dry fuel consumed axis
   yVals <- c(0, max(regionDM))
-  eaxis(side=4, at = pretty(range(yVals)),  cex.axis=2, f.smalltcl=0)
+  eaxis(side=4, at = pretty(range(yVals)),  cex.axis=2.2, f.smalltcl=0)
 
-  mtext("*kg Dry Fuel \n Consumed", side=4, line=6.5, cex=2)
+  mtext("*kg Dry Fuel \n Consumed", side=4, line=9.5, cex=2, font=2)
   
 }
-
 dev.off()
 
 
@@ -266,7 +272,6 @@ map.det$NA_L2CODE <- as.numeric(as.character(map.det$NA_L2CODE))
 png(filename=paste("Figures/summary/ecoregion_burn_area_map_",
                    largeRegion,".png"), 
     res=250, height=2350, width=3000)
-par(las=1, mar=c(0,0,0,0))
 
 # Make a simple map showing the ecoregions 
 if(largeRegion=="west"){
@@ -279,21 +284,24 @@ for (i in 1:nRegions){
   m <- as.numeric(as.character(map.det$NA_L2CODE)) == keepRegions[i]
     plot(map.det[m,], col=regionColors[i], add=T)
 }
-map("state", add=T, lty=2)
-if(largeRegion == "southeast"){
-  legend("bottomright",
-         legend=keepRegions,
-         fill=regionColors,
-         bty="n",
-         cex=3)
-} else{
-  legend("topleft",
-         legend=keepRegions,
-         fill=regionColors,
-         bty="n",
-         cex=3)
-}
 
+map("state", add=T, lty=2)
+
+# Handle the legend based on the region being plotted 
+if(largeRegion == "southeast"){
+  legend("bottomright", inset=c(-0.25,0),
+         legend=keepRegionNames,
+         fill=regionColors,
+         bty="n",
+         cex=3,
+         xpd=T)
+} else{
+  legend("bottomleft", inset=c(-0.02,0),
+         legend=keepRegionNames,
+         fill=regionColors,
+         bty="n",
+         cex=2.3)
+}
 
 dev.off()
 # # get centroids

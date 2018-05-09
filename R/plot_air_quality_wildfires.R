@@ -6,6 +6,10 @@
 # This script is also responsible for creating dataframes merging the yearly 
 # analysis files output by R/assign_HYSPLITPoints_to_FPAFOD.R
 
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
+unknownCol   <- adjustcolor("gray", alpha.f = 1)
+
 library(ggplot2)
 library(ggmap)
 library(maps)
@@ -64,23 +68,24 @@ dev.off()
 # Show the number of FPA wildfires that are associated with air quality 
 # forecasts in each region. 
 ################################################################################
-png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region.png"), 
-    res=250, height=1000, 
-    width=1500)
+
 
 # Mask out non west or southeast region, also wildfires with no hysplits
 m <- (FPA_FOD$region != "") & (FPA_FOD$n_HP > 0)
 df <- FPA_FOD[m,]
 
-ggplot(df, aes(x=region, fill=fire_cause))+
+g <- ggplot(df, aes(x=region, fill=fire_cause))+
   geom_bar(stat="count", width=0.5, position = "dodge")+
-  scale_fill_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
   guides(fill=guide_legend(title="Fire Cause"))+
   theme_tufte(ticks=T, base_size = 20)+
-  ylab("Wildfire count")+
+  ylab("FPA FOD fires linked\nto air quality forecasts")+
   ggtitle("FPA FOD wildires associated\nwith air quality forecasts")
 
-
+png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region.png"), 
+    res=250, height=1000, 
+    width=1500)
+print(g)
 dev.off()
 
 ################################################################################
@@ -103,7 +108,7 @@ df$wild <- wild
 
 ggplot(df, aes(x=region, fill=wild))+
   geom_bar(stat="count", width=0.5, position = "dodge")+
-  #scale_fill_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  #scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
   guides(fill=guide_legend(title="Accounted for in\nFPA FOD"))+
   theme_tufte(ticks=T, base_size = 20)+
   theme(plot.title = element_text(hjust = 0.5))+ # Center the title
@@ -123,14 +128,14 @@ png(filename=paste0(figureDir, "AQ_fires_mapped.png"), res=100,
 
 states <- map_data("state")
 ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
-                        fill = NA, color = "gray") + 
+                        fill = NA, color = lightningCol) + 
   coord_fixed(1.3)+ # fixes the relationship between one unit in the y direction and one unit in the x direction.
   theme_tufte(ticks=T, base_size = 20)+
   geom_point(data = AQ_fires, aes(x = LONGITUDE, y = LATITUDE, 
                                   color = fire_cause, size = FIRE_SIZE)
                                   #shape=fire_cause)
              )+
-  scale_colour_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))
+  scale_colour_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))
   
 dev.off()  
 
@@ -148,7 +153,7 @@ png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"), res=100,
     width=2000, height=1200)
 
 ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
-                        fill = NA, color = "gray") + 
+                        fill = NA, color = lightningCol) + 
   coord_fixed(1.3)+ 
   theme_tufte(ticks=T, base_size = 20)+
   geom_point(data = hysplitPoints, aes(x = Lon, y = Lat, 
@@ -172,9 +177,9 @@ png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"),
     width=2000, height=1200)
 
 ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
-                        fill = NA, color = "gray") + 
+                        fill = NA, color = lightningCol) + 
   coord_fixed(1.3)+
-  geom_point(data = HP_paired, aes(x = Lon, y = Lat), shape=19, size=0.5, col="blue")+
+  geom_point(data = HP_paired, aes(x = Lon, y = Lat), shape=19, size=0.5, col=unknownCol)+
   geom_point(data = AQ_fires, aes(x = LONGITUDE, y = LATITUDE), shape=19, size=0.5, col="red")+
   theme_tufte(ticks=T, base_size = 20)+
   ylim(c(25,49.5))+
@@ -191,7 +196,7 @@ png(filename=paste0(figureDir, "fire_size_vs.png"), width=1700, height=1400,
 
 p <- ggplot(AQ_fires, aes(x=FIRE_SIZE, y=n_HP, col=fire_cause, size=totalDurationHours))
 p + geom_point() +  
-  scale_colour_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  scale_colour_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
   theme_tufte(ticks=T, base_size = 20)+
   xlab("Fire Size (acres)") + ylab("Hysplit points associated with fire")
 
@@ -216,7 +221,7 @@ png(filename=paste0(figureDir, "regional_counts.png"), width=2000, height=800,
 
 g <- ggplot(df, aes(NA_L2CODE,fill=fire_cause))
 g + geom_bar()+
-  scale_fill_manual(values = c("Lightning"="gray", "Human"="orange", "Unknown"="blue"))+
+  scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
   theme_tufte(ticks=T, base_size = 15)+
   #facet_wrap(~fireType)+
   #ylab("Wildfires associated with AQ forecasts")+

@@ -5,19 +5,14 @@
 # area by ignition type. This plot will use burn area from FPA_FOD dataframe
 # for all available years. 
 
-# TODO: What % of western US wildfires are less than 1000 acres and what
-# TODO: percent of total burn area do they account for?
-
-# TODO: combine ignition_size_histogram_western_US.png and 
-# TODO: cumulativeBurnAreaBySize_western_US.png by making the later a second
-# TODO: y-axis of the former. Use the former x-axis as it shows the log scale
-# TODO: much more nicely. 
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
 
 # ----------------- User selected data subset parameters  ----------------------
 
 # TODO: Figure out why colorado subset does not add up to 100% for both types
 
-regionName <- "west" # "west" "southeast"
+regionName <- "southeast" # "west" "southeast"
 
 if (regionName == "west"){
   
@@ -105,11 +100,11 @@ plot(years, lightningTotal,
      pch="",
      ylim=c(0, yMax))
 
-points(years, humanTotal, pch=19, col="orange")
-lines(years, humanTotal, pch=19, col="orange", lty=2)
+points(years, humanTotal, pch=19, col=humanCol)
+lines(years, humanTotal, pch=19, col=humanCol, lty=2)
 
-points(years, lightningTotal, pch=19, col="gray")
-lines(years, lightningTotal, pch=19, col="gray", lty=2)
+points(years, lightningTotal, pch=19, col=lightningCol)
+lines(years, lightningTotal, pch=19, col=lightningCol, lty=2)
 
 #axis(1, at=years)
 eaxis(2)
@@ -118,7 +113,7 @@ mtext("Annual Burn Area [Acres]", side=2,  line=4)
 legend("topleft",
        bty="n",
        legend=c("Human", "Lightning"),
-       fill=c("orange", "gray"),
+       fill=c(humanCol, lightningCol),
        cex=1.5
 )
 
@@ -141,13 +136,13 @@ h_lightning <- hist(log10(fireSize[lightningMask]),
 par(mar=c(4, 6, 2, 2))
 
 plot(h_human$mids, h_human$counts, 
-     col="orange", pch=19,
+     col=humanCol, pch=19,
      bty="n", xaxt="n", yaxt="n",
      ylab="", xlab="")
-lines(h_human$mids, h_human$counts, col="orange", lwd=2)
+lines(h_human$mids, h_human$counts, col=humanCol, lwd=2)
 
-points(h_lightning$mids, h_lightning$counts, col="gray", pch=19)
-lines(h_lightning$mids, h_lightning$counts, col="gray", lwd=2)
+points(h_lightning$mids, h_lightning$counts, col=lightningCol, pch=19)
+lines(h_lightning$mids, h_lightning$counts, col=lightningCol, lwd=2)
 
 labels <- 10^(logBreaks) 
 axis(side=1, at=logBreaks, labels=labels)
@@ -159,7 +154,7 @@ mtext("Frequency", side=2,  line=4)
 legend("topright",
        bty="n",
        legend=c(paste("n = ", sum(!lightningMask)), paste("n = ", sum(lightningMask)) ),
-       fill=c("orange", "gray"),
+       fill=c(humanCol, lightningCol),
        cex=1.5
 )
 
@@ -232,8 +227,8 @@ plot(acre_bins, percent_burn_area,
 
 mtext("% of total\n burn area",2 , line=3, cex=2, las=1)
 
-lines(acre_bins, percent_lightning, lwd=4, col="gray")
-lines(acre_bins, percent_human, lwd=4, col="orange")
+lines(acre_bins, percent_lightning, lwd=4, col=lightningCol)
+lines(acre_bins, percent_human, lwd=4, col=humanCol)
 
 # label percent totals of each part
 lightningPercent <- round(percent_lightning[nBins], 1)
@@ -245,13 +240,13 @@ legend("topleft",
                 "Human-ignition",
                 "Combined"),
        lty=1,
-       col=c("gray","orange","black"),
+       col=c(lightningCol,humanCol,"black"),
        cex=2,
        lwd=4
        )
 
-text(acre_bins[nBins], percent_lightning[nBins]+3, labels=paste(lightningPercent, "%"), col="gray", cex=2, xpd=T)
-text(acre_bins[nBins], percent_human[nBins]+3, labels=paste(humanPercent, "%"), col="orange", cex=2, xpd=T)
+text(acre_bins[nBins], percent_lightning[nBins]+3, labels=paste(lightningPercent, "%"), col=lightningCol, cex=2, xpd=T)
+text(acre_bins[nBins], percent_human[nBins]+3, labels=paste(humanPercent, "%"), col=humanCol, cex=2, xpd=T)
 
 eaxis(1, cex.axis=1.6)
 mtext("Fire Size (acres)", 1 , line=3, cex=2)

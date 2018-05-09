@@ -10,6 +10,8 @@ library(ggplot2)
 library(ggthemes)
 
 regionName <- "southeast_and_west"
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
 
 # where the r (coef) values live. 
 dataDir <- "Data/correlations/"
@@ -72,10 +74,10 @@ df$variable     <- factor(df$variable, levels=c("T2M","TP","RH"))
 p <- ggplot(df, aes(x=variable, y=r, fill=ignitionType))+
   geom_bar(stat="identity", width=.5, position = "dodge")+
   scale_x_discrete("Meteorology variable",     
-                   labels=c("T","TP", "RH"))+
+                   labels=c("T","P", "RH"))+
   geom_hline(yintercept=0, linetype="dashed", color = "black")+
   facet_grid(~ecoregion)+ 
-  scale_fill_manual(values=c("gray", "orange"))+
+  scale_fill_manual(values=c(lightningCol, humanCol))+
   scale_y_continuous("Pearson correlation")+
   guides(fill=guide_legend(title="Ignition"))+
   # geom_text(aes(label = paste(round(r, 2)), # for labeling the bars 

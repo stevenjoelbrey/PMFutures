@@ -7,6 +7,9 @@
 # TODO: See if there is a difference in environmental conditions of where fires
 # TODO: occur based on association with air quality forecasts. 
 
+lightningCol <- adjustcolor("cyan4", alpha.f = 1)
+humanCol     <- adjustcolor("orange", alpha.f = 1)
+
 
 library(ggplot2)
 library(RColorBrewer)
@@ -84,17 +87,17 @@ sizeTheme <- scale_size_area(labels = comma,
 
 
 # Create a color palette (NOT USED)
-myPalette <- colorRampPalette(colors = c("blue", "orange"))
+myPalette <- colorRampPalette(colors = c(lightningCol, humanCol))
 
 # Create a colorscale that is shared
 sc <- scale_colour_gradient( labels=comma, limits=c(2, 38),
-                            low = "orange", 
-                            high = "blue")
+                            low = humanCol, 
+                            high = lightningCol)
 if(minSize > 100){
   sc <- scale_colour_gradient( labels=comma, limits=c(min(df$fuel_moisture_1000hr), 
                                                       max(df$fuel_moisture_1000hr)),
-                               low = "orange", 
-                               high = "blue")
+                               low = humanCol, 
+                               high = lightningCol)
 }
 
 # Plot the space for the desired ecoregions 
@@ -131,8 +134,8 @@ dev.off()
 # of figure 6 much easier and to the point. 
 ################################################################################
 g <- ggplot(df, aes(ecoRegionNames, fuel_moisture_1000hr))+
-  geom_boxplot(aes(colour = ignitionType))+
-  scale_colour_manual(values=c("darkgray", "orange"))+
+  geom_boxplot(aes(colour = ignitionType), notch=T)+
+  scale_colour_manual(values=c(lightningCol, humanCol))+
   theme_tufte(ticks=T, base_size = 22)+
   coord_flip()+
   ylab("1000 hr fuel moisture %")+
@@ -141,7 +144,7 @@ g <- ggplot(df, aes(ecoRegionNames, fuel_moisture_1000hr))+
   theme(legend.position="top")
   
 saveName <- paste0("Figures/fireAttribute_DOY_space/", yAxis,"_minSize=",
-                   minSize,"_",regionName,"_fm_100_boxplot.png")
+                   minSize,"_",regionName,"_fm_1000_boxplot.png")
 png(filename=saveName, width=2500, height=2800, res=250)
 print(g)
 print("Ran save figiure code")
