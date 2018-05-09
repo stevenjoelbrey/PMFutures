@@ -1,4 +1,4 @@
-# plot_figure_7.R
+# plot_ignition_correlations_mapped.R
 
 # plot the correlation in interannual burn area by ignition type for all US 
 # ecoregions.
@@ -8,6 +8,8 @@ library(maps)
 require(rgdal)
 require(ggplot2)
 library(ggthemes)
+library(rgeos)
+library(maptools)
 
 # Load the ecoregion spatial polygons into the work space
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
@@ -47,7 +49,7 @@ WBorder <- data.frame(minLat=minLat, maxLat=maxLat,
 
 # Convert the spatialpolygondataframe to an ordinary dataframe that retains 
 # spatial info. Regular dataframe required for plotting in ggplot2. 
-spdf.map <- fortify(SPDF, region = "NA_L2CODE")
+spdf.map <- ggplot2::fortify(SPDF, region = "NA_L2CODE")
 
 # Initialize correltions to NA, that way ecoregions were they are not assigned will be left blank
 spdf.map$cor <- NA 
@@ -59,9 +61,14 @@ for (eco in ecoregion){
   spdf.map$cor[m] <- ignition_correlations[eco==ecoregion]
 }
 
+# Create a color pallete Jeff likes..
+myPalette <- colorRampPalette(rev(brewer.pal(11, "Spectral")))
+sc <- scale_colour_gradientn(colours = myPalette(100), na.value="white")#, limits=c(1, 8))
+
 cor_map <- ggplot(spdf.map, aes(x = long, y = lat, group = group, fill = cor)) +
-  geom_polygon(colour = "white", size = 0.5, aes(group = group)) +
   coord_fixed(1.3) +
+  geom_polygon(colour = "white", size = 0.5, aes(group = group)) +
+  #sc+
   scale_fill_continuous(na.value="white")+
   geom_polygon(data=states, aes(x = long, y = lat, group = group),  
                fill="transparent", color = "black", linetype = 1, size = 0.2)+
