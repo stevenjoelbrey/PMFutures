@@ -1,5 +1,12 @@
 # plot_annual_burn_area.R
 
+# ------------------------- Description ---------------------------------------
+# This script is used to plot the burn area total, color coded by wildfire
+# ignition type, for 1992 - 2015. This is a very simple plot that demonstrates
+# interannual variability. 
+# ------------------------------------------------------------------------------
+
+
 library(sfsmisc)
 
 load("Data/FPA_FOD/FPA_FOD_1992_2015.RData")
