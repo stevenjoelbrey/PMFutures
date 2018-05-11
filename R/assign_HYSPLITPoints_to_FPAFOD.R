@@ -42,9 +42,9 @@ library(maps)
 library(lubridate)
 
 # -------------------------- Set tolerance values  -----------------------------
-distanceTol <- 10  # haversinse kilometers required for HP to be assigned to FPAFOD
+distanceTol   <- 10  # haversinse kilometers required for HP to be assigned to FPAFOD
 timeBefireTol <- 1 # days before FPAFOD discovery_date HP allowed to occur for match
-timeAfterTol <- 7  # days after FPAFOD discovery_date HP allowed to be assigned
+timeAfterTol  <- 7  # days after FPAFOD discovery_date HP allowed to be assigned
 
 
 # Load the HMS Hysplit Points dataframe. To be sure nothing strange happens in
@@ -56,11 +56,6 @@ hysplitPoints <- hysplitPoints[yearMask,]
 
 # Keep track of how many wildfires this is assocaited with
 hysplitPoints$nFPAFODPaired <- rep(0, dim(hysplitPoints)[1])
-
-# HEADERS <- c("Fire1", "Fire2", "Fire3", "Fire4", "Fire5", "Fire6")
-# df <-  data.frame(matrix(ncol = length(HEADERS), nrow = dim(hysplitPoints)[1]))
-# names(df) <- HEADERS
-# hysplitPoints <- cbind(hysplitPoints, df)
 
 # Load the FPA-FOD wildfires that will be assigned Hysplit Point Stats
 load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
@@ -83,6 +78,9 @@ FPA_FOD$totalDurationHours <- blank
 FPA_FOD$minDate <- blankTime
 FPA_FOD$maxDate <- blankTime
 
+# Handy tool for converting differences in time from seconds to days
+secondsPerDay <- (24*60*60)
+
 for (i in 1:nWildfire){ # nWildfire
   
   # Get fire location
@@ -95,8 +93,9 @@ for (i in 1:nWildfire){ # nWildfire
   # be associated with this wildfire. Calculate difference in date in days.
   # First make POSIXct as.numeric for seconds since epoch, then seconds to days.
   
-  # Positive DT values mean hysplit point occurs that nmany days AFTER FPA FOD
-  DT <- ( as.numeric(hysplitPoints$DATE - as.numeric(fireDate) )) / (24*60*60)
+  # Positive DT values mean hysplit point occurs that many days AFTER FPA FOD 
+  # DISCOVERY_DATE. Negative means it occurred that many days before.
+  DT <- ( as.numeric(hysplitPoints$DATE) - as.numeric(fireDate) ) / secondsPerDay
   tMask <- (DT <= timeAfterTol) & (DT >= -1*timeBefireTol)
   
   # What points are close enough? First subset down to a degree
@@ -105,7 +104,7 @@ for (i in 1:nWildfire){ # nWildfire
   distMask <- (DX <= 0.2) & (DY <= 0.2)
   distMaskClone <- distMask
   
-  # haversine the points that passed the 0.3 deg restriction)
+  # haversine the points that passed the 0.2 deg restriction)
   # Only make haversine calculation when needed
   if( sum(distMask & tMask) > 0 ){
     
