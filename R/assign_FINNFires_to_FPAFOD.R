@@ -42,8 +42,9 @@ distanceTol   <- 10  # haversinse kilometers required for match
 timeBefireTol <- 1   # days before FPAFOD discovery_date FINN allowed to occur for match
 timeAfterTol  <- 7   # days after FPAFOD discovery_date allowed to be assigned
 
-# Load the FPA-FOD wildfires that will be assigned FINN Stats
-load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
+# Load the FPA-FOD wildfires that will be assigned FINN Stats.
+# TODO: Load the FPA-FOD wildfires that already have HMS assignments made? 
+load("Data/HMS/FPA_FOD_gridMet_1992-2015.RData")
 
 # Loop through wildfires, making assignments one at a time. 
 yearMask  <- FPA_FOD$FIRE_YEAR == year
