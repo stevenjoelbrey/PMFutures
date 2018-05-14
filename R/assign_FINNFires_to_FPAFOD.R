@@ -50,13 +50,21 @@ load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
 yearMask  <- FPA_FOD$FIRE_YEAR == year
 FPA_FOD   <- FPA_FOD[yearMask, ]
 nWildfire <- dim(FPA_FOD)[1]
+fire_cause <- rep("", nWildfire)
+fire_cause[FPA_FOD$STAT_CAUSE_DESCR=="Lightning"] <- "Lightning"
+fire_cause[FPA_FOD$STAT_CAUSE_DESCR!="Lightning" & FPA_FOD$STAT_CAUSE_DESCR!="Missing/Undefined"] <- "Human"
+fire_cause[FPA_FOD$STAT_CAUSE_DESCR=="Missing/Undefined"] <- "Missing/Undefined"
+
 
 # Load the FINN fires. They come in one big batch.
 load("Data/FINN/FINN_CONUS_2002-2016.RData")
 
 # Keep track of how many FPA FOD wildfires each FINN detectection are assocaited 
 # with
-FINN$nFPAFODPaired <- rep(0, dim(FINN)[1])
+FINN$nFPAFODPaired       <- rep(0, dim(FINN)[1])
+FINN$nFPAHumanPaired     <- rep(0, dim(FINN)[1])
+FINN$nFPALightningPaired <- rep(0, dim(FINN)[1])
+FINN$nMissingPaired      <- rep(0, dim(FINN)[1])
 
 # Create columns in FPA FOD that will store paired FINN information  
 #   TOTAL_PM25: The total PM25 emissions associated with this file [units?]
@@ -138,6 +146,18 @@ for (i in 1:nWildfire){ # nWildfire
     # We also want to know what wildfire the FINN detection was paired to. 
     # TODO: Get those fires ID, that would be epic!
     FINN$nFPAFODPaired[timeAndSpace] <- FINN$nFPAFODPaired[timeAndSpace] + 1
+    
+    # I want to know the ignition types of FPA wildfires that were paired to these
+    # FINN fires
+    if(fire_cause[i]=="Lightning"){
+      FINN$nFPALightningPaired[timeAndSpace] <- FINN$nFPALightningPaired[timeAndSpace] + 1
+    } else if(fire_cause[i]=="Human"){
+      FINN$nFPAHumanPaired[timeAndSpace] <- FINN$nFPAHumanPaired[timeAndSpace] + 1
+    } else{
+      FINN$nMissingPaired[timeAndSpace] <- FINN$nMissingPaired[timeAndSpace] + 1
+    }
+    
+    
     
     # Plotting code for testing and development
     # plot(hysplitPoints$Lon[distMaskClone], hysplitPoints$Lat[distMaskClone],
