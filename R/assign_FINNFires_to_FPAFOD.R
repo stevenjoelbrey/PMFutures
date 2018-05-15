@@ -2,6 +2,7 @@
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0){
   args=2002
+  conservePM25 = "yes"
 }
 
 
@@ -10,6 +11,7 @@ if(length(args)==0){
 # Rscript --vanilla R/assign_FINNFires_to_FPAFOD.R  YEAR 
 
 year <- args[1]
+conservePM25 = args[2]
 print(paste("WORKING ON ASSIGNING FINN FIRES TO FPA FOD FOR YEAR:", year))
 
 # ------------------------- Description ---------------------------------------
@@ -50,7 +52,7 @@ load("Data/FPA_FOD/FPA_FOD_gridMet_1992-2015.RData")
 yearMask  <- FPA_FOD$FIRE_YEAR == year
 FPA_FOD   <- FPA_FOD[yearMask, ]
 nWildfire <- dim(FPA_FOD)[1]
-fire_cause <- rep("", nWildfire)
+fire_cause <- rep("-", nWildfire)
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR=="Lightning"] <- "Lightning"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR!="Lightning" & FPA_FOD$STAT_CAUSE_DESCR!="Missing/Undefined"] <- "Human"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR=="Missing/Undefined"] <- "Missing/Undefined"
@@ -89,7 +91,7 @@ for (i in 1:nWildfire){ # nWildfire
   fireLat <- FPA_FOD$LATITUDE[i]
   fireLon <- FPA_FOD$LONGITUDE[i]
   fireDate <- FPA_FOD$DISCOVERY_DATE[i]
-  
+
   # Now, make the first round of masks for FINN detections that could 
   # potentially be associated with this wildfire. Calculate difference in date 
   # in days. First make POSIXct as.numeric for seconds since epoch, then seconds 
@@ -138,11 +140,20 @@ for (i in 1:nWildfire){ # nWildfire
     FPA_FOD$n_FINN[i] <- n_paired
     
     # Assign other column data 
-    FPA_FOD$TOTAL_PM25[i] <- sum(FINN$PM25[timeAndSpace])
-    FPA_FOD$FINN_AREA[i]  <- sum(FINN$AREA[timeAndSpace])
+    # NOTE: nothing to stop FINN detections (rows) from being assigned to multiple FPA
+    # NOTE: FOD wildfires. This could result in double, triple, etc, counting of FINN PM25. 
+    FPA_FOD$TOTAL_PM25[i] <- sum(FINN$PM25[timeAndSpace]) # Could be used on more than one wildfire 
+    FPA_FOD$FINN_AREA[i]  <- sum(FINN$AREA[timeAndSpace]) # ""
     FPA_FOD$minDate[i]    <- min(FINN$DATE[timeAndSpace])
     FPA_FOD$maxDate[i]    <- max(FINN$DATE[timeAndSpace])
+
+    if (conservePM25 == "yes"){
+      # remove the PM25 and AREA that have already been assigned
+      FINN$PM25[timeAndSpace] <- 0
+      FINN$AREA[timeAndSpace] <- 0
+    }
     
+    #-------------------------------------------------------------------------#
     # We also want to know what wildfire the FINN detection was paired to. 
     # TODO: Get those fires ID, that would be epic!
     FINN$nFPAFODPaired[timeAndSpace] <- FINN$nFPAFODPaired[timeAndSpace] + 1
@@ -191,14 +202,14 @@ FPA_FOD$maxDate[FPA_FOD$maxDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 appendedFPA_FOD <- paste0("Data/FINN/FPA_FOD_with_FINN_dxdy=",
                           distanceTol,"_", 
                           "DT=", timeBefireTol, "_", timeAfterTol,"_",
-                          year, ".RData")
+                          year, "_test.RData")
 save(FPA_FOD, file = appendedFPA_FOD)
 
 # Save the FINN dataframe with the number of FOD fires each was paired to.
 saveName2 <- paste0("Data/FINN/FINN_with_FPAFOD_dxdy=",
                     distanceTol,"_", 
                     "DT=", timeBefireTol, "_", timeAfterTol,"_",
-                    year, ".RData")
+                    year, "_test.RData")
 
 # We want to save these one year at a time to be appended later. 
 FINNYearMask <- year(FINN$DATE)==year
