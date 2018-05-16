@@ -39,7 +39,9 @@ library(maps)
 library(lubridate) # for month() year() etc. 
 
 # -------------------------- Set tolerance values  -----------------------------
-# TODO: consider making these arguments
+# TODO: Consider handling very small wildfires differently, e.g. same day
+# TODO: required for time match pairing. 
+# TODO: consider making these arguments.
 distanceTol   <- 10  # haversinse kilometers required for match
 timeBefireTol <- 1   # days before FPAFOD discovery_date FINN allowed to occur for match
 timeAfterTol  <- 7   # days after FPAFOD discovery_date allowed to be assigned
@@ -72,6 +74,7 @@ FINN$nFPAFODPaired       <- rep(0, dim(FINN)[1])
 FINN$nFPAHumanPaired     <- rep(0, dim(FINN)[1])
 FINN$nFPALightningPaired <- rep(0, dim(FINN)[1])
 FINN$nMissingPaired      <- rep(0, dim(FINN)[1])
+FINN$FPA_FOD_ID          <- ""
 
 # Create columns in FPA FOD that will store paired FINN information  
 #   TOTAL_PM25: The total PM25 emissions associated with this file [units?]
@@ -172,6 +175,9 @@ for (i in 1:nWildfire){ # nWildfire
     # TODO: Get those fires ID, that would be epic!
     FINN$nFPAFODPaired[timeAndSpace] <- FINN$nFPAFODPaired[timeAndSpace] + 1
     
+    # Keep track of the FPA_FOD IDs of the paired
+    FINN$FPA_FOD_ID[timeAndSpace] <- paste(FINN$FPA_FOD_ID[timeAndSpace], FPA_FOD$FOD_ID[i], sep="_") 
+    
     # I want to know the ignition types of FPA wildfires that were paired to these
     # FINN fires
     if(fire_cause[i]=="Lightning"){
@@ -193,7 +199,7 @@ for (i in 1:nWildfire){ # nWildfire
   }else{
     # All other rows left NA, there are no FINN points associated with this
     # wildfire. There are also no emissions.  
-    FPA_FOD$n_FINN[i] <- 0
+    FPA_FOD$n_FINN[i]     <- 0
     FPA_FOD$TOTAL_PM25[i] <- 0
     FPA_FOD$FINN_AREA[i]  <- 0
   }
@@ -223,7 +229,7 @@ saveName2 <- paste0("Data/FINN/FINN_with_FPAFOD_dxdy=",
                     distanceTol,"_", 
                     "DT=", timeBefireTol, "_", timeAfterTol,"_",
                     year,"_", 
-                    "conservePM25", conservePM25, ".RData")
+                    "conservePM25=", conservePM25, ".RData")
 
 # We want to save these one year at a time to be appended later. 
 FINNYearMask <- year(FINN$DATE)==year # This now only gets rid of 2 months
