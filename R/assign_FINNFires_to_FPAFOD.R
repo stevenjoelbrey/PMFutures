@@ -75,6 +75,9 @@ FINN$nFPAHumanPaired     <- rep(0, dim(FINN)[1])
 FINN$nFPALightningPaired <- rep(0, dim(FINN)[1])
 FINN$nMissingPaired      <- rep(0, dim(FINN)[1])
 FINN$FPA_FOD_ID          <- ""
+# Preserve these values because they are cleared out as we loop through wildfires
+# when conservePM=yes
+PM25                     <- FINN$PM25
 
 # Create columns in FPA FOD that will store paired FINN information  
 #   TOTAL_PM25: The total PM25 emissions associated with this file [units?]
@@ -210,6 +213,10 @@ for (i in 1:nWildfire){ # nWildfire
   }
   
 } # End of wildfire loop
+
+# When conservePM25=yes, any FINN fire paired with an FPA_FOD wildfire will be
+# made 0, so we want to put those PM25 values back before saving. 
+FINN$PM25 <- PM2
 
 # Where no meaningful date was assigned, turn back to NA
 FPA_FOD$minDate[FPA_FOD$minDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
