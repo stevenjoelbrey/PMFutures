@@ -1,5 +1,5 @@
 # plot_FINN_FPAFOD_wildfires.R
-
+#
 # ------------------------- Description ---------------------------------------
 # This script plots FINN wildfires and thier pairing with FPA FOD as well as
 # FPA FOD and how they are paired to FINN.
@@ -11,9 +11,11 @@
 # TODO: arguments for loading data with difference time and distance tolerances
 # TODO: for pairing 
 
-lightningCol <- adjustcolor("cyan4", alpha.f = 1)
-humanCol     <- adjustcolor("orange", alpha.f = 1)
-unknownCol   <- adjustcolor("gray", alpha.f = 1)
+a <- 0.4
+lightningCol <- adjustcolor("cyan4", alpha.f = a)
+humanCol     <- adjustcolor("orange", alpha.f = a)
+unknownCol   <- adjustcolor("gray", alpha.f = a)
+noPairCol    <- adjustcolor("black", alpha.f = a)
 
 library(ggplot2)
 library(ggmap)
@@ -30,18 +32,13 @@ print("Loading data file that exists")
 load(paste0(dataDir, "FINN_with_FPAFOD_dxdy=10_DT=1_7_2002_2015.RData"))
 load(paste0(dataDir, "FPA_FOD_with_FINN_dxdy=10_DT=1_7_2002_2015.RData"))
 
-# # I do not want Alaska, HI, or PR, for plotting purposes. 
-# fire_states <- FPA_FOD$STATE
-# stateMask <- fire_states != "HI" & fire_states != "AK" & fire_states != "PR"
-# FPA_FOD <- FPA_FOD[stateMask, ]
 
 fire_cause <- rep("", dim(FPA_FOD)[1])
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR != "Lightning" & FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"] <- "Human"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR == "Missing/Undefined"] <- "Unknown"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR == "Lightning"] <- "Lightning"
-# Make this a factor 
+# Make this a factor and assign it
 fire_cause <- factor(fire_cause, levels=c("Lightning", "Human", "Unknown"))
-
 FPA_FOD$fire_cause <- fire_cause
 
 # Lets get some basics out of the way. Wildfires per year, proportion associated
@@ -88,39 +85,44 @@ dev.off()
 ################################################################################
 
 # Mask out non west or southeast region
-m <- (FPA_FOD$region != "") & (FPA_FOD$n_FINN > 0)
+m  <- (FPA_FOD$region != "") & (FPA_FOD$n_FINN > 0)
 df <- FPA_FOD[m,]
 
-sum((df$region=="Southeast") & (df$fire_cause=="Human"))
-sum((df$region=="West") & (df$fire_cause=="Human"))
+# These sums are created and shown so that I can be sure I know what ggplot
+# code is doing/showing
+print(paste("Southeast human total:", sum( (df$region=="Southeast") & (df$fire_cause=="Human") ) ))
+print(paste("Southeast lightning total:", sum( (df$region=="Southeast") & (df$fire_cause=="Lightning") ) ))
 
+print(paste( "West human total:" ,sum((df$region=="West") & (df$fire_cause=="Human")) ))
+print(paste( "West lightning total:" ,sum((df$region=="West") & (df$fire_cause=="Lightning")) ))
 
 g <- ggplot(df, aes(x=region, fill=fire_cause))+
   geom_bar(stat="count", width=0.5, position = "dodge")+
   scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
   guides(fill=guide_legend(title="Fire Cause"))+
-  theme_tufte(ticks=T, base_size = 20)+
+  theme_tufte(ticks=T, base_size = 16)+
   ylab("FPA FOD fires linked\nto FINN fires")+
   ggtitle("FPA FOD wildires co-located\nwith FINN fires")
 
 png(filename=paste0(figureDir, "FPA_FOD_with_FINN_count_by_region.png"), 
     res=250, height=1000, 
-    width=1500)
+    width=1300)
 print(g)
 dev.off()
 
 ################################################################################
 # Show the total PM2.5 emissions estimated by FINN for these paired wildfires
-# NOTE: Be careful when using dodge
+# NOTE: Be careful when using dodge. It can do strange things when summing a 
+# NOTE: numeric variable for a specific subset of the data 
 # https://stackoverflow.com/questions/46279720/using-dodge-position-in-ggplot-changing-column-values
 ################################################################################
 west_lightning_PM25 <- sum(df$TOTAL_PM25[ (df$region=="West") & (df$fire_cause=="Lightning")])
-east_human_PM25 <- sum(df$TOTAL_PM25[ (df$region=="Southeast") & (df$fire_cause=="Human")])
+east_human_PM25    <- sum(df$TOTAL_PM25[ (df$region=="Southeast") & (df$fire_cause=="Human")])
 
 # Create a new category, sum PM25 for a given region fire_cause combo
 p <- ggplot(df %>%
-            group_by(region, fire_cause) %>%
-            summarise(TOTAL_PM25_SUMMED = sum(TOTAL_PM25)),
+            group_by(region, fire_cause) %>% 
+            summarise(TOTAL_PM25_SUMMED = sum(TOTAL_PM25)), # i.e. sums TOTAL_PM25 by region and fire cause
             aes(x = region, y = TOTAL_PM25_SUMMED, fill = fire_cause))
 
 # Now set up the dodged bars by color and other styling needed for plot 
@@ -139,38 +141,63 @@ png(filename=paste0(figureDir, "Total_PM25_FPA_FOD_paired_to_FINN.png"),
 print(p2)
 dev.off()
 
+rm(df)
 ################################################################################
 # Show the number of FINN fires that are associated with FPA FOD wildfires
 # in each region. 
-# TODO: This needs an ignition attribution and then the y-axis needs to be 
-# TODO: changed to total PM25.
-# TODO: Use the summary teqnique shown above! 
 ################################################################################
 
-# Mask out non west or southeast region, also wildfires with no hysplits
+# Mask out non west or southeast region areas
 m <- (FINN$region != "") 
 df <- FINN[m,]
 
-# Make an association factor 
-wild <- rep("", sum(m))
-wild[df$pairedWithFPAFOD] <- "Yes"
-wild[!df$pairedWithFPAFOD] <- "No"
-df$wild <- wild
+# Create a datafrane if the number of wildfires for each ignition type associated
+# with a given FINN (row) detection
+noFPAPaired <- rep(0, length(df$nFPAFODPaired))
+noFPAPaired[df$nFPAFODPaired==0] <- Inf # Want this to be the category when no FPA FOD
 
-sum(df$region=="West" & df$wild=="No")
+ignition <- data.frame(nFPALightningPaired=df$nFPALightningPaired, 
+                       nFPAHumanPaired=df$nFPAHumanPaired, 
+                       nMissingPaired=df$nMissingPaired,
+                       noFPAPaired=noFPAPaired)
+# Which column has the biggest number?
+# If the row is all zeros than which.max returns the first index. This is why
+# Inf assigned to noFPAPaired rows that are all zero.
+mode_column <- apply(ignition, 1, which.max)
 
-p <- ggplot(df, aes(x=region, fill=wild))+
-  geom_bar(stat="count", width=0.5, position = "dodge")+
-  #scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
-  guides(fill=guide_legend(title="Accounted for in\nFPA FOD"))+
+# Assign the wildfire responsible and make this a factor
+ignitionType <- names(ignition)[mode_column]
+ignitionType <- factor(ignitionType, 
+                       levels=c("nFPALightningPaired", "nFPAHumanPaired", "nMissingPaired", "noFPAPaired"), 
+                       labels=c("Lightning", "Human", "Unknown/Missing", "No FPA FOD paired"))
+
+df$ignitionType <- ignitionType
+
+sum(df$PM25[df$region=="West" & df$ignitionType=="Lightning"])
+sum(df$PM25[ (df$region=="Southeast") & (df$ignitionType=="Human")])
+
+# Sanity check
+sum(df$PM25[df$region=="West" & (df$nFPALightningPaired>0 | df$nFPAHumanPaired>0)])
+
+
+
+# Create a new category, sum PM25 for a given region ignitionType combo
+g_sum <- ggplot(df %>%
+                group_by(region, ignitionType) %>% 
+                summarise(PM25_SUMMED = sum(PM25)),
+                aes(x = region, y = PM25_SUMMED, fill = ignitionType))
+
+g <- g_sum + geom_bar(stat = "identity", position = "dodge")+ 
+  scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown/Missing"=unknownCol, "No FPA FOD paired"=noPairCol))+
+  guides(fill=guide_legend(title="Ignition type"))+
   theme_tufte(ticks=T, base_size = 20)+
   theme(plot.title = element_text(hjust = 0.5))+ # Center the title
-  ylab("FINN detection count")+
-  ggtitle("FINN detections")
+  ylab(expression("PM"[2.5]*" [kg]"))+
+  ggtitle(expression("FINN PM"[2.5]*" emissions"))
 
-png(filename=paste0(figureDir, "FINN_wFPA_FOD_count_by_region.png"), 
-    res=250, height=1300, width=2000)
-print(p)
+png(filename=paste0(figureDir, "FINN_PM25_emissions_by_ignition.png"), 
+    res=250, height=1300, width=1700)
+print(g)
 dev.off()
 
 ################################################################################
