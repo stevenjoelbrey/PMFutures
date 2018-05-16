@@ -1,18 +1,18 @@
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)==0){
-  args=2002
-  conservePM25 = "yes"
+  args=c(2005, "no")
 }
-
+print(args)
 
 # -----------------------assign_FINNFires_to_FPAFOD.R--------------------------- 
 # TO RUN THIS SCRIPT:
 # Rscript --vanilla R/assign_FINNFires_to_FPAFOD.R  YEAR 
 
-year <- args[1]
-conservePM25 = args[2]
+year <- as.numeric(args[1])
+conservePM25 = as.character(args[2])
 print(paste("WORKING ON ASSIGNING FINN FIRES TO FPA FOD FOR YEAR:", year))
+print(paste("conservePM25:", conservePM25))
 
 # ------------------------- Description ---------------------------------------
 # This script is used to assign FINN FIRE detections to FPA FOD fires. The goal 
@@ -61,6 +61,11 @@ fire_cause[FPA_FOD$STAT_CAUSE_DESCR=="Missing/Undefined"] <- "Missing/Undefined"
 # Load the FINN fires. They come in one big batch.
 load("Data/FINN/FINN_CONUS_2002-2016.RData")
 
+# Subset FINN fires by the dates that will be allowed for pairing. 
+tMask <- FINN$DATE >= as.POSIXct(paste0(year-1, "-12-01"), tz="UTC") &
+         FINN$DATE <= as.POSIXct(paste0(year+1, "-01-30"), tz="UTC")
+FINN <- FINN[tMask,]
+
 # Keep track of how many FPA FOD wildfires each FINN detectection are assocaited 
 # with
 FINN$nFPAFODPaired       <- rep(0, dim(FINN)[1])
@@ -84,6 +89,7 @@ FPA_FOD$maxDate    <- blankTime
 # Handy conversion for time comparisons 
 secondsPerDay <- (24*60*60)
 kmPerDeg <- 111
+rad_earth <- 6378137/1000 # radius of earth in km (from distHaversine function)
 
 for (i in 1:nWildfire){ # nWildfire
   
@@ -103,10 +109,10 @@ for (i in 1:nWildfire){ # nWildfire
   # The DT we want are DT positive up to timeAFterTol and DT -1 and 0. 
   tMask <- (DT <= timeAfterTol) & (DT >= -1*timeBefireTol)
   
-  # What points are close enough? First subset down to a 0.2 degree of lat/lon
+  # What points are close enough? First subset down to 0.2 degree of lat/lon
   DX <- abs(FINN$LONGI - fireLon)
   DY <- abs(FINN$LATI - fireLat)
-  distMask <- (DX <= 0.2) & (DY <= 0.2)
+  distMask <- (DX <= 0.20) & (DY <= 0.20)
   distMaskClone <- distMask
   
   # Account for differences in longitude as a function of latitude but only 
@@ -115,16 +121,24 @@ for (i in 1:nWildfire){ # nWildfire
   if( sum(distMask & tMask) > 0 ){
     
     # Calculate hypotenuse distance accounting for changing km with lat accross
-    # longitude
-    dx <- cos(fireLat*pi/180) * kmPerDeg * DX[distMask]
-    dy <- DY[distMask] * kmPerDeg
-    dist_km <- (dx^2 + dy^2)^(0.5)
+    # longitude.
+    # NOTE: These distances will only be done where distMask is TRUE, so it
+    # NOTE: is being done on a subset of the distances calculated above
+    # dx <- cos(fireLat*pi/180) * kmPerDeg * DX[distMask]
+    # dy <- DY[distMask] * kmPerDeg
+    # dist_km <- (dx^2 + dy^2)^(0.5)
 
+    # distHaversine
+    p1 <- c(fireLon, fireLat)
+    p2 <- cbind(FINN$LONGI[distMask], FINN$LATI[distMask])
+    dist_km <- geosphere::distHaversine(p1, p2, r=rad_earth)
+    
     # Mask projected onto already subset data 
     dist_km_mask <- (dist_km <= distanceTol) 
     
-    # Update the distMask, this maps back to all hysplit points using the km
-    # distance masking requirements 
+    # Update the distMask[distMask], aka where distMask was TRUE, which are the 
+    # points the calculations were done for. This maps back to all FINN points 
+    # using the km distance masking requirements. 
     distMask[distMask] <- dist_km_mask
     
   }
@@ -168,8 +182,6 @@ for (i in 1:nWildfire){ # nWildfire
       FINN$nMissingPaired[timeAndSpace] <- FINN$nMissingPaired[timeAndSpace] + 1
     }
     
-    
-    
     # Plotting code for testing and development
     # plot(hysplitPoints$Lon[distMaskClone], hysplitPoints$Lat[distMaskClone],
     #      pch=19, col="blue") # Plots hysplit points that are close enough
@@ -179,7 +191,7 @@ for (i in 1:nWildfire){ # nWildfire
     #        pch=19, cex=0.3, col="red") # plots the wildfires that are close enough in space and time. 
     
   }else{
-    # All other rows left NA, there are no hysplit points associated with this
+    # All other rows left NA, there are no FINN points associated with this
     # wildfire. There are also no emissions.  
     FPA_FOD$n_FINN[i] <- 0
     FPA_FOD$TOTAL_PM25[i] <- 0
@@ -202,16 +214,18 @@ FPA_FOD$maxDate[FPA_FOD$maxDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 appendedFPA_FOD <- paste0("Data/FINN/FPA_FOD_with_FINN_dxdy=",
                           distanceTol,"_", 
                           "DT=", timeBefireTol, "_", timeAfterTol,"_",
-                          year, "_test.RData")
+                          year,
+                          ".RData")
 save(FPA_FOD, file = appendedFPA_FOD)
 
 # Save the FINN dataframe with the number of FOD fires each was paired to.
 saveName2 <- paste0("Data/FINN/FINN_with_FPAFOD_dxdy=",
                     distanceTol,"_", 
                     "DT=", timeBefireTol, "_", timeAfterTol,"_",
-                    year, "_test.RData")
+                    year,"_", 
+                    "conservePM25", conservePM25, ".RData")
 
 # We want to save these one year at a time to be appended later. 
-FINNYearMask <- year(FINN$DATE)==year
+FINNYearMask <- year(FINN$DATE)==year # This now only gets rid of 2 months
 FINN <- FINN[FINNYearMask,]
 save(FINN, file = saveName2)
