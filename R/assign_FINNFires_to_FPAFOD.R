@@ -220,8 +220,8 @@ FPA_FOD$maxDate[FPA_FOD$maxDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 appendedFPA_FOD <- paste0("Data/FINN/FPA_FOD_with_FINN_dxdy=",
                           distanceTol,"_", 
                           "DT=", timeBefireTol, "_", timeAfterTol,"_",
-                          year,
-                          ".RData")
+                          year,"_",
+                          "conservePM25=", conservePM25,".RData")
 save(FPA_FOD, file = appendedFPA_FOD)
 
 # Save the FINN dataframe with the number of FOD fires each was paired to.
