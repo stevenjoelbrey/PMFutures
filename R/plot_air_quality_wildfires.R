@@ -6,9 +6,10 @@
 # This script is also responsible for creating dataframes merging the yearly 
 # analysis files output by R/assign_HYSPLITPoints_to_FPAFOD.R
 
-lightningCol <- adjustcolor("cyan4", alpha.f = 1)
-humanCol     <- adjustcolor("orange", alpha.f = 1)
-unknownCol   <- adjustcolor("gray", alpha.f = 1)
+a <- 1
+lightningCol <- adjustcolor("cyan4", alpha.f = a)
+humanCol     <- adjustcolor("orange", alpha.f = a)
+unknownCol   <- adjustcolor("gray", alpha.f = a)
 
 library(ggplot2)
 library(ggmap)
@@ -77,14 +78,13 @@ df <- FPA_FOD[m,]
 g <- ggplot(df, aes(x=region, fill=fire_cause))+
   geom_bar(stat="count", width=0.5, position = "dodge")+
   scale_fill_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))+
-  guides(fill=guide_legend(title="Fire Cause"))+
-  theme_tufte(ticks=T, base_size = 20)+
-  ylab("FPA FOD fires linked\nto air quality forecasts")+
-  ggtitle("FPA FOD wildires associated\nwith air quality forecasts")
+  guides(fill=guide_legend(title="Ignition Type"))+
+  theme_tufte(ticks=T, base_size = 19)+
+  ylab("FPA FOD wildfires linked\nto air quality forecasts")+
+  ggtitle("")
 
 png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region.png"), 
-    res=250, height=1000, 
-    width=1500)
+    res=250, height=1300, width=1500)
 print(g)
 dev.off()
 

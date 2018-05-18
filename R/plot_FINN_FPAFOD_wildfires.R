@@ -24,27 +24,14 @@ library(mapdata)
 library(ggthemes)
 library(dplyr)
 
-# This script contains useful functions and tolerance arugments 
-source("R/merge_paired_FINN_FPAFOD_fires.R")
-
 dataDir   <- "Data/FINN/" 
-
-# Figures of a given set of tolerances live in the same directory
-figureDir <- paste0("Figures/FINN_assignments/", 
-                    "dxdy=", distanceTol,"_",
-                    "DT=",DT,"_",
-                    year1,"_",year2,"_",
-                    "conservePM25=", conservePM25,"/")
-
-# If the figure dirctory does not exist, create it
-if(!dir.exists(figureDir)){
-  dir.create(figureDir)
-}
+figureDir <- "Figures/FINN_assignments/"
 
 # Load the merged yearly paired fire data created by R/merge_paired_fires.R
 print("Loading data file that exists")
-load(appendedFINN(distanceTol, DT, paste0(year1,"_",year2), conservePM25))
-load(appendedFPA_FOD(distanceTol, DT, paste0(year1,"_",year2), conservePM25))
+load(paste0(dataDir, "FINN_with_FPAFOD_dxdy=10_DT=1_7_2002_2015.RData"))
+load(paste0(dataDir, "FPA_FOD_with_FINN_dxdy=10_DT=1_7_2002_2015.RData"))
+
 
 fire_cause <- rep("", dim(FPA_FOD)[1])
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR != "Lightning" & FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"] <- "Human"
@@ -184,13 +171,15 @@ ignitionType <- factor(ignitionType,
                        levels=c("nFPALightningPaired", "nFPAHumanPaired", "nMissingPaired", "noFPAPaired"), 
                        labels=c("Lightning", "Human", "Unknown/Missing", "No FPA FOD paired"))
 
-# Put this factor on the dataframe to be plotted
 df$ignitionType <- ignitionType
 
-# Sanity checks
 sum(df$PM25[df$region=="West" & df$ignitionType=="Lightning"])
 sum(df$PM25[ (df$region=="Southeast") & (df$ignitionType=="Human")])
+
+# Sanity check
 sum(df$PM25[df$region=="West" & (df$nFPALightningPaired>0 | df$nFPAHumanPaired>0)])
+
+
 
 # Create a new category, sum PM25 for a given region ignitionType combo
 g_sum <- ggplot(df %>%
