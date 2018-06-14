@@ -10,7 +10,7 @@ if(length(args)==0){
 
 # assign_HYSPLITPoints_to_FPAFOD.R 
 
-# TO RUN THIS SCRIPT
+# TO RUN THIS SCRIPT (e.g.)
 # Rscript --vanilla R/assign_HYSPLITPoints_to_FPAFOD.R 2007
 
 year <- args[1]
@@ -42,10 +42,9 @@ library(maps)
 library(lubridate)
 
 # -------------------------- Set tolerance values  -----------------------------
-distanceTol   <- 10  # haversinse kilometers required for HP to be assigned to FPAFOD
-timeBefireTol <- 1 # days before FPAFOD discovery_date HP allowed to occur for match
-timeAfterTol  <- 7  # days after FPAFOD discovery_date HP allowed to be assigned
-
+distanceTolBase <- 4  # haversinse kilometers required for HP to be assigned to FPAFOD
+timeBefireTol   <- 1 # days before FPAFOD discovery_date HP allowed to occur for match
+timeAfterTol    <- 20  # days after FPAFOD discovery_date HP allowed to be assigned
 
 # Load the HMS Hysplit Points dataframe. To be sure nothing strange happens in
 # assignments, allow assignments to be made using only this years data. This 
@@ -88,6 +87,13 @@ for (i in 1:nWildfire){ # nWildfire
   fireLon <- FPA_FOD$LONGITUDE[i]
   # Get fire date
   fireDate <- FPA_FOD$DISCOVERY_DATE[i]
+  fireSize <- FPA_FOD$FIRE_SIZE[i]
+  
+  # Distance tolerance should be a dynamic function of radius of the wildfire
+  # assuming the wildfire burn scar is circular in shape. 
+  A <- fireSize * 0.00404686 # second number is km2/acre
+  r <- sqrt(A/pi)
+  distanceTol <- distanceTolBase + r
   
   # Now, make the first round of masks for hysplit points that could potentially
   # be associated with this wildfire. Calculate difference in date in days.
@@ -95,9 +101,12 @@ for (i in 1:nWildfire){ # nWildfire
   
   # Positive DT values mean hysplit point occurs that many days AFTER FPA FOD 
   # DISCOVERY_DATE. Negative means it occurred that many days before.
-  DT <- ( as.numeric(hysplitPoints$DATE) - as.numeric(fireDate) ) / secondsPerDay
-  tMask <- (DT <= timeAfterTol) & (DT >= -1*timeBefireTol)
-  
+  if(fireSize < 10){ 
+    tMask <- fireDate == hysplitPoints$DATE
+  } else{
+    DT <- ( as.numeric(hysplitPoints$DATE) - as.numeric(fireDate) ) / secondsPerDay
+    tMask <- (DT <= timeAfterTol) & (DT >= -1*timeBefireTol)
+  }
   # What points are close enough? First subset down to a degree
   DX <- abs(hysplitPoints$Lon - fireLon)
   DY <- abs(hysplitPoints$Lat - fireLat)
@@ -135,7 +144,7 @@ for (i in 1:nWildfire){ # nWildfire
   timeAndSpace <- distMask & tMask
   n_HP <- sum(timeAndSpace)
   
-  
+  # If any meet the co-location criteria count them up
   if(n_HP > 0){
     
     # print(paste("index:", i, "has data that meets dist cuttoff"))
@@ -149,7 +158,8 @@ for (i in 1:nWildfire){ # nWildfire
     FPA_FOD$maxDate[i] <- max(hysplitPoints$DATE[timeAndSpace])
     
     # We also want to know what wildfire the HYSPLIT point was paired to. 
-    # TODO: Get those fires ID, that would be epic!
+    # TODO: Get those fires ID, that would be epic! This functionality exists
+    # TODO: in R/assign_FINN_to_FPAFOD.R
     hysplitPoints$nFPAFODPaired[timeAndSpace] <- hysplitPoints$nFPAFODPaired[timeAndSpace] + 1
     
     # plot(hysplitPoints$Lon[distMaskClone], hysplitPoints$Lat[distMaskClone],
@@ -178,9 +188,9 @@ FPA_FOD$minDate[FPA_FOD$minDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 FPA_FOD$maxDate[FPA_FOD$maxDate < as.POSIXct("1901-01-01", tz="UTC")] <- NA
 
 # save the appended data 
-saveName1 <- paste0("Data/HMS/FPA_FOD_with_HP_", year, ".RData")
+saveName1 <- paste0("Data/HMS/FPA_FOD_with_HP_dynamicR_", year, ".RData")
 save(FPA_FOD, file = saveName1)
 
 # Save the hysplitpoints dataframe with the number of FOD fires it was paired to
-saveName2 <- paste0("Data/HMS/hysplitPoints_with_FPAFOD_", year, ".RData")
+saveName2 <- paste0("Data/HMS/hysplitPoints_with_FPAFOD_dynamicR_", year, ".RData")
 save(hysplitPoints, file = saveName2)
