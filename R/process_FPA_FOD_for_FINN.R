@@ -40,6 +40,11 @@ for (year in years){
   
   # Calculate area in SI units (m2)
   AREA <- df$FIRE_SIZE * m2perAcre # acres  * (m2/acres) = m2
+  df$AREA_m2 <- AREA
+  
+  # Save this subset dataframe to pair with FINN processed data so that all
+  # columns (attributes are maintained)
+  save(df, file=paste0(dataOutDir, "FPA_FOD_forFINN_", year, ".RData"))
   
   # Create the dataframe to save out. This takes attributes from FPA FOD for 
   # this year and creates columns for FINN to add information. 
@@ -62,7 +67,8 @@ for (year in years){
   writeOGR(spdf, 
            dsn = paste0(dataOutDir, "/shape/"), 
            layer=paste0("FPA_FOD_", year), 
-           driver="ESRI Shapefile")
+           driver="ESRI Shapefile",
+           overwrite_layer=TRUE)
   
   # Clear out the variables before we come back through here. 
   rm(spdf, df_out, FPA_FOD, df, coords, AREA)

@@ -6,6 +6,7 @@
 # This script is also responsible for creating dataframes merging the yearly 
 # analysis files output by R/assign_HYSPLITPoints_to_FPAFOD.R
 
+v <- "" # "dynamicR_"
 a <- 1
 lightningCol <- adjustcolor("cyan4", alpha.f = a)
 humanCol     <- adjustcolor("orange", alpha.f = a)
@@ -17,13 +18,13 @@ library(maps)
 library(mapdata)
 library(ggthemes)
 
-dataDir <- "Data/HMS/" 
+dataDir   <- "Data/HMS/" 
 figureDir <- "Figures/HMS_assignments/"
 
 # Load the merged yearly paired fire data created by R/merge_paired_fires.R
 print("Loading data file that exists")
-load(paste0(dataDir, "FPA_FOD_with_HP_2007_2015.RData"))
-load(paste0(dataDir, "hysplitPoints_with_FPA_FOD_2007_2015.RData"))
+load(paste0(dataDir, "FPA_FOD_with_HP_", v, "2007_2015.RData"))
+load(paste0(dataDir, "hysplitPoints_with_FPA_FOD_", v, "2007_2015.RData"))
 
 # I do not want Alaska, HI, or PR, for plotting purposes. 
 fire_states <- FPA_FOD$STATE
@@ -53,7 +54,7 @@ for (i in 1:nYears){
 # Save the figure that shows if there is a trend in fires associated with AQ
 # forecasts. Based on the way the data are generated it is not clear what this
 # tells us. 
-png(filename=paste0(figureDir, "percent_AQ_wildfires.png"), 
+png(filename=paste0(figureDir, "percent_AQ_wildfires_",v,".png"), 
     res=250, height=1000, 
     width=2000)
 
@@ -81,9 +82,10 @@ g <- ggplot(df, aes(x=region, fill=fire_cause))+
   guides(fill=guide_legend(title="Ignition Type"))+
   theme_tufte(ticks=T, base_size = 19)+
   ylab("FPA FOD wildfires linked\nto air quality forecasts")+
-  ggtitle("")
+  ggtitle("")+
+  xlab("")
 
-png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region.png"), 
+png(filename=paste0(figureDir, "FPA_FOD_AQfires_count_by_region_", v, ".png"), 
     res=250, height=1300, width=1500)
 print(g)
 dev.off()
@@ -92,7 +94,7 @@ dev.off()
 # Show the number of Hysplit points that are associated with FPA FOD wildfires
 # in each region. 
 ################################################################################
-png(filename=paste0(figureDir, "HysplitPoints_wFPA_FOD_count_by_region.png"), 
+png(filename=paste0(figureDir, "HysplitPoints_wFPA_FOD_count_by_region_", v, ".png"), 
     res=250, height=1000, 
     width=1500)
 
@@ -123,7 +125,7 @@ dev.off()
 ################################################################################
 AQ_fires <- FPA_FOD[FPA_FOD$n_HP > 0, ] 
 
-png(filename=paste0(figureDir, "AQ_fires_mapped.png"), res=100, 
+png(filename=paste0(figureDir, "AQ_fires_mapped_", v, ".png"), res=100, 
     width=2000, height=1200)
 
 states <- map_data("state")
@@ -146,10 +148,9 @@ dev.off()
 
 world <- map_data("world")
 
-
 hysplitPoints$paried  <- as.factor(hysplitPoints$nFPAFODPaired > 0)
 
-png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"), res=100, 
+png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped_", v, ".png"), res=100, 
     width=2000, height=1200)
 
 ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
@@ -173,7 +174,7 @@ dev.off()
 
 HP_paired <- hysplitPoints[hysplitPoints$nFPAFODPaired > 0, ]
 
-png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped.png"), 
+png(filename=paste0(figureDir, "paired_HYSPLITPoints_mapped_", v, ".png"), 
     width=2000, height=1200)
 
 ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
@@ -191,7 +192,7 @@ dev.off()
 ################################################################################
 # HMS smoke duration hours as a function of 
 ################################################################################
-png(filename=paste0(figureDir, "fire_size_vs.png"), width=1700, height=1400,
+png(filename=paste0(figureDir, "fire_size_vs_", v, ".png"), width=1700, height=1400,
     res=200)
 
 p <- ggplot(AQ_fires, aes(x=FIRE_SIZE, y=n_HP, col=fire_cause, size=totalDurationHours))
@@ -216,7 +217,7 @@ fireType[df$n_HP == 0] <- "No AQ forecast"
 fireType <- factor(fireType, levels = c("No AQ forecast", "AQ forecast"))
 df$fireType <- fireType
 
-png(filename=paste0(figureDir, "regional_counts.png"), width=2000, height=800,
+png(filename=paste0(figureDir, "regional_counts_", v, ".png"), width=2000, height=800,
     res=200)
 
 g <- ggplot(df, aes(NA_L2CODE,fill=fire_cause))

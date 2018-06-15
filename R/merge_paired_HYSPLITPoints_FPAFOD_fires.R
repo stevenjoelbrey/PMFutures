@@ -11,19 +11,19 @@ dataDir <- "Data/HMS/"
 # If the merged datasets do not exist, make them. 
 
 # Merge the yearly files 
-df <- get(load( paste0(dataDir, "FPA_FOD_with_HP_", year1, ".RData") ))
-df_hms <- get(load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", year1, ".RData") ))
+df <- get(load( paste0(dataDir, "FPA_FOD_with_HP_dynamicR_", year1, ".RData") ))
+df_hms <- get(load( paste0(dataDir, "hysplitPoints_with_FPAFOD_dynamicR_", year1, ".RData") ))
 for(y in (year1+1):year2){
   
   print(paste("Appending:", y, "to", year1))
   
   # Load "FPA_FOD" dataframe 
-  load( paste0(dataDir, "FPA_FOD_with_HP_", y, ".RData") )
+  load( paste0(dataDir, "FPA_FOD_with_HP_dynamicR_", y, ".RData") )
   df <- rbind(df, FPA_FOD)
   rm(FPA_FOD)
   
   # Load "hysplitPoints" data frame
-  load( paste0(dataDir, "hysplitPoints_with_FPAFOD_", y, ".RData") )
+  load( paste0(dataDir, "hysplitPoints_with_FPAFOD_dynamicR_", y, ".RData") )
   df_hms <- rbind(df_hms, hysplitPoints)
   rm(hysplitPoints)
   
@@ -75,6 +75,6 @@ region[EMask] <- "Southeast"
 FPA_FOD$region <- factor(region, levels = c("West", "Southeast", ""))
 
 
-save(FPA_FOD, file=paste0(dataDir, "FPA_FOD_with_HP_", year1, "_", year2, ".RData"))
-save(hysplitPoints, file=paste0(dataDir, "hysplitPoints_with_FPA_FOD_", 
+save(FPA_FOD, file=paste0(dataDir, "FPA_FOD_with_HP_dynamicR_", year1, "_", year2, ".RData"))
+save(hysplitPoints, file=paste0(dataDir, "hysplitPoints_with_FPA_FOD_dynamicR_", 
                                 year1,"_", year2, ".RData"))

@@ -1,15 +1,19 @@
 # plot_FINN_FPAFOD_wildfires.R
 #
 # ------------------------- Description ---------------------------------------
-# This script plots FINN wildfires and thier pairing with FPA FOD as well as
-# FPA FOD and how they are paired to FINN.
+# This script plots FPA FOD PM25 emissions as estimated by the FINN modeling 
+# franework. FPA FOD fires were used instead of MODIS dections and PM25 
+# emissions were estimated by Christine. 
 #
 # Loads data created by:
-#   R/assign_FINNFires_to_FPAFOD.R
-#   R/merge_paired_FINN_FPAFOD_fires.R
+#   R/process_FPA_FOD_for_FINN.R
+#   R/sanity_check_FINN_procssed_data.R
 
-# TODO: arguments for loading data with difference time and distance tolerances
-# TODO: for pairing 
+# ------------------------- Arguments ------------------------------------------
+year1 <- 2002 
+year2 <- 2015
+dataInFile   <- "Data/FINN/processed/FPA_FOD_wFINN-PM25_2002-2015.RData" 
+figureDir <- paste0("Figures/FINN_emissions/")
 
 a <- 1 # alpha for color in plots 
 lightningCol <- adjustcolor("cyan4", alpha.f = a)
@@ -24,34 +28,17 @@ library(mapdata)
 library(ggthemes)
 library(dplyr)
 
-# This script contains useful functions and tolerance arugments 
-source("R/merge_paired_FINN_FPAFOD_fires.R")
-
-year1 <- 2002 
-year2 <- 2015
-distanceTol  <- "10"  # distance km tolerance 
-DT           <- "1_7" # daysbefore_after tolerance 
-conservePM25 <- "no"
-dataDir   <- "Data/FINN/" 
-
-# Figures of a given set of tolerances live in the same directory
-figureDir <- paste0("Figures/FINN_assignments/", 
-                    "dxdy=", distanceTol,"_",
-                    "DT=",DT,"_",
-                    year1,"_",year2,"_",
-                    "conservePM25=", conservePM25,"/")
-
 # If the figure dirctory does not exist, create it
 if(!dir.exists(figureDir)){
   dir.create(figureDir)
 }
 
-# Load the merged yearly paired fire data created by R/merge_paired_fires.R
-print("Loading data file that exists")
-load(appendedFINN(distanceTol, DT, paste0(year1,"_",year2), conservePM25))
-load(appendedFPA_FOD(distanceTol, DT, paste0(year1,"_",year2), conservePM25))
+# Load the CONUS FPA FOD wildfires where FINN PM2.5 emission estimates have
+# been made. 
+load(dataInFile)
 
-fire_cause <- rep("", dim(FPA_FOD)[1])
+# Handle wildfire cause
+fire_cause <- rep("-", dim(FPA_FOD)[1])
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR != "Lightning" & FPA_FOD$STAT_CAUSE_DESCR != "Missing/Undefined"] <- "Human"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR == "Missing/Undefined"] <- "Unknown"
 fire_cause[FPA_FOD$STAT_CAUSE_DESCR == "Lightning"] <- "Lightning"
@@ -59,52 +46,16 @@ fire_cause[FPA_FOD$STAT_CAUSE_DESCR == "Lightning"] <- "Lightning"
 fire_cause <- factor(fire_cause, levels=c("Lightning", "Human", "Unknown"))
 FPA_FOD$fire_cause <- fire_cause
 
-# Lets get some basics out of the way. Wildfires per year, proportion associated
-# with FINN analysis
-# TODO: Make monthly
-years <- unique(FPA_FOD$FIRE_YEAR)
-nYears <- length(years)
-n_fires     <- rep(NA, nYears)
-n_FINN_fires <- rep(NA, nYears)
-for (i in 1:nYears){
-  yearMask <- FPA_FOD$FIRE_YEAR == years[i]
-  n_fires[i] <- sum(yearMask)
-  n_FINN_fires[i] <- sum(yearMask & (FPA_FOD$n_FINN > 0) ) 
-}
 
-percentPaired <- round(sum(FPA_FOD$n_FINN>0)/length(FPA_FOD$n_FINN)*100,2)
-
-n_Finn_west <- FPA_FOD$n_FINN[FPA_FOD$region == "West"]
-percentPaired_west <- round(sum(n_Finn_west>0)/length(n_Finn_west)*100,2)
-
-n_Finn_se <- FPA_FOD$n_FINN[FPA_FOD$region == "Southeast"]
-percentPaired_se <- round(sum(n_Finn_se>0)/length(n_Finn_se)*100,2)
-
-
-# Save the figure that shows if there is a trend in fires associated with AQ
-# forecasts. Based on the way the data are generated it is not clear what this
-# tells us. 
-png(filename=paste0(figureDir, "percent_AQ_wildfires.png"), 
-    res=250, height=1000, 
-    width=2000)
-
-plot(years, n_FINN_fires/n_fires*100, 
-     xlab="year", ylab="% wildfires paired with FINN", las=1)
-lines(years, n_FINN_fires/n_fires*100)
-title("Annual percent of FPA FOD wildfires paired with FINN",
-      sub=paste(percentPaired, "% of wildfires paired with FINN"))
-
-dev.off()
+# Mask out non west or southeast region
+m  <- (FPA_FOD$region != "") & (FPA_FOD$n_FINN > 0)
+df <- FPA_FOD[m,]
 
 
 ################################################################################
 # Show the number of FPA wildfires that are associated with FINN fires in
 # in each region. 
 ################################################################################
-
-# Mask out non west or southeast region
-m  <- (FPA_FOD$region != "") & (FPA_FOD$n_FINN > 0)
-df <- FPA_FOD[m,]
 
 # These sums are created and shown so that I can be sure I know what ggplot
 # code is doing/showing
@@ -134,32 +85,32 @@ dev.off()
 # NOTE: numeric variable for a specific subset of the data 
 # https://stackoverflow.com/questions/46279720/using-dodge-position-in-ggplot-changing-column-values
 ################################################################################
-west_lightning_PM25 <- sum(df$TOTAL_PM25[ (df$region=="West") & (df$fire_cause=="Lightning")])
-east_human_PM25    <- sum(df$TOTAL_PM25[ (df$region=="Southeast") & (df$fire_cause=="Human")])
-
-# Create a new category, sum PM25 for a given region fire_cause combo
-p <- ggplot(df %>%
-            group_by(region, fire_cause) %>% 
-            summarise(TOTAL_PM25_SUMMED = sum(TOTAL_PM25)), # i.e. sums TOTAL_PM25 by region and fire cause
-            aes(x = region, y = TOTAL_PM25_SUMMED, fill = fire_cause))
-
-# Now set up the dodged bars by color and other styling needed for plot 
-p2 <- p + geom_bar(stat = "identity", position = "dodge")+ 
-  scale_fill_manual(values = c("Lightning"=lightningCol, 
-                               "Human"=humanCol, 
-                               "Unknown"=unknownCol))+
-  guides(fill=guide_legend(title="Fire Cause"))+
-  theme_tufte(ticks=T, base_size = 20)+
-  ylab(expression("PM"[2.5]*" [kg]"))+
-  ggtitle(expression("PM"[2.5]*" emissions from FPA FOD wildires"))
-
-# Save the image 
-png(filename=paste0(figureDir, "Total_PM25_FPA_FOD_paired_to_FINN.png"), 
-    res=250, height=1300, width=2000)
-print(p2)
-dev.off()
-
-rm(df)
+# west_lightning_PM25 <- sum(df$TOTAL_PM25[ (df$region=="West") & (df$fire_cause=="Lightning")])
+# east_human_PM25    <- sum(df$TOTAL_PM25[ (df$region=="Southeast") & (df$fire_cause=="Human")])
+# 
+# # Create a new category, sum PM25 for a given region fire_cause combo
+# p <- ggplot(df %>%
+#             group_by(region, fire_cause) %>%
+#             summarise(TOTAL_PM25_SUMMED = sum(TOTAL_PM25)), # i.e. sums TOTAL_PM25 by region and fire cause
+#             aes(x = region, y = TOTAL_PM25_SUMMED, fill = fire_cause))
+# 
+# # Now set up the dodged bars by color and other styling needed for plot
+# p2 <- p + geom_bar(stat = "identity", position = "dodge")+
+#   scale_fill_manual(values = c("Lightning"=lightningCol,
+#                                "Human"=humanCol,
+#                                "Unknown"=unknownCol))+
+#   guides(fill=guide_legend(title="Fire Cause"))+
+#   theme_tufte(ticks=T, base_size = 20)+
+#   ylab(expression("PM"[2.5]*" [kg]"))+
+#   ggtitle(expression("PM"[2.5]*" emissions from FPA FOD wildires"))
+# 
+# # Save the image
+# png(filename=paste0(figureDir, "Total_PM25_FPA_FOD_paired_to_FINN.png"),
+#     res=250, height=1300, width=2000)
+# print(p2)
+# dev.off()
+# 
+# rm(df)
 ################################################################################
 # Show the number of FINN fires that are associated with FPA FOD wildfires
 # in each region. 
@@ -216,28 +167,28 @@ png(filename=paste0(figureDir, "FINN_PM25_emissions_by_ignition.png"),
 print(g)
 dev.off()
 
-################################################################################
-# Map when and where the paired fire data occur in the US. 
-# http://eriqande.github.io/rep-res-web/lectures/making-maps-with-R.html
-################################################################################
-FINN_fires <- FPA_FOD[FPA_FOD$n_FINN > 0, ] 
-
-states <- map_data("state")
-P <- ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
-                        fill = NA, color = lightningCol) + 
-  coord_fixed(1.3)+ # fixes the relationship between one unit in the y direction and one unit in the x direction.
-  theme_tufte(ticks=T, base_size = 20)+
-  geom_point(data = FINN_fires, aes(x = LONGITUDE, y = LATITUDE, 
-                                  color = fire_cause, size = FIRE_SIZE)
-             #shape=fire_cause)
-  )+
-  scale_colour_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))
-
-
-png(filename=paste0(figureDir, "FPA_FOD_paired_wFINN_fires_mapped.png"), res=100, 
-    width=2000, height=1200)
-print(P)
-dev.off()  
+# ################################################################################
+# # Map when and where the paired fire data occur in the US. 
+# # http://eriqande.github.io/rep-res-web/lectures/making-maps-with-R.html
+# ################################################################################
+# FINN_fires <- FPA_FOD[FPA_FOD$n_FINN > 0, ] 
+# 
+# states <- map_data("state")
+# P <- ggplot() + geom_polygon(data = states, aes(x=long, y = lat, group = group),
+#                         fill = NA, color = lightningCol) + 
+#   coord_fixed(1.3)+ # fixes the relationship between one unit in the y direction and one unit in the x direction.
+#   theme_tufte(ticks=T, base_size = 20)+
+#   geom_point(data = FINN_fires, aes(x = LONGITUDE, y = LATITUDE, 
+#                                   color = fire_cause, size = FIRE_SIZE)
+#              #shape=fire_cause)
+#   )+
+#   scale_colour_manual(values = c("Lightning"=lightningCol, "Human"=humanCol, "Unknown"=unknownCol))
+# 
+# 
+# png(filename=paste0(figureDir, "FPA_FOD_paired_wFINN_fires_mapped.png"), res=100, 
+#     width=2000, height=1200)
+# print(P)
+# dev.off()  
 
 ################################################################################
 # Plot the locations of FINN fires that have been paired with FPA FOD and 
