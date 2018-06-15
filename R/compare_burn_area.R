@@ -4,12 +4,14 @@
 # sister function for spatial component is called Python/compare_burn_area_maps.py
 
 # What region are you investigating? 
-minLat <- 31
+minLat <- 25
 maxLat <- 49
 minLon <- -125
-maxLon <- -100
+maxLon <- -65
 
-includedMonths <- 5:10
+region <- "CONUS" # "western_US"
+
+includedMonths <- 1:12
 
 # for labelling files
 monthSpan <- paste0("months_",min(includedMonths), "_", max(includedMonths))
@@ -18,6 +20,7 @@ library(ncdf4)
 library(ggplot2)
 library(fields)
 library(RColorBrewer)
+library(stringr)
 
 # Load ecoregions spatial shapes
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
@@ -243,8 +246,6 @@ for (i in 1:length(YYYYMM)){
 # ----------------------------- mapTimespanSum ---------------------------------
 # Plot total burn area for each! Over the whole time period! Show ecoregion
 # perimeters? No, totals in each ecoregion! 
-
-
 GFED_BA_flip_total <- apply(GFED_BA_flip, 2:3, sum, na.rm=T)
 FPA_BA_flip_total  <- apply(FPA_BA_NA_flip, 2:3, sum, na.rm=T)
 
@@ -257,14 +258,30 @@ eco_6.2 <- SPDF[eco_mask,]
 
 quartz(width=10, height=5)
 
-png(filename="Figures/burn_area_comparison/summary/maps/western_US_2003_2013_burn_area.png", 
-    res=200,
-    width=3500, 
-    height=1500)
+#------------------------------------------------------------------------------#
+figureDir <- "Figures/burn_area_comparison/summary/maps/"
 
-par(mfrow=c(1,2), las=1, mar=c(4,4,4,9))
+if(region=="CONUS"){
+  
+  width <- 5500*0.8 
+  height <- 6000*.8
+  res <- 200
+  png(filename=paste0(figureDir, region, "_2003_2013_burn_area.png"), 
+      res=res,
+      width=width, 
+      height=height)
+  par(mfrow=c(2,1), las=1, mar=c(4,4,4,16))
+} else{
+  width <- 3500
+  height <- 1500
+  res <- 200
+  png(filename=paste0(figureDir, region, "_2003_2013_burn_area.png"), 
+      res=res,
+      width=width, 
+      height=height)
+  par(mfrow=c(1,2), las=1, mar=c(4,4,4,9))
 
-# TODO: Add ecoregions? 
+}
 
 # Label the legend. Span the orders of magnitude needed. 
 x <- -2:6
@@ -280,11 +297,13 @@ image.plot(lonSubset, latSubset_flip, log10(GFED_BA_flip_total),
            cex.axis=1.5,
            xaxt="n",
            yaxt="n",
-           bty="n"
+           bty="n",
+           horizontal = T
            )
-map("state", add=T, lty=1)
+map("state", add=T, lty=1, lwd=2)
+
 #plot(eco_6.2, add=T, border="black", lwd=3)
-title(paste("GFED4s burn area 2003-2013"))
+title(paste("GFED4s cumulative burn burn area (acres) 2003 to 2013"), cex.main=3)
 
 image.plot(lonSubset, latSubset_flip, log10(FPA_BA_flip_total), 
            zlim=c(-2, 6),
@@ -296,12 +315,12 @@ image.plot(lonSubset, latSubset_flip, log10(FPA_BA_flip_total),
            cex.axis=1.5,
            xaxt="n",
            yaxt="n",
-           bty="n"
+           bty="n",
+           horizontal = T
            )
 map("state", add=T, lty=1)
 #plot(eco_6.2, add=T, border="black", lwd=3)
-title(paste("FPA-FOD burn area 2003-2013"))
-
+title(paste("FPA-FOD cumulative burn area (acres) 2003 to 2013"), cex.main=3)
 
 dev.off()
 
