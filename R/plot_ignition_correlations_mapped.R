@@ -14,14 +14,14 @@ library(maptools)
 # Load the ecoregion spatial polygons into the work space
 load("Data/GIS/na_cec_eco_l2/na_cec_eco_level_2.RData")
 
-# Assign human and lightning burn area correlations
+# Assign human and lightning ignition burn area correlations
 # TODO: Do this dynamically for all ecoregions with FPA FOD wildfires occuring.
 # TODO: Currently these numbers have been hard coded by looking at the figures
-# TODO: that show the pearson r values for these burn area quantities by ecoregion,
+# TODO: that show the spearman r values for these burn area quantities by ecoregion,
 # TODO: Those correlations are calculated and plotted by R/plot_interannual_variability.
 # TODO: The numbers typed in the arrays below were taken from the table of correlations
 # TODO: in the SI and typed in here on 4/18/2018. 
-ecoregion             <- c(6.2, 10.1, 11.1, 8.3, 8.4, 8.5, 15.4)
+ecoregion             <- c(6.2,  10.1, 11.1, 8.3,  8.4,  8.5,  15.4)
 ignition_correlations <- c(0.79, 0.83, 0.19, 0.51, 0.67, 0.66, 0.3)
 
 # Figure out where the ecoregions listed above live in the array of ecoregions 
